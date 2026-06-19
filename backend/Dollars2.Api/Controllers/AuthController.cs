@@ -5,9 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Dollars2.Api.Controllers;
 
-[ApiController]
 [Route("api/auth")]
-public class AuthController : ControllerBase
+public class AuthController : DollarsControllerBase
 {
     private readonly AuthService _authService;
 

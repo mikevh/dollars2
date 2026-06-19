@@ -1,5 +1,5 @@
-using System.Data;
 using System.Text;
+using Dollars2.Api.Data;
 using Dollars2.Api.Repositories;
 using Dollars2.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -11,11 +11,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-builder.Services.AddScoped<IDbConnection>(_ =>
-    new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped(sp =>
+    new DbSession(new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"))));
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<RefreshTokenRepository>();
+builder.Services.AddScoped<BudgetRepository>();
+builder.Services.AddScoped<BudgetGroupRepository>();
+builder.Services.AddScoped<LineItemRepository>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<BudgetService>();
 
 var frontendUrl = builder.Configuration["Cors:FrontendUrl"]
     ?? throw new InvalidOperationException("Cors:FrontendUrl is not configured.");

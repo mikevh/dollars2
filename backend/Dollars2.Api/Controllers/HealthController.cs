@@ -4,14 +4,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Dollars2.Api.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-public class HealthController : ControllerBase
+public class HealthController : DollarsControllerBase
 {
     [HttpGet]
     [AllowAnonymous]
     public IActionResult Get()
     {
-        return Ok(ApiResponse<object>.Success(new { status = "healthy", timestamp = DateTime.UtcNow }));
+        return Ok(DollarsApiResponse<object>.Success(new { status = "healthy", timestamp = DateTime.UtcNow }));
     }
 }
