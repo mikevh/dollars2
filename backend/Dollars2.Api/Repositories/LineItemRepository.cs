@@ -68,4 +68,17 @@ public class LineItemRepository
             new { GroupId = groupId },
             _db.CurrentTransaction);
     }
+
+    public async Task<bool> IsOwnedByUserAsync(int lineItemId, int userId)
+    {
+        return await _db.Connection.QuerySingleAsync<bool>(
+            @"SELECT CASE WHEN EXISTS (
+                SELECT 1 FROM LineItems li
+                INNER JOIN BudgetGroups bg ON bg.Id = li.GroupId
+                INNER JOIN Budgets b ON b.Id = bg.BudgetId
+                WHERE li.Id = @LineItemId AND b.UserId = @UserId
+              ) THEN 1 ELSE 0 END",
+            new { LineItemId = lineItemId, UserId = userId },
+            _db.CurrentTransaction);
+    }
 }

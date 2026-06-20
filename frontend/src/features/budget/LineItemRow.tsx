@@ -27,11 +27,9 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
     }
   }, [startEditing])
 
-  const received = 0
-  const spent = 0
   const remaining = isIncome
-    ? lineItem.plannedAmount - received
-    : lineItem.plannedAmount - spent
+    ? lineItem.plannedAmount - lineItem.receivedAmount
+    : lineItem.plannedAmount - lineItem.spentAmount
 
   const saveUpdate = async (name: string, plannedAmount: number) => {
     if (name === lineItem.name && plannedAmount === lineItem.plannedAmount) {
@@ -141,7 +139,7 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
           </span>
         )}
         <span className="w-24 border border-transparent px-2 py-0.5 text-right text-gray-500 dark:text-gray-400">
-          {formatCurrency(isIncome ? received : spent)}
+          {formatCurrency(isIncome ? lineItem.receivedAmount : lineItem.spentAmount)}
         </span>
         <span className={`w-24 border border-transparent px-2 py-0.5 text-right ${remaining < 0 ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
           {formatCurrency(remaining)}

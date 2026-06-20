@@ -10,13 +10,15 @@ public class BudgetService
     private readonly BudgetRepository _budgetRepo;
     private readonly BudgetGroupRepository _groupRepo;
     private readonly LineItemRepository _lineItemRepo;
+    private readonly TransactionAssignmentRepository _assignmentRepo;
 
-    public BudgetService(DbSession dbSession, BudgetRepository budgetRepo, BudgetGroupRepository groupRepo, LineItemRepository lineItemRepo)
+    public BudgetService(DbSession dbSession, BudgetRepository budgetRepo, BudgetGroupRepository groupRepo, LineItemRepository lineItemRepo, TransactionAssignmentRepository assignmentRepo)
     {
         _dbSession = dbSession;
         _budgetRepo = budgetRepo;
         _groupRepo = groupRepo;
         _lineItemRepo = lineItemRepo;
+        _assignmentRepo = assignmentRepo;
     }
 
     public async Task<DollarsApiResponse<BudgetResponse>> GetBudgetAsync(int userId, int year, int month)
@@ -122,13 +124,18 @@ public class BudgetService
         group.Name = name;
 
         var lineItems = await _lineItemRepo.GetByGroupIdAsync(id);
+        var lineItemResponses = new List<LineItemResponse>();
+        foreach (var item in lineItems)
+        {
+            lineItemResponses.Add(await MapLineItemAsync(item));
+        }
         return DollarsApiResponse<BudgetGroupResponse>.Success(new BudgetGroupResponse
         {
             Id = group.Id,
             Name = group.Name,
             IsIncome = group.IsIncome,
             SortOrder = group.SortOrder,
-            LineItems = lineItems.Select(MapLineItem).ToList()
+            LineItems = lineItemResponses
         });
     }
 
@@ -209,7 +216,7 @@ public class BudgetService
         var itemId = await _lineItemRepo.CreateAsync(groupId, name, plannedAmount, maxSort + 1);
         var item = (await _lineItemRepo.GetByIdAsync(itemId))!;
 
-        return DollarsApiResponse<LineItemResponse>.Success(MapLineItem(item));
+        return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item));
     }
 
     public async Task<DollarsApiResponse<LineItemResponse>> UpdateLineItemAsync(int id, string name, decimal plannedAmount, int userId)
@@ -229,7 +236,7 @@ public class BudgetService
         item.Name = name;
         item.PlannedAmount = plannedAmount;
 
-        return DollarsApiResponse<LineItemResponse>.Success(MapLineItem(item));
+        return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item));
     }
 
     public async Task<DollarsApiResponse<bool>> DeleteLineItemAsync(int id, int userId)
@@ -296,13 +303,18 @@ public class BudgetService
         foreach (var group in groups)
         {
             var lineItems = await _lineItemRepo.GetByGroupIdAsync(group.Id);
+            var lineItemResponses = new List<LineItemResponse>();
+            foreach (var item in lineItems)
+            {
+                lineItemResponses.Add(await MapLineItemAsync(item));
+            }
             groupResponses.Add(new BudgetGroupResponse
             {
                 Id = group.Id,
                 Name = group.Name,
                 IsIncome = group.IsIncome,
                 SortOrder = group.SortOrder,
-                LineItems = lineItems.Select(MapLineItem).ToList()
+                LineItems = lineItemResponses
             });
         }
 
@@ -357,12 +369,19 @@ public class BudgetService
         return await VerifyGroupOwnershipAsync(group, userId);
     }
 
-    private static LineItemResponse MapLineItem(LineItem item) => new()
+    private async Task<LineItemResponse> MapLineItemAsync(LineItem item)
     {
-        Id = item.Id,
-        Name = item.Name,
-        PlannedAmount = item.PlannedAmount,
-        SortOrder = item.SortOrder,
-        Notes = item.Notes
-    };
+        var spent = await _assignmentRepo.GetSpentByLineItemIdAsync(item.Id);
+        var received = await _assignmentRepo.GetReceivedByLineItemIdAsync(item.Id);
+        return new LineItemResponse
+        {
+            Id = item.Id,
+            Name = item.Name,
+            PlannedAmount = item.PlannedAmount,
+            SpentAmount = Math.Abs(spent),
+            ReceivedAmount = received,
+            SortOrder = item.SortOrder,
+            Notes = item.Notes
+        };
+    }
 }

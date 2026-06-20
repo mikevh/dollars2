@@ -17,6 +17,8 @@ export interface LineItemResponse {
   id: number
   name: string
   plannedAmount: number
+  spentAmount: number
+  receivedAmount: number
   sortOrder: number
   notes: string | null
 }

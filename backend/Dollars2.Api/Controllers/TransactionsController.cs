@@ -94,4 +94,26 @@ public class TransactionsController : DollarsControllerBase
         }
         return Ok(result);
     }
+
+    [HttpPost("{id}/assign")]
+    public async Task<IActionResult> Assign(int id, [FromBody] AssignTransactionRequest request)
+    {
+        var result = await _transactionService.AssignAsync(id, request.LineItemId, GetUserId());
+        if (result.Error is not null)
+        {
+            return BadRequest(result);
+        }
+        return Ok(result);
+    }
+
+    [HttpPost("{id}/unassign")]
+    public async Task<IActionResult> Unassign(int id)
+    {
+        var result = await _transactionService.UnassignAsync(id, GetUserId());
+        if (result.Error is not null)
+        {
+            return BadRequest(result);
+        }
+        return Ok(result);
+    }
 }

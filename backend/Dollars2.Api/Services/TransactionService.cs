@@ -169,6 +169,55 @@ public class TransactionService
         return DollarsApiResponse<bool>.Success(true);
     }
 
+    public async Task<DollarsApiResponse<TransactionResponse>> AssignAsync(int id, int lineItemId, int userId)
+    {
+        var transaction = await _transactionRepo.GetByIdAsync(id);
+        if (transaction is null || transaction.UserId != userId)
+        {
+            return DollarsApiResponse<TransactionResponse>.Fail("Transaction not found.", "TRANSACTION_NOT_FOUND");
+        }
+
+        if (transaction.IsDeleted)
+        {
+            return DollarsApiResponse<TransactionResponse>.Fail("Cannot assign a deleted transaction.", "TRANSACTION_DELETED");
+        }
+
+        var existing = await _assignmentRepo.GetByTransactionIdAsync(id);
+        if (existing.Any())
+        {
+            return DollarsApiResponse<TransactionResponse>.Fail("Transaction is already assigned. Unassign first.", "ALREADY_ASSIGNED");
+        }
+
+        var lineItem = await _lineItemRepo.GetByIdAsync(lineItemId);
+        if (lineItem is null || !await _lineItemRepo.IsOwnedByUserAsync(lineItemId, userId))
+        {
+            return DollarsApiResponse<TransactionResponse>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
+        }
+
+        await _assignmentRepo.CreateAsync(id, lineItemId, transaction.Amount);
+        transaction = (await _transactionRepo.GetByIdAsync(id))!;
+        return DollarsApiResponse<TransactionResponse>.Success(await BuildResponseAsync(transaction));
+    }
+
+    public async Task<DollarsApiResponse<TransactionResponse>> UnassignAsync(int id, int userId)
+    {
+        var transaction = await _transactionRepo.GetByIdAsync(id);
+        if (transaction is null || transaction.UserId != userId)
+        {
+            return DollarsApiResponse<TransactionResponse>.Fail("Transaction not found.", "TRANSACTION_NOT_FOUND");
+        }
+
+        var existing = await _assignmentRepo.GetByTransactionIdAsync(id);
+        if (!existing.Any())
+        {
+            return DollarsApiResponse<TransactionResponse>.Fail("Transaction is not assigned.", "NOT_ASSIGNED");
+        }
+
+        await _assignmentRepo.DeleteByTransactionIdAsync(id);
+        transaction = (await _transactionRepo.GetByIdAsync(id))!;
+        return DollarsApiResponse<TransactionResponse>.Success(await BuildResponseAsync(transaction));
+    }
+
     private async Task<TransactionResponse> BuildResponseAsync(Transaction t)
     {
         var assignments = await _assignmentRepo.GetByTransactionIdAsync(t.Id);
