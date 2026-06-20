@@ -39,6 +39,14 @@ public class TransactionAssignmentRepository
             _db.CurrentTransaction);
     }
 
+    public async Task DeleteByLineItemIdAsync(int lineItemId)
+    {
+        await _db.Connection.ExecuteAsync(
+            "DELETE FROM TransactionAssignments WHERE LineItemId = @LineItemId",
+            new { LineItemId = lineItemId },
+            _db.CurrentTransaction);
+    }
+
     public async Task DeleteByTransactionIdAsync(int transactionId)
     {
         await _db.Connection.ExecuteAsync(

@@ -182,19 +182,31 @@ public class TransactionService
             return DollarsApiResponse<TransactionResponse>.Fail("Cannot assign a deleted transaction.", "TRANSACTION_DELETED");
         }
 
-        var existing = await _assignmentRepo.GetByTransactionIdAsync(id);
-        if (existing.Any())
-        {
-            return DollarsApiResponse<TransactionResponse>.Fail("Transaction is already assigned. Unassign first.", "ALREADY_ASSIGNED");
-        }
-
         var lineItem = await _lineItemRepo.GetByIdAsync(lineItemId);
         if (lineItem is null || !await _lineItemRepo.IsOwnedByUserAsync(lineItemId, userId))
         {
             return DollarsApiResponse<TransactionResponse>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
         }
 
-        await _assignmentRepo.CreateAsync(id, lineItemId, transaction.Amount);
+        _dbSession.BeginTransaction();
+        try
+        {
+            var existing = await _assignmentRepo.GetByTransactionIdAsync(id);
+            if (existing.Any())
+            {
+                _dbSession.Rollback();
+                return DollarsApiResponse<TransactionResponse>.Fail("Transaction is already assigned. Unassign first.", "ALREADY_ASSIGNED");
+            }
+
+            await _assignmentRepo.CreateAsync(id, lineItemId, transaction.Amount);
+            _dbSession.Commit();
+        }
+        catch
+        {
+            _dbSession.Rollback();
+            throw;
+        }
+
         transaction = (await _transactionRepo.GetByIdAsync(id))!;
         return DollarsApiResponse<TransactionResponse>.Success(await BuildResponseAsync(transaction));
     }

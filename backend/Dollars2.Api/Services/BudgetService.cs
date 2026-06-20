@@ -252,7 +252,19 @@ public class BudgetService
             return DollarsApiResponse<bool>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
         }
 
-        await _lineItemRepo.DeleteAsync(id);
+        _dbSession.BeginTransaction();
+        try
+        {
+            await _assignmentRepo.DeleteByLineItemIdAsync(id);
+            await _lineItemRepo.DeleteAsync(id);
+            _dbSession.Commit();
+        }
+        catch
+        {
+            _dbSession.Rollback();
+            throw;
+        }
+
         return DollarsApiResponse<bool>.Success(true);
     }
 
