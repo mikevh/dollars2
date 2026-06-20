@@ -32,6 +32,12 @@ public class BudgetService
 
     public async Task<DollarsApiResponse<BudgetResponse>> CreateBudgetAsync(int userId, int year, int month)
     {
+        var now = DateTime.UtcNow;
+        if (year < now.Year || (year == now.Year && month < now.Month))
+        {
+            return DollarsApiResponse<BudgetResponse>.Fail("Cannot create a budget for a past month.", "PAST_MONTH");
+        }
+
         var existing = await _budgetRepo.GetByMonthAsync(userId, year, month);
         if (existing is not null)
         {
@@ -39,7 +45,7 @@ public class BudgetService
         }
 
         var previous = await _budgetRepo.GetPreviousAsync(userId, year, month);
-        if (previous is null && !(year == DateTime.UtcNow.Year && month == DateTime.UtcNow.Month))
+        if (previous is null && !(year == now.Year && month == now.Month))
         {
             var prevYear = month == 1 ? year - 1 : year;
             var prevMonth = month == 1 ? 12 : month - 1;

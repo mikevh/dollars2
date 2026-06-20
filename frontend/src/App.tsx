@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast'
 import { useAppSelector } from './app/hooks'
 import { useTheme } from './features/theme/useTheme'
 import LoginPage from './pages/LoginPage'
+import BudgetPage from './pages/BudgetPage'
 import Footer from './components/Footer'
 
 function App() {
@@ -17,9 +18,7 @@ function App() {
           path="/"
           element={
             isAuthenticated ? (
-              <div className="min-h-screen bg-gray-50 pb-12 dark:bg-gray-900">
-                <div className="p-4 text-lg text-gray-900 dark:text-white">Dollars2</div>
-              </div>
+              <BudgetPage />
             ) : (
               <Navigate to="/login" replace />
             )
