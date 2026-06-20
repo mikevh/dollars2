@@ -18,8 +18,12 @@ builder.Services.AddScoped<RefreshTokenRepository>();
 builder.Services.AddScoped<BudgetRepository>();
 builder.Services.AddScoped<BudgetGroupRepository>();
 builder.Services.AddScoped<LineItemRepository>();
+builder.Services.AddScoped<AccountRepository>();
+builder.Services.AddScoped<TransactionRepository>();
+builder.Services.AddScoped<TransactionAssignmentRepository>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<BudgetService>();
+builder.Services.AddScoped<TransactionService>();
 
 var frontendUrl = builder.Configuration["Cors:FrontendUrl"]
     ?? throw new InvalidOperationException("Cors:FrontendUrl is not configured.");

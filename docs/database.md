@@ -90,7 +90,8 @@ Unique constraint: (UserId, Year, Month)
 | Column | Type | Notes |
 |--------|------|-------|
 | Id | int | PK, identity |
-| AccountId | int | FK → Accounts |
+| UserId | int | FK → Users |
+| AccountId | int | FK → Accounts, null for manual |
 | ProviderTransactionId | nvarchar(500) | null for manual |
 | Date | date | |
 | Description | nvarchar(500) | |

@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { fetchBudget, createBudget } from '../features/budget/budgetSlice'
 import MonthNav from '../features/budget/MonthNav'
 import BudgetPane from '../features/budget/BudgetPane'
+import TransactionPane from '../features/transactions/TransactionPane'
 
 export default function BudgetPage() {
   const dispatch = useAppDispatch()
@@ -28,34 +29,42 @@ export default function BudgetPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16 dark:bg-gray-900">
-      <div className="mx-auto max-w-2xl px-4">
+      <div className="mx-auto max-w-6xl px-4">
         <MonthNav />
 
-        {loading && (
-          <div className="py-12 text-center text-gray-500 dark:text-gray-400">Loading...</div>
-        )}
-
-        {!loading && error === 'BUDGET_NOT_FOUND' && (
-          <div className="py-12 text-center">
-            <p className="mb-4 text-gray-500 dark:text-gray-400">
-              No budget for this month.
-            </p>
-            {!isPastMonth && (
-              <button
-                onClick={handleCreateBudget}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Create Budget
-              </button>
+        <div className="flex gap-6">
+          <div className="flex-1">
+            {loading && (
+              <div className="py-12 text-center text-gray-500 dark:text-gray-400">Loading...</div>
             )}
+
+            {!loading && error === 'BUDGET_NOT_FOUND' && (
+              <div className="py-12 text-center">
+                <p className="mb-4 text-gray-500 dark:text-gray-400">
+                  No budget for this month.
+                </p>
+                {!isPastMonth && (
+                  <button
+                    onClick={handleCreateBudget}
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    Create Budget
+                  </button>
+                )}
+              </div>
+            )}
+
+            {!loading && error && error !== 'BUDGET_NOT_FOUND' && (
+              <div className="py-12 text-center text-red-500">{error}</div>
+            )}
+
+            {!loading && budget && <BudgetPane budget={budget} />}
           </div>
-        )}
 
-        {!loading && error && error !== 'BUDGET_NOT_FOUND' && (
-          <div className="py-12 text-center text-red-500">{error}</div>
-        )}
-
-        {!loading && budget && <BudgetPane budget={budget} />}
+          <div className="w-96 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <TransactionPane />
+          </div>
+        </div>
       </div>
     </div>
   )
