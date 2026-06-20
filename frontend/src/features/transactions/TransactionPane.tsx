@@ -116,6 +116,7 @@ export default function TransactionPane() {
           <TransactionRow
             key={t.id}
             transaction={t}
+            draggable={activeTab === 'new'}
             actions={
               <>
                 {activeTab === 'new' && (

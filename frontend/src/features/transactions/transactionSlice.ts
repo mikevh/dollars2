@@ -106,6 +106,17 @@ export const hardDeleteTransaction = createAsyncThunk(
   }
 )
 
+export const assignTransaction = createAsyncThunk(
+  'transactions/assign',
+  async ({ id, lineItemId }: { id: number; lineItemId: number }, { rejectWithValue }) => {
+    const result = await api.post<TransactionResponse>(`/api/transactions/${id}/assign`, { lineItemId })
+    if (result.error) {
+      return rejectWithValue(result.error.message)
+    }
+    return id
+  }
+)
+
 const pending = (state: TransactionState) => {
   state.loading = true
   state.error = null
@@ -153,6 +164,9 @@ const transactionSlice = createSlice({
         state.transactions = state.transactions.filter((t) => t.id !== action.payload)
       })
       .addCase(hardDeleteTransaction.fulfilled, (state, action) => {
+        state.transactions = state.transactions.filter((t) => t.id !== action.payload)
+      })
+      .addCase(assignTransaction.fulfilled, (state, action) => {
         state.transactions = state.transactions.filter((t) => t.id !== action.payload)
       })
   },

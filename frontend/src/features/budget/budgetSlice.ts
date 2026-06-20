@@ -128,6 +128,22 @@ const budgetSlice = createSlice({
         state.currentMonth -= 1
       }
     },
+    applyTransactionAssignment(state, action: { payload: { lineItemId: number; amount: number } }) {
+      if (!state.budget) {
+        return
+      }
+      for (const group of state.budget.groups) {
+        const lineItem = group.lineItems.find((li) => li.id === action.payload.lineItemId)
+        if (lineItem) {
+          if (action.payload.amount < 0) {
+            lineItem.spentAmount += Math.abs(action.payload.amount)
+          } else {
+            lineItem.receivedAmount += action.payload.amount
+          }
+          break
+        }
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -204,5 +220,5 @@ const budgetSlice = createSlice({
   },
 })
 
-export const { nextMonth, prevMonth } = budgetSlice.actions
+export const { nextMonth, prevMonth, applyTransactionAssignment } = budgetSlice.actions
 export default budgetSlice.reducer

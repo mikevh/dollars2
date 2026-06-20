@@ -1,16 +1,30 @@
+import { useDraggable } from '@dnd-kit/core'
 import type { TransactionResponse } from '../../types/transaction'
 import { formatCurrency } from '../../utils/format'
 
 interface TransactionRowProps {
   transaction: TransactionResponse
   actions?: React.ReactNode
+  draggable?: boolean
 }
 
-export default function TransactionRow({ transaction, actions }: TransactionRowProps) {
+export default function TransactionRow({ transaction, actions, draggable }: TransactionRowProps) {
   const isIncome = transaction.amount > 0
 
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `transaction-${transaction.id}`,
+    data: { transaction },
+    disabled: !draggable,
+  })
+
   return (
-    <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2 last:border-b-0 dark:border-gray-700">
+    <div
+      ref={setNodeRef}
+      {...(draggable ? { ...listeners, ...attributes } : {})}
+      className={`flex items-center justify-between border-b border-gray-100 px-4 py-2 last:border-b-0 dark:border-gray-700 ${
+        draggable ? 'cursor-grab active:cursor-grabbing' : ''
+      } ${isDragging ? 'opacity-50' : ''}`}
+    >
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm text-gray-900 dark:text-white">{transaction.description}</div>
         <div className="flex gap-2 text-xs text-gray-400 dark:text-gray-500">

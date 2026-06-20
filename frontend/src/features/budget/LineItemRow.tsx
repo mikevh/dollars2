@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
+import { useDroppable } from '@dnd-kit/core'
 import type { LineItemResponse } from '../../types/budget'
 import { formatCurrency } from '../../utils/format'
 import { useAppDispatch } from '../../app/hooks'
@@ -15,6 +16,10 @@ interface LineItemRowProps {
 
 export default function LineItemRow({ lineItem, groupId, isIncome, startEditing, onEditComplete }: LineItemRowProps) {
   const dispatch = useAppDispatch()
+  const { isOver, setNodeRef } = useDroppable({
+    id: `lineitem-${lineItem.id}`,
+    data: { lineItemId: lineItem.id },
+  })
   const [editingName, setEditingName] = useState(false)
   const [editingAmount, setEditingAmount] = useState(false)
   const [nameValue, setNameValue] = useState(lineItem.name)
@@ -73,7 +78,12 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
   }
 
   return (
-    <div className="flex h-10 items-center justify-between border-b border-gray-100 px-4 last:border-b-0 dark:border-gray-700">
+    <div
+      ref={setNodeRef}
+      className={`flex h-10 items-center justify-between border-b border-gray-100 px-4 last:border-b-0 dark:border-gray-700 ${
+        isOver ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+      }`}
+    >
       <div className="flex items-center gap-2">
         {editingName ? (
           <input
