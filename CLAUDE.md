@@ -1,0 +1,79 @@
+# Dollars2
+
+Zero-based budgeting web app (EveryDollar clone). Self-hosted, multi-user with separate data per user.
+
+## Tech Stack
+
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS v4, Redux Toolkit, dnd-kit v6, react-hot-toast
+- **Backend:** .NET 10, ASP.NET Core Web API, Dapper, raw SQL
+- **Database:** MSSQL, raw SQL migrations (numbered, tracking table)
+- **Auth:** Email-only login (v1), JWT 30-day + refresh tokens
+
+## Project Structure
+
+```
+frontend/          React app (Vite)
+backend/           .NET 10 Web API (single project: Dollars2.Api)
+docs/              Specs (backend.md, frontend.md, database.md)
+```
+
+## Conventions
+
+- Always use curly braces on conditional/loop statements, even single-line bodies
+- Any API calls with multiple DB mutating calls must be wrapped in a DbSession transaction
+- JWT secret and SQL connection string stored in dotnet user-secrets, NOT appsettings.json (placeholders: `<dotnet user secret>`)
+- Backend envelope response pattern: `DollarsApiResponse<T>` with `{ data, error }` — both fields always present
+- Business rule violations return error results, not exceptions
+- Frontend: fetch API into Redux thunks (no Axios, no React Query), toast for errors
+- Inline editing pattern: click to edit, Enter/blur saves, Escape cancels
+- `onMouseDown preventDefault` on action buttons adjacent to inputs (prevents blur from hiding buttons before click)
+- Fixed height rows (`h-10`) with `border border-transparent px-2 py-0.5` on spans to match input dimensions
+- Migration scripts use `ScriptName` column (not `Name`) in the Migrations table
+- Migrations 006+ have `IF NOT EXISTS` idempotency guards
+
+## Development
+
+```bash
+# Frontend
+cd frontend && npm run dev
+
+# Backend
+cd backend/Dollars2.Api && dotnet run
+
+# Type check
+cd frontend && npx tsc --noEmit
+
+# Backend build
+cd backend/Dollars2.Api && dotnet build
+```
+
+## Sprint Approach
+
+- Break work into the smallest possible increments, one concern per sprint
+- Interview for specs, verify decisions explicitly
+- Code review uncommitted changes before committing
+
+## Code Review Backlog (2026-06-19)
+
+Critical items (1-5) were fixed in commit e1d84ba. Remaining:
+
+### Medium
+- Reorder endpoints accept partial ID lists — need `ids.Length != validIds.Count` check
+- Tracked transactions don't re-fetch on month change — useEffect missing currentYear/currentMonth deps
+- Transaction request models lack `[Required]`/`[Range]` validation attributes
+- No index on RefreshToken.Token column
+- Refresh token expiry double-stacks (JWT 30d + 30d = 60d) — needs own config
+- `DollarsControllerBase.UserId` uses null-forgiving `!` — should return 401 on missing claim
+- Unused npm packages: `@dnd-kit/sortable`, `@dnd-kit/utilities`
+- `GETUTCDATE()` vs `SYSUTCDATETIME()` inconsistency across repos
+
+### Low
+- Early migrations (000-005) lack `IF NOT EXISTS` guards
+- Several repos use `SELECT *` instead of explicit columns
+- `new Date()` in frontend components stale if left open overnight
+- N+1 queries in `BuildBudgetResponseAsync` (has TODO)
+- No rate limiting on auth endpoints (v1 tradeoff)
+
+## Out of Scope (v1)
+
+Transfers, account management UI, passkeys, open registration, auto-categorization, debt tracking, shared budgets, reporting/charts, mobile, CSV import/export, recurring transactions
