@@ -1,9 +1,4 @@
----
-name: out-of-scope
-description: Explicitly excluded features for v1
-metadata:
-  type: project
----
+# Out of Scope
 
 ## Deferred to Later Versions
 

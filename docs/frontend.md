@@ -1,9 +1,4 @@
----
-name: frontend
-description: React/TypeScript frontend spec — Vite, Redux, Tailwind, dnd-kit, all UI details
-metadata:
-  type: project
----
+# Frontend
 
 ## Stack
 

@@ -1,9 +1,4 @@
----
-name: transaction-handling
-description: Transactions via Plaid, SimpleFIN, and manual entry; inbox with drag-and-drop, splits, soft-delete
-metadata:
-  type: project
----
+# Transaction Handling
 
 ## Bank Sync
 

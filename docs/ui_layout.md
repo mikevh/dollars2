@@ -1,9 +1,4 @@
----
-name: ui-layout
-description: Budget view (left) with transaction pane (right), tabbed inbox, line item activity, month nav
-metadata:
-  type: project
----
+# UI Layout
 
 ## General
 

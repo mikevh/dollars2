@@ -1,9 +1,4 @@
----
-name: tech-stack
-description: React/Tailwind frontend, .NET backend, MSSQL database, self-hosted deployment
-metadata:
-  type: project
----
+# Tech Stack
 
 - **Frontend:** React with Tailwind CSS
 - **Backend:** .NET

@@ -1,9 +1,4 @@
----
-name: budget-structure
-description: Monthly zero-based budgets with groups, line items, rollover balances, and template copying
-metadata:
-  type: project
----
+# Budget Structure
 
 ## Monthly Budget
 

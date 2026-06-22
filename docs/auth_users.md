@@ -1,9 +1,4 @@
----
-name: auth-users
-description: Email-only auth (v1), JWT with refresh tokens, multi-user with separate budgets
-metadata:
-  type: project
----
+# Authentication & Users
 
 ## V1 Authentication
 

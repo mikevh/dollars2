@@ -1,9 +1,4 @@
----
-name: accounts
-description: Per-user bank accounts stored in DB with JSON connection details for Plaid/SimpleFIN
-metadata:
-  type: project
----
+# Accounts
 
 ## Account Storage
 

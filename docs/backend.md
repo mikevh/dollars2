@@ -1,9 +1,4 @@
----
-name: backend
-description: .NET 10 Web API spec — architecture, endpoints, sync, auth, database
-metadata:
-  type: project
----
+# Backend
 
 ## Stack
 

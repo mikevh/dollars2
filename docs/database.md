@@ -1,9 +1,4 @@
----
-name: database
-description: MSSQL schema — tables, columns, types, constraints, relationships
-metadata:
-  type: project
----
+# Database Schema
 
 ## Conventions
 
