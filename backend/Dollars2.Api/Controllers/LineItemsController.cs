@@ -10,10 +10,23 @@ namespace Dollars2.Api.Controllers;
 public class LineItemsController : DollarsControllerBase
 {
     private readonly BudgetService _budgetService;
+    private readonly TransactionService _transactionService;
 
-    public LineItemsController(BudgetService budgetService)
+    public LineItemsController(BudgetService budgetService, TransactionService transactionService)
     {
         _budgetService = budgetService;
+        _transactionService = transactionService;
+    }
+
+    [HttpGet("{lineItemId}/activity")]
+    public async Task<IActionResult> GetActivity(int lineItemId)
+    {
+        var result = await _transactionService.GetByLineItemAsync(lineItemId, GetUserId());
+        if (result.Error is not null)
+        {
+            return BadRequest(result);
+        }
+        return Ok(result);
     }
 
     [HttpPut("{lineItemId}")]

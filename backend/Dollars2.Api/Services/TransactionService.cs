@@ -65,6 +65,22 @@ public class TransactionService
         return DollarsApiResponse<List<TransactionResponse>>.Success(responses);
     }
 
+    public async Task<DollarsApiResponse<List<TransactionResponse>>> GetByLineItemAsync(int lineItemId, int userId)
+    {
+        if (!await _lineItemRepo.IsOwnedByUserAsync(lineItemId, userId))
+        {
+            return DollarsApiResponse<List<TransactionResponse>>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
+        }
+
+        var transactions = await _transactionRepo.GetByLineItemIdAsync(lineItemId);
+        var responses = new List<TransactionResponse>();
+        foreach (var t in transactions)
+        {
+            responses.Add(await BuildResponseAsync(t));
+        }
+        return DollarsApiResponse<List<TransactionResponse>>.Success(responses);
+    }
+
     public async Task<DollarsApiResponse<TransactionResponse>> CreateAsync(int userId, DateTime date, string description, decimal amount, string? notes)
     {
         if (amount == 0)

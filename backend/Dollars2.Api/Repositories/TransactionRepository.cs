@@ -60,6 +60,17 @@ public class TransactionRepository
             _db.CurrentTransaction);
     }
 
+    public async Task<IEnumerable<Transaction>> GetByLineItemIdAsync(int lineItemId)
+    {
+        return await _db.Connection.QueryAsync<Transaction>(
+            @"SELECT t.* FROM Transactions t
+              INNER JOIN TransactionAssignments ta ON ta.TransactionId = t.Id
+              WHERE ta.LineItemId = @LineItemId AND t.IsDeleted = 0
+              ORDER BY t.Date DESC",
+            new { LineItemId = lineItemId },
+            _db.CurrentTransaction);
+    }
+
     public async Task<int> CreateAsync(int userId, DateTime date, string description, decimal amount, string? notes, bool isManual)
     {
         return await _db.Connection.QuerySingleAsync<int>(

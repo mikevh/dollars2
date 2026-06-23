@@ -7,9 +7,10 @@ import LineItemRow from './LineItemRow'
 
 interface BudgetGroupCardProps {
   group: BudgetGroupResponse
+  onSelectLineItem?: (lineItemId: number) => void
 }
 
-export default function BudgetGroupCard({ group }: BudgetGroupCardProps) {
+export default function BudgetGroupCard({ group, onSelectLineItem }: BudgetGroupCardProps) {
   const dispatch = useAppDispatch()
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(group.name)
@@ -118,6 +119,7 @@ export default function BudgetGroupCard({ group }: BudgetGroupCardProps) {
             isIncome={group.isIncome}
             startEditing={item.id === editingNewItemId}
             onEditComplete={() => setEditingNewItemId(null)}
+            onSelect={() => onSelectLineItem?.(item.id)}
           />
         ))
       )}

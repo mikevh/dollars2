@@ -7,6 +7,7 @@ import { fetchBudget, createBudget, applyTransactionAssignment } from '../featur
 import { assignTransaction } from '../features/transactions/transactionSlice'
 import MonthNav from '../features/budget/MonthNav'
 import BudgetPane from '../features/budget/BudgetPane'
+import ActivityPane from '../features/budget/ActivityPane'
 import TransactionPane from '../features/transactions/TransactionPane'
 import TransactionRow from '../features/transactions/TransactionRow'
 import type { TransactionResponse } from '../types/transaction'
@@ -17,6 +18,7 @@ export default function BudgetPage() {
     (state) => state.budget
   )
   const [draggingTransaction, setDraggingTransaction] = useState<TransactionResponse | null>(null)
+  const [selectedLineItemId, setSelectedLineItemId] = useState<number | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -27,6 +29,7 @@ export default function BudgetPage() {
     (currentYear === now.getFullYear() && currentMonth < now.getMonth() + 1)
 
   useEffect(() => {
+    setSelectedLineItemId(null)
     dispatch(fetchBudget({ year: currentYear, month: currentMonth }))
   }, [dispatch, currentYear, currentMonth])
 
@@ -36,6 +39,19 @@ export default function BudgetPage() {
       toast.error(result.payload as string)
     }
   }
+
+  const selectedLineItem = (() => {
+    if (!budget || !selectedLineItemId) {
+      return null
+    }
+    for (const group of budget.groups) {
+      const lineItem = group.lineItems.find((li) => li.id === selectedLineItemId)
+      if (lineItem) {
+        return { lineItem, isIncome: group.isIncome }
+      }
+    }
+    return null
+  })()
 
   const handleDragStart = (event: DragStartEvent) => {
     setDraggingTransaction(event.active.data.current?.transaction ?? null)
@@ -65,7 +81,7 @@ export default function BudgetPage() {
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="min-h-screen bg-gray-50 pb-16 dark:bg-gray-900">
+      <div className="min-h-screen bg-gray-50 pb-16 dark:bg-gray-900" onClick={() => setSelectedLineItemId(null)}>
         <div className="mx-auto max-w-6xl px-4">
           <MonthNav />
 
@@ -95,11 +111,19 @@ export default function BudgetPage() {
                 <div className="py-12 text-center text-red-500">{error}</div>
               )}
 
-              {!loading && budget && <BudgetPane budget={budget} />}
+              {!loading && budget && <BudgetPane budget={budget} onSelectLineItem={setSelectedLineItemId} />}
             </div>
 
-            <div className="w-96 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-              <TransactionPane />
+            <div className="w-96 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800" onClick={(e) => e.stopPropagation()}>
+              {selectedLineItem ? (
+                <ActivityPane
+                  lineItem={selectedLineItem.lineItem}
+                  isIncome={selectedLineItem.isIncome}
+                  onClose={() => setSelectedLineItemId(null)}
+                />
+              ) : (
+                <TransactionPane />
+              )}
             </div>
           </div>
         </div>

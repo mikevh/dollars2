@@ -12,9 +12,10 @@ interface LineItemRowProps {
   isIncome: boolean
   startEditing?: boolean
   onEditComplete?: () => void
+  onSelect?: () => void
 }
 
-export default function LineItemRow({ lineItem, groupId, isIncome, startEditing, onEditComplete }: LineItemRowProps) {
+export default function LineItemRow({ lineItem, groupId, isIncome, startEditing, onEditComplete, onSelect }: LineItemRowProps) {
   const dispatch = useAppDispatch()
   const { isOver, setNodeRef } = useDroppable({
     id: `lineitem-${lineItem.id}`,
@@ -80,7 +81,8 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
   return (
     <div
       ref={setNodeRef}
-      className={`flex h-10 items-center justify-between border-b border-gray-100 px-4 last:border-b-0 dark:border-gray-700 ${
+      onClick={(e) => { e.stopPropagation(); onSelect?.() }}
+      className={`flex h-10 cursor-pointer items-center justify-between border-b border-gray-100 px-4 last:border-b-0 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50 ${
         isOver ? 'bg-blue-50 dark:bg-blue-900/20' : ''
       }`}
     >
@@ -90,6 +92,7 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
             type="text"
             value={nameValue}
             onChange={(e) => setNameValue(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
             onBlur={handleSaveName}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -104,15 +107,15 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
           />
         ) : (
           <span
-            onClick={() => setEditingName(true)}
-            className="cursor-pointer text-sm text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+            onClick={(e) => { e.stopPropagation(); setEditingName(true) }}
+            className="cursor-text text-sm text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
           >
             {lineItem.name}
           </span>
         )}
         {editingName && <button
           onMouseDown={(e) => e.preventDefault()}
-          onClick={handleDelete}
+          onClick={(e) => { e.stopPropagation(); handleDelete() }}
           className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
           title="Delete item"
         >
@@ -127,6 +130,7 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
             type="number"
             value={amountValue}
             onChange={(e) => setAmountValue(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
             onBlur={handleSaveAmount}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -142,8 +146,8 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
           />
         ) : (
           <span
-            onClick={() => setEditingAmount(true)}
-            className="w-24 cursor-pointer border border-transparent px-2 py-0.5 text-right text-gray-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
+            onClick={(e) => { e.stopPropagation(); setEditingAmount(true) }}
+            className="w-24 cursor-text border border-transparent px-2 py-0.5 text-right text-gray-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
           >
             {formatCurrency(lineItem.plannedAmount)}
           </span>

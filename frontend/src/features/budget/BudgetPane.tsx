@@ -8,9 +8,10 @@ import BudgetGroupCard from './BudgetGroupCard'
 
 interface BudgetPaneProps {
   budget: BudgetResponse
+  onSelectLineItem?: (lineItemId: number) => void
 }
 
-export default function BudgetPane({ budget }: BudgetPaneProps) {
+export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps) {
   const dispatch = useAppDispatch()
   const [addingGroup, setAddingGroup] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
@@ -53,9 +54,9 @@ export default function BudgetPane({ budget }: BudgetPaneProps) {
         {formatCurrency(totalIncomePlanned)} income − {formatCurrency(totalExpensesPlanned)} expenses = {formatCurrency(leftToBudget)} left to budget
       </div>
 
-      {incomeGroup && <BudgetGroupCard group={incomeGroup} />}
+      {incomeGroup && <BudgetGroupCard group={incomeGroup} onSelectLineItem={onSelectLineItem} />}
       {expenseGroups.map((group) => (
-        <BudgetGroupCard key={group.id} group={group} />
+        <BudgetGroupCard key={group.id} group={group} onSelectLineItem={onSelectLineItem} />
       ))}
 
       {addingGroup ? (
