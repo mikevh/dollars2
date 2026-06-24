@@ -103,7 +103,9 @@ public class TransactionService
 
         if (!transaction.IsManual)
         {
-            return DollarsApiResponse<TransactionResponse>.Fail("Cannot edit a synced transaction.", "CANNOT_EDIT_SYNCED");
+            await _transactionRepo.UpdateNotesAsync(id, notes);
+            transaction = (await _transactionRepo.GetByIdAsync(id))!;
+            return DollarsApiResponse<TransactionResponse>.Success(await BuildResponseAsync(transaction));
         }
 
         if (amount == 0)

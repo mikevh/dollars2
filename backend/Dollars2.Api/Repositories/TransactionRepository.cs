@@ -89,6 +89,14 @@ public class TransactionRepository
             _db.CurrentTransaction);
     }
 
+    public async Task UpdateNotesAsync(int id, string? notes)
+    {
+        await _db.Connection.ExecuteAsync(
+            "UPDATE Transactions SET Notes = @Notes, UpdatedAt = SYSUTCDATETIME() WHERE Id = @Id",
+            new { Id = id, Notes = notes },
+            _db.CurrentTransaction);
+    }
+
     public async Task SoftDeleteAsync(int id)
     {
         await _db.Connection.ExecuteAsync(

@@ -75,7 +75,6 @@ Critical items (1-5) were fixed in commit e1d84ba. Remaining:
 
 ### Medium
 - Reorder endpoints accept partial ID lists — need `ids.Length != validIds.Count` check
-- Tracked transactions don't re-fetch on month change — useEffect missing currentYear/currentMonth deps
 - Transaction request models lack `[Required]`/`[Range]` validation attributes
 - No index on RefreshToken.Token column
 - Refresh token expiry double-stacks (JWT 30d + 30d = 60d) — needs own config

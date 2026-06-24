@@ -55,20 +55,28 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
   const selectedIds = new Set(pendingAssignments.map((a) => a.lineItemId))
 
   useEffect(() => {
-    if (pendingAssignments.length === 1) {
-      setPendingAssignments((prev) => [{ ...prev[0], amount: absTotal.toString() }])
-    }
-  }, [amount])
+    setPendingAssignments((prev) => {
+      if (prev.length === 1) {
+        return [{ ...prev[0], amount: absTotal.toString() }]
+      }
+      return prev
+    })
+  }, [absTotal])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose()
+      } else if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault()
+        if (canSave && !saving) {
+          handleSave()
+        }
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  })
 
   const addAssignment = (lineItemId: number, lineItemName: string) => {
     setPendingAssignments((prev) => {
@@ -112,7 +120,7 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
     for (let i = 0; i < pendingAssignments.length; i++) {
       const p = pendingAssignments[i]
       const o = originalAssignments.find((a) => a.lineItemId === p.lineItemId)
-      if (!o || parseFloat(p.amount) !== parseFloat(o.amount)) {
+      if (!o || Math.abs(parseFloat(p.amount) - parseFloat(o.amount)) > 0.005) {
         return true
       }
     }
@@ -184,7 +192,6 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
 
     onMutate()
     onClose()
-    setSaving(false)
   }
 
   const handleDelete = async () => {
@@ -356,7 +363,7 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
 
         <div className="mt-5 flex items-center justify-between">
           <div className="flex gap-2">
-            {!isCreate && originalAssignments.length === 0 && (
+            {!isCreate && originalAssignments.length === 0 && pendingAssignments.length === 0 && (
               <button
                 onClick={handleDelete}
                 className="rounded border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/20"

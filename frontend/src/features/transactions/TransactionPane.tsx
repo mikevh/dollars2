@@ -29,6 +29,7 @@ interface TransactionPaneProps {
 export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps) {
   const dispatch = useAppDispatch()
   const { transactions, loading, error, activeTab } = useAppSelector((state) => state.transactions)
+  const { currentYear, currentMonth } = useAppSelector((state) => state.budget)
   const [editingTransaction, setEditingTransaction] = useState<TransactionResponse | null | 'create'>(null)
 
   const fetchCurrentTab = () => {
@@ -47,7 +48,7 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
 
   useEffect(() => {
     fetchCurrentTab()
-  }, [dispatch, activeTab])
+  }, [dispatch, activeTab, currentYear, currentMonth])
 
   const handleSoftDelete = async (id: number) => {
     const result = await dispatch(softDeleteTransaction({ id }))

@@ -51,7 +51,7 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
           ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400'
           : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400'
       }`}>
-        {formatCurrency(totalIncomePlanned)} income − {formatCurrency(totalExpensesPlanned)} expenses = {formatCurrency(leftToBudget)} left to budget
+        {formatCurrency(leftToBudget)} left to budget
       </div>
 
       {incomeGroup && <BudgetGroupCard group={incomeGroup} onSelectLineItem={onSelectLineItem} />}
