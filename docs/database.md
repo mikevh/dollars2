@@ -111,6 +111,8 @@ Unique constraint: (AccountId, ProviderTransactionId) where ProviderTransactionI
 | CreatedAt | datetime2 | |
 | UpdatedAt | datetime2 | |
 
+Unique constraint: (TransactionId, LineItemId)
+
 ### SyncLog
 
 | Column | Type | Notes |

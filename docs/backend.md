@@ -83,14 +83,18 @@
 - `GET /api/line-items/{id}/activity` — get transactions + rollover history
 
 ### Transactions
-- `GET /api/transactions?tab=new|tracked|deleted|pending` — list by tab (tracked uses date range params: `from`, `to`)
+- `GET /api/transactions/new` — unassigned transactions
+- `GET /api/transactions/tracked?fromDate=...` — assigned transactions from date
+- `GET /api/transactions/deleted` — soft-deleted transactions
+- `GET /api/transactions/pending` — pending bank transactions
 - `POST /api/transactions` — manual entry
 - `PUT /api/transactions/{id}` — edit (manual: all fields; synced: notes only)
-- `PUT /api/transactions/{id}/assign` — assign to line item(s) with split amounts
-- `PUT /api/transactions/{id}/unassign` — remove assignment
-- `DELETE /api/transactions/{id}` — soft-delete (synced) or hard-delete (manual)
+- `POST /api/transactions/{id}/assign` — assign full amount to a single line item (used by drag-and-drop)
+- `POST /api/transactions/{id}/unassign` — remove all assignments
+- `PUT /api/transactions/{id}/assignments` — atomically replace all assignments with split amounts (used by edit dialog)
+- `DELETE /api/transactions/{id}` — soft-delete
+- `DELETE /api/transactions/{id}/permanent` — hard-delete (manual only, must be soft-deleted first)
 - `POST /api/transactions/{id}/restore` — restore from deleted
-- `GET /api/transactions/search?q=...` — search by name and amount (as text)
 
 ### Sync
 - `POST /api/sync` — trigger manual sync
