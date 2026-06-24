@@ -4,22 +4,25 @@ import type { LineItemResponse } from '../../types/budget'
 import type { TransactionResponse } from '../../types/transaction'
 import { formatCurrency } from '../../utils/format'
 import TransactionRow from '../transactions/TransactionRow'
+import TransactionEditDialog from '../transactions/TransactionEditDialog'
 
 interface ActivityPaneProps {
   lineItem: LineItemResponse
   isIncome: boolean
   onClose: () => void
+  onBudgetMutate?: () => void
 }
 
-export default function ActivityPane({ lineItem, isIncome, onClose }: ActivityPaneProps) {
+export default function ActivityPane({ lineItem, isIncome, onClose, onBudgetMutate }: ActivityPaneProps) {
   const [transactions, setTransactions] = useState<TransactionResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editingTransaction, setEditingTransaction] = useState<TransactionResponse | null>(null)
 
   const spent = isIncome ? lineItem.receivedAmount : lineItem.spentAmount
   const remaining = lineItem.plannedAmount - spent
 
-  useEffect(() => {
+  const fetchActivity = () => {
     setLoading(true)
     setError(null)
     api.get<TransactionResponse[]>(`/api/line-items/${lineItem.id}/activity`).then((result) => {
@@ -30,7 +33,16 @@ export default function ActivityPane({ lineItem, isIncome, onClose }: ActivityPa
       }
       setLoading(false)
     })
+  }
+
+  useEffect(() => {
+    fetchActivity()
   }, [lineItem.id])
+
+  const handleDialogMutate = () => {
+    fetchActivity()
+    onBudgetMutate?.()
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -77,10 +89,26 @@ export default function ActivityPane({ lineItem, isIncome, onClose }: ActivityPa
           <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">No transactions</div>
         )}
 
-        {!loading && !error && transactions.map((t) => (
-          <TransactionRow key={t.id} transaction={t} />
-        ))}
+        {!loading && !error && transactions.map((t) => {
+          const assignment = t.assignments.find((a) => a.lineItemId === lineItem.id)
+          return (
+            <TransactionRow
+              key={t.id}
+              transaction={t}
+              displayAmount={assignment ? assignment.amount : undefined}
+              onClick={() => setEditingTransaction(t)}
+            />
+          )
+        })}
       </div>
+
+      {editingTransaction && (
+        <TransactionEditDialog
+          transaction={editingTransaction}
+          onClose={() => setEditingTransaction(null)}
+          onMutate={handleDialogMutate}
+        />
+      )}
     </div>
   )
 }

@@ -246,6 +246,64 @@ public class TransactionService
         return DollarsApiResponse<TransactionResponse>.Success(await BuildResponseAsync(transaction));
     }
 
+    public async Task<DollarsApiResponse<TransactionResponse>> SetAssignmentsAsync(
+        int transactionId, List<(int lineItemId, decimal amount)> assignments, int userId)
+    {
+        var transaction = await _transactionRepo.GetByIdAsync(transactionId);
+        if (transaction is null || transaction.UserId != userId)
+        {
+            return DollarsApiResponse<TransactionResponse>.Fail("Transaction not found.", "TRANSACTION_NOT_FOUND");
+        }
+
+        if (transaction.IsDeleted)
+        {
+            return DollarsApiResponse<TransactionResponse>.Fail("Cannot assign a deleted transaction.", "TRANSACTION_DELETED");
+        }
+
+        var lineItemIds = assignments.Select(a => a.lineItemId).ToList();
+        if (lineItemIds.Distinct().Count() != lineItemIds.Count)
+        {
+            return DollarsApiResponse<TransactionResponse>.Fail("Duplicate line item in assignments.", "DUPLICATE_LINE_ITEM");
+        }
+
+        foreach (var (lineItemId, _) in assignments)
+        {
+            if (!await _lineItemRepo.IsOwnedByUserAsync(lineItemId, userId))
+            {
+                return DollarsApiResponse<TransactionResponse>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
+            }
+        }
+
+        if (assignments.Count > 0)
+        {
+            var sum = assignments.Sum(a => a.amount);
+            if (sum != transaction.Amount)
+            {
+                return DollarsApiResponse<TransactionResponse>.Fail(
+                    "Assignment amounts must equal the transaction amount.", "AMOUNT_MISMATCH");
+            }
+        }
+
+        _dbSession.BeginTransaction();
+        try
+        {
+            await _assignmentRepo.DeleteByTransactionIdAsync(transactionId);
+            foreach (var (lineItemId, amount) in assignments)
+            {
+                await _assignmentRepo.CreateAsync(transactionId, lineItemId, amount);
+            }
+            _dbSession.Commit();
+        }
+        catch
+        {
+            _dbSession.Rollback();
+            throw;
+        }
+
+        transaction = (await _transactionRepo.GetByIdAsync(transactionId))!;
+        return DollarsApiResponse<TransactionResponse>.Success(await BuildResponseAsync(transaction));
+    }
+
     private async Task<TransactionResponse> BuildResponseAsync(Transaction t)
     {
         var assignments = await _assignmentRepo.GetByTransactionIdAsync(t.Id);

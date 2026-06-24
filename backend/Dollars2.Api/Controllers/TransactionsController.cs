@@ -116,4 +116,18 @@ public class TransactionsController : DollarsControllerBase
         }
         return Ok(result);
     }
+
+    [HttpPut("{id}/assignments")]
+    public async Task<IActionResult> SetAssignments(int id, [FromBody] SetAssignmentsRequest request)
+    {
+        var assignments = request.Assignments
+            .Select(a => (a.LineItemId, a.Amount))
+            .ToList();
+        var result = await _transactionService.SetAssignmentsAsync(id, assignments, GetUserId());
+        if (result.Error is not null)
+        {
+            return BadRequest(result);
+        }
+        return Ok(result);
+    }
 }

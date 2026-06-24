@@ -53,6 +53,10 @@ export default function BudgetPage() {
     return null
   })()
 
+  const handleBudgetMutate = () => {
+    dispatch(fetchBudget({ year: currentYear, month: currentMonth }))
+  }
+
   const handleDragStart = (event: DragStartEvent) => {
     setDraggingTransaction(event.active.data.current?.transaction ?? null)
   }
@@ -120,9 +124,10 @@ export default function BudgetPage() {
                   lineItem={selectedLineItem.lineItem}
                   isIncome={selectedLineItem.isIncome}
                   onClose={() => setSelectedLineItemId(null)}
+                  onBudgetMutate={handleBudgetMutate}
                 />
               ) : (
-                <TransactionPane />
+                <TransactionPane onBudgetMutate={handleBudgetMutate} />
               )}
             </div>
           </div>

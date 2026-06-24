@@ -6,13 +6,14 @@ import {
   fetchTrackedTransactions,
   fetchDeletedTransactions,
   fetchPendingTransactions,
-  createTransaction,
   softDeleteTransaction,
   restoreTransaction,
   hardDeleteTransaction,
   setActiveTab,
 } from './transactionSlice'
 import TransactionRow from './TransactionRow'
+import TransactionEditDialog from './TransactionEditDialog'
+import type { TransactionResponse } from '../../types/transaction'
 
 const tabs = [
   { key: 'new' as const, label: 'New' },
@@ -21,15 +22,16 @@ const tabs = [
   { key: 'pending' as const, label: 'Pending' },
 ]
 
-export default function TransactionPane() {
+interface TransactionPaneProps {
+  onBudgetMutate?: () => void
+}
+
+export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps) {
   const dispatch = useAppDispatch()
   const { transactions, loading, error, activeTab } = useAppSelector((state) => state.transactions)
-  const [adding, setAdding] = useState(false)
-  const [newDesc, setNewDesc] = useState('')
-  const [newAmount, setNewAmount] = useState('')
-  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0])
+  const [editingTransaction, setEditingTransaction] = useState<TransactionResponse | null | 'create'>(null)
 
-  useEffect(() => {
+  const fetchCurrentTab = () => {
     if (activeTab === 'new') {
       dispatch(fetchNewTransactions())
     } else if (activeTab === 'tracked') {
@@ -41,24 +43,11 @@ export default function TransactionPane() {
     } else if (activeTab === 'pending') {
       dispatch(fetchPendingTransactions())
     }
-  }, [dispatch, activeTab])
-
-  const handleAdd = async () => {
-    const description = newDesc.trim()
-    if (!description) {
-      return
-    }
-    const amount = parseFloat(newAmount) || 0
-    const result = await dispatch(createTransaction({ date: newDate, description, amount }))
-    if (createTransaction.rejected.match(result)) {
-      toast.error(result.payload as string)
-    } else {
-      setNewDesc('')
-      setNewAmount('')
-      setNewDate(new Date().toISOString().split('T')[0])
-      setAdding(false)
-    }
   }
+
+  useEffect(() => {
+    fetchCurrentTab()
+  }, [dispatch, activeTab])
 
   const handleSoftDelete = async (id: number) => {
     const result = await dispatch(softDeleteTransaction({ id }))
@@ -79,6 +68,11 @@ export default function TransactionPane() {
     if (hardDeleteTransaction.rejected.match(result)) {
       toast.error(result.payload as string)
     }
+  }
+
+  const handleDialogMutate = () => {
+    fetchCurrentTab()
+    onBudgetMutate?.()
   }
 
   return (
@@ -117,11 +111,12 @@ export default function TransactionPane() {
             key={t.id}
             transaction={t}
             draggable={activeTab === 'new'}
+            onClick={activeTab !== 'pending' ? () => setEditingTransaction(t) : undefined}
             actions={
               <>
                 {activeTab === 'new' && (
                   <button
-                    onClick={() => handleSoftDelete(t.id)}
+                    onClick={(e) => { e.stopPropagation(); handleSoftDelete(t.id) }}
                     className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
                     title="Delete"
                   >
@@ -133,14 +128,14 @@ export default function TransactionPane() {
                 {activeTab === 'deleted' && (
                   <div className="flex gap-1">
                     <button
-                      onClick={() => handleRestore(t.id)}
+                      onClick={(e) => { e.stopPropagation(); handleRestore(t.id) }}
                       className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                     >
                       Restore
                     </button>
                     {t.isManual && (
                       <button
-                        onClick={() => handleHardDelete(t.id)}
+                        onClick={(e) => { e.stopPropagation(); handleHardDelete(t.id) }}
                         className="text-xs text-red-500 hover:text-red-600"
                       >
                         Delete
@@ -156,71 +151,21 @@ export default function TransactionPane() {
 
       {activeTab === 'new' && (
         <div className="border-t border-gray-200 p-3 dark:border-gray-700">
-          {adding ? (
-            <div className="flex flex-col gap-2">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleAdd()
-                    } else if (e.key === 'Escape') {
-                      setAdding(false)
-                    }
-                  }}
-                  placeholder="Description"
-                  autoFocus
-                  className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                />
-                <input
-                  type="number"
-                  value={newAmount}
-                  onChange={(e) => setNewAmount(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleAdd()
-                    } else if (e.key === 'Escape') {
-                      setAdding(false)
-                    }
-                  }}
-                  placeholder="0.00"
-                  step="0.01"
-                  className="w-24 rounded border border-gray-300 px-2 py-1 text-right text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      setAdding(false)
-                    }
-                  }}
-                  className="rounded border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                />
-                <div className="flex-1" />
-                <button
-                  onClick={handleAdd}
-                  disabled={!newDesc.trim() || !parseFloat(newAmount)}
-                  className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => setAdding(true)}
-              className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              + Add Transaction
-            </button>
-          )}
+          <button
+            onClick={() => setEditingTransaction('create')}
+            className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            + Add Transaction
+          </button>
         </div>
+      )}
+
+      {editingTransaction !== null && (
+        <TransactionEditDialog
+          transaction={editingTransaction === 'create' ? null : editingTransaction}
+          onClose={() => setEditingTransaction(null)}
+          onMutate={handleDialogMutate}
+        />
       )}
     </div>
   )
