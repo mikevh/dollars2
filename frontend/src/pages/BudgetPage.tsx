@@ -4,7 +4,7 @@ import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { fetchBudget, createBudget, applyTransactionAssignment } from '../features/budget/budgetSlice'
-import { assignTransaction } from '../features/transactions/transactionSlice'
+import { assignTransaction, fetchCounts } from '../features/transactions/transactionSlice'
 import MonthNav from '../features/budget/MonthNav'
 import BudgetPane from '../features/budget/BudgetPane'
 import ActivityPane from '../features/budget/ActivityPane'
@@ -80,6 +80,7 @@ export default function BudgetPage() {
       toast.error(result.payload as string)
     } else {
       dispatch(applyTransactionAssignment({ lineItemId, amount: transaction.amount }))
+      dispatch(fetchCounts())
     }
   }
 

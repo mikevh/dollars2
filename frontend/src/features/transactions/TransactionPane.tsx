@@ -17,10 +17,10 @@ import TransactionEditDialog from './TransactionEditDialog'
 import type { TransactionResponse } from '../../types/transaction'
 
 const tabs = [
-  { key: 'new' as const, label: 'New' },
-  { key: 'tracked' as const, label: 'Tracked' },
-  { key: 'deleted' as const, label: 'Deleted' },
-  { key: 'pending' as const, label: 'Pending' },
+  { key: 'new' as const, label: 'New', showCount: true },
+  { key: 'tracked' as const, label: 'Tracked', showCount: false },
+  { key: 'deleted' as const, label: 'Deleted', showCount: false },
+  { key: 'pending' as const, label: 'Pending', showCount: true },
 ]
 
 interface TransactionPaneProps {
@@ -82,7 +82,7 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
     <div className="flex h-full flex-col">
       <div className="flex border-b border-gray-200 dark:border-gray-700">
         {tabs.map((tab) => {
-          const count = counts[tab.key]
+          const count = tab.showCount ? counts[tab.key] : 0
           return (
             <button
               key={tab.key}
