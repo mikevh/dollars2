@@ -34,7 +34,8 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
   const budget = useAppSelector((state) => state.budget.budget)
 
   const [description, setDescription] = useState(transaction?.description ?? '')
-  const [amount, setAmount] = useState(transaction?.amount?.toString() ?? '')
+  const [isExpense, setIsExpense] = useState(transaction ? transaction.amount < 0 : true)
+  const [amount, setAmount] = useState(transaction ? Math.abs(transaction.amount).toString() : '')
   const [date, setDate] = useState(transaction?.date?.slice(0, 10) ?? new Date().toISOString().split('T')[0])
   const [notes, setNotes] = useState(transaction?.notes ?? '')
   const [saving, setSaving] = useState(false)
@@ -104,10 +105,12 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
     )
   }
 
+  const signedAmount = isExpense ? -absTotal : absTotal
+
   const hasFieldChanges = isCreate || (
     transaction && (
       description.trim() !== transaction.description ||
-      parseFloat(amount) !== transaction.amount ||
+      signedAmount !== transaction.amount ||
       date !== transaction.date.slice(0, 10) ||
       (notes.trim() || null) !== (transaction.notes || null)
     )
@@ -128,17 +131,18 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
   })()
 
   const hasChanges = hasFieldChanges || hasAssignmentChange
-  const canSave = description.trim() && parseFloat(amount) && hasChanges && assignmentsValid
+  const canSave = description.trim() && absTotal > 0 && hasChanges && assignmentsValid
 
   const handleSave = async () => {
     const desc = description.trim()
     if (!desc) {
       return
     }
-    const txAmount = parseFloat(amount)
-    if (!txAmount) {
+    const rawAmount = parseFloat(amount)
+    if (!rawAmount) {
       return
     }
+    const txAmount = isExpense ? -Math.abs(rawAmount) : Math.abs(rawAmount)
 
     setSaving(true)
 
@@ -233,6 +237,33 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
         </div>
 
         <div className="flex flex-col gap-3">
+          {isEditable ? (
+            <div className="flex gap-4">
+              <label className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="radio"
+                  checked={isExpense}
+                  onChange={() => setIsExpense(true)}
+                  className="accent-blue-600"
+                />
+                Expense
+              </label>
+              <label className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="radio"
+                  checked={!isExpense}
+                  onChange={() => setIsExpense(false)}
+                  className="accent-blue-600"
+                />
+                Income
+              </label>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              {transaction.amount < 0 ? 'Expense' : 'Income'}
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Description</label>
             {isEditable ? (
@@ -260,7 +291,7 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
                   className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               ) : (
-                <div className="text-sm text-gray-900 dark:text-white">{amount}</div>
+                <div className="text-sm text-gray-900 dark:text-white">{formatCurrency(parseFloat(amount))}</div>
               )}
             </div>
             <div className="flex-1">
