@@ -9,18 +9,22 @@ import TransactionEditDialog from '../transactions/TransactionEditDialog'
 interface ActivityPaneProps {
   lineItem: LineItemResponse
   isIncome: boolean
+  budgetMonth: number
   onClose: () => void
   onBudgetMutate?: () => void
 }
 
-export default function ActivityPane({ lineItem, isIncome, onClose, onBudgetMutate }: ActivityPaneProps) {
+const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+export default function ActivityPane({ lineItem, isIncome, budgetMonth, onClose, onBudgetMutate }: ActivityPaneProps) {
   const [transactions, setTransactions] = useState<TransactionResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editingTransaction, setEditingTransaction] = useState<TransactionResponse | null>(null)
 
   const spent = isIncome ? lineItem.receivedAmount : lineItem.spentAmount
-  const remaining = lineItem.plannedAmount - spent
+  const rollover = isIncome ? 0 : lineItem.rolloverAmount
+  const remaining = lineItem.plannedAmount + rollover - spent
 
   const fetchActivity = () => {
     setLoading(true)
@@ -68,6 +72,14 @@ export default function ActivityPane({ lineItem, isIncome, onClose, onBudgetMuta
           <span className="text-gray-400 dark:text-gray-500">{isIncome ? 'Received' : 'Spent'} </span>
           <span className="font-medium text-gray-700 dark:text-gray-300">{formatCurrency(spent)}</span>
         </div>
+        {rollover !== 0 && (
+          <div>
+            <span className="text-gray-400 dark:text-gray-500">Rollover </span>
+            <span className={`font-medium ${rollover < 0 ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+              {formatCurrency(rollover)}
+            </span>
+          </div>
+        )}
         <div>
           <span className="text-gray-400 dark:text-gray-500">Remaining </span>
           <span className={`font-medium ${remaining < 0 ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
@@ -85,8 +97,17 @@ export default function ActivityPane({ lineItem, isIncome, onClose, onBudgetMuta
           <div className="py-8 text-center text-sm text-red-500">{error}</div>
         )}
 
-        {!loading && !error && transactions.length === 0 && (
+        {!loading && !error && transactions.length === 0 && rollover === 0 && (
           <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">No transactions</div>
+        )}
+
+        {!loading && !error && rollover !== 0 && (
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2 dark:border-gray-700">
+            <span className="text-sm italic text-gray-500 dark:text-gray-400">Rollover from {monthNames[(budgetMonth - 2 + 12) % 12]}</span>
+            <span className={`text-sm font-medium ${rollover > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+              {rollover > 0 ? '+' : '-'}{formatCurrency(Math.abs(rollover))}
+            </span>
+          </div>
         )}
 
         {!loading && !error && transactions.map((t) => {

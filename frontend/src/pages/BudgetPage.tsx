@@ -123,6 +123,7 @@ export default function BudgetPage() {
                 <ActivityPane
                   lineItem={selectedLineItem.lineItem}
                   isIncome={selectedLineItem.isIncome}
+                  budgetMonth={currentMonth}
                   onClose={() => setSelectedLineItemId(null)}
                   onBudgetMutate={handleBudgetMutate}
                 />

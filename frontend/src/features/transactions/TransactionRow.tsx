@@ -8,9 +8,10 @@ interface TransactionRowProps {
   draggable?: boolean
   onClick?: () => void
   displayAmount?: number
+  showAssignment?: boolean
 }
 
-export default function TransactionRow({ transaction, actions, draggable, onClick, displayAmount }: TransactionRowProps) {
+export default function TransactionRow({ transaction, actions, draggable, onClick, displayAmount, showAssignment }: TransactionRowProps) {
   const shownAmount = displayAmount ?? transaction.amount
   const isIncome = shownAmount > 0
 
@@ -34,6 +35,9 @@ export default function TransactionRow({ transaction, actions, draggable, onClic
         <div className="flex gap-2 text-xs text-gray-400 dark:text-gray-500">
           <span>{new Date(transaction.date.slice(0, 10) + 'T00:00:00').toLocaleDateString()}</span>
           {transaction.isManual && <span>manual</span>}
+          {showAssignment && transaction.assignments.length > 0 && (
+            <span className="truncate">{transaction.assignments.map((a) => a.lineItemName).join(', ')}</span>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-3">

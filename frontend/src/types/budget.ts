@@ -19,6 +19,7 @@ export interface LineItemResponse {
   plannedAmount: number
   spentAmount: number
   receivedAmount: number
+  rolloverAmount: number
   sortOrder: number
   notes: string | null
 }

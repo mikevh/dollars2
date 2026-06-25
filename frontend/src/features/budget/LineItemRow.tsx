@@ -35,7 +35,7 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
 
   const remaining = isIncome
     ? lineItem.plannedAmount - lineItem.receivedAmount
-    : lineItem.plannedAmount - lineItem.spentAmount
+    : lineItem.plannedAmount + lineItem.rolloverAmount - lineItem.spentAmount
 
   const saveUpdate = async (name: string, plannedAmount: number) => {
     if (name === lineItem.name && plannedAmount === lineItem.plannedAmount) {

@@ -24,6 +24,7 @@ public class LineItemResponse
     public decimal PlannedAmount { get; set; }
     public decimal SpentAmount { get; set; }
     public decimal ReceivedAmount { get; set; }
+    public decimal RolloverAmount { get; set; }
     public int SortOrder { get; set; }
     public string? Notes { get; set; }
 }

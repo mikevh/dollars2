@@ -8,6 +8,7 @@ public class LineItem
     public decimal PlannedAmount { get; set; }
     public int SortOrder { get; set; }
     public string? Notes { get; set; }
+    public int? PreviousLineItemId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

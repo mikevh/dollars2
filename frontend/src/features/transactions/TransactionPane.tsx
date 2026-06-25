@@ -112,6 +112,7 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
             key={t.id}
             transaction={t}
             draggable={activeTab === 'new'}
+            showAssignment={activeTab === 'tracked'}
             onClick={activeTab !== 'pending' ? () => setEditingTransaction(t) : undefined}
             actions={
               <>

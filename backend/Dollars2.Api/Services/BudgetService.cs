@@ -127,7 +127,7 @@ public class BudgetService
         var lineItemResponses = new List<LineItemResponse>();
         foreach (var item in lineItems)
         {
-            lineItemResponses.Add(await MapLineItemAsync(item));
+            lineItemResponses.Add(await MapLineItemAsync(item, group.IsIncome));
         }
         return DollarsApiResponse<BudgetGroupResponse>.Success(new BudgetGroupResponse
         {
@@ -216,7 +216,7 @@ public class BudgetService
         var itemId = await _lineItemRepo.CreateAsync(groupId, name, plannedAmount, maxSort + 1);
         var item = (await _lineItemRepo.GetByIdAsync(itemId))!;
 
-        return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item));
+        return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item, group.IsIncome));
     }
 
     public async Task<DollarsApiResponse<LineItemResponse>> UpdateLineItemAsync(int id, string name, decimal plannedAmount, int userId)
@@ -236,7 +236,8 @@ public class BudgetService
         item.Name = name;
         item.PlannedAmount = plannedAmount;
 
-        return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item));
+        var group = (await _groupRepo.GetByIdAsync(item.GroupId))!;
+        return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item, group.IsIncome));
     }
 
     public async Task<DollarsApiResponse<bool>> DeleteLineItemAsync(int id, int userId)
@@ -255,6 +256,7 @@ public class BudgetService
         _dbSession.BeginTransaction();
         try
         {
+            await _lineItemRepo.ClearPreviousLinkAsync(id);
             await _assignmentRepo.DeleteByLineItemIdAsync(id);
             await _lineItemRepo.DeleteAsync(id);
             _dbSession.Commit();
@@ -318,7 +320,7 @@ public class BudgetService
             var lineItemResponses = new List<LineItemResponse>();
             foreach (var item in lineItems)
             {
-                lineItemResponses.Add(await MapLineItemAsync(item));
+                lineItemResponses.Add(await MapLineItemAsync(item, group.IsIncome));
             }
             groupResponses.Add(new BudgetGroupResponse
             {
@@ -350,7 +352,7 @@ public class BudgetService
 
             foreach (var sourceItem in sourceItems)
             {
-                await _lineItemRepo.CreateAsync(newGroupId, sourceItem.Name, sourceItem.PlannedAmount, sourceItem.SortOrder);
+                await _lineItemRepo.CreateAsync(newGroupId, sourceItem.Name, sourceItem.PlannedAmount, sourceItem.SortOrder, sourceItem.Id);
             }
         }
     }
@@ -381,10 +383,17 @@ public class BudgetService
         return await VerifyGroupOwnershipAsync(group, userId);
     }
 
-    private async Task<LineItemResponse> MapLineItemAsync(LineItem item)
+    private async Task<LineItemResponse> MapLineItemAsync(LineItem item, bool isIncome)
     {
         var spent = await _assignmentRepo.GetSpentByLineItemIdAsync(item.Id);
         var received = await _assignmentRepo.GetReceivedByLineItemIdAsync(item.Id);
+
+        decimal rollover = 0;
+        if (!isIncome)
+        {
+            rollover = await _lineItemRepo.GetRolloverAsync(item.Id);
+        }
+
         return new LineItemResponse
         {
             Id = item.Id,
@@ -392,6 +401,7 @@ public class BudgetService
             PlannedAmount = item.PlannedAmount,
             SpentAmount = Math.Abs(spent),
             ReceivedAmount = received,
+            RolloverAmount = rollover,
             SortOrder = item.SortOrder,
             Notes = item.Notes
         };
