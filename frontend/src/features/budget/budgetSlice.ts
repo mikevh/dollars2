@@ -10,14 +10,19 @@ interface BudgetState {
   currentMonth: number
 }
 
-const now = new Date()
+function currentYearMonth() {
+  const now = new Date()
+  return { year: now.getFullYear(), month: now.getMonth() + 1 }
+}
+
+const { year: initYear, month: initMonth } = currentYearMonth()
 
 const initialState: BudgetState = {
   budget: null,
   loading: false,
   error: null,
-  currentYear: now.getFullYear(),
-  currentMonth: now.getMonth() + 1,
+  currentYear: initYear,
+  currentMonth: initMonth,
 }
 
 export const fetchBudget = createAsyncThunk(

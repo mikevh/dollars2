@@ -68,16 +68,12 @@ cd backend/Dollars2.Api && dotnet build
 - Break work into the smallest possible increments, one concern per sprint
 - Interview for specs, verify decisions explicitly
 - Code review uncommitted changes before committing
+- Never commit or push unless explicitly told to — tell the user things are ready, wait for instruction
 
 ## Code Review Backlog (2026-06-19)
 
-Critical items (1-5) fixed in e1d84ba. Medium items (6-12) fixed in subsequent commits. Remaining:
-
-### Low
-- Early migrations (000-005) lack `IF NOT EXISTS` guards
-- Several repos use `SELECT *` instead of explicit columns
-- `new Date()` in frontend components stale if left open overnight
-- N+1 queries in `BuildBudgetResponseAsync` (has TODO)
+All critical and medium items resolved. Low items: most fixed. Remaining known issues:
+- N+1 queries in `BuildBudgetResponseAsync` (has TODO — deferred, low impact at current scale)
 - No rate limiting on auth endpoints (v1 tradeoff)
 
 ## Out of Scope (v1)

@@ -16,7 +16,7 @@ public class TransactionAssignmentRepository
     public async Task<IEnumerable<TransactionAssignment>> GetByTransactionIdAsync(int transactionId)
     {
         return await _db.Connection.QueryAsync<TransactionAssignment>(
-            "SELECT * FROM TransactionAssignments WHERE TransactionId = @TransactionId",
+            "SELECT Id, TransactionId, LineItemId, Amount, CreatedAt, UpdatedAt FROM TransactionAssignments WHERE TransactionId = @TransactionId",
             new { TransactionId = transactionId },
             _db.CurrentTransaction);
     }
@@ -24,7 +24,7 @@ public class TransactionAssignmentRepository
     public async Task<IEnumerable<TransactionAssignment>> GetByLineItemIdAsync(int lineItemId)
     {
         return await _db.Connection.QueryAsync<TransactionAssignment>(
-            "SELECT * FROM TransactionAssignments WHERE LineItemId = @LineItemId",
+            "SELECT Id, TransactionId, LineItemId, Amount, CreatedAt, UpdatedAt FROM TransactionAssignments WHERE LineItemId = @LineItemId",
             new { LineItemId = lineItemId },
             _db.CurrentTransaction);
     }

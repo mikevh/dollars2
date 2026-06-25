@@ -16,7 +16,7 @@ public class TransactionRepository
     public async Task<Transaction?> GetByIdAsync(int id)
     {
         return await _db.Connection.QuerySingleOrDefaultAsync<Transaction>(
-            "SELECT * FROM Transactions WHERE Id = @Id",
+            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE Id = @Id",
             new { Id = id },
             _db.CurrentTransaction);
     }
@@ -47,7 +47,7 @@ public class TransactionRepository
     public async Task<IEnumerable<Transaction>> GetDeletedAsync(int userId)
     {
         return await _db.Connection.QueryAsync<Transaction>(
-            "SELECT * FROM Transactions WHERE UserId = @UserId AND IsDeleted = 1 ORDER BY Date DESC",
+            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE UserId = @UserId AND IsDeleted = 1 ORDER BY Date DESC",
             new { UserId = userId },
             _db.CurrentTransaction);
     }
@@ -55,7 +55,7 @@ public class TransactionRepository
     public async Task<IEnumerable<Transaction>> GetPendingAsync(int userId)
     {
         return await _db.Connection.QueryAsync<Transaction>(
-            "SELECT * FROM Transactions WHERE UserId = @UserId AND IsPending = 1 AND IsDeleted = 0 ORDER BY Date DESC",
+            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE UserId = @UserId AND IsPending = 1 AND IsDeleted = 0 ORDER BY Date DESC",
             new { UserId = userId },
             _db.CurrentTransaction);
     }
