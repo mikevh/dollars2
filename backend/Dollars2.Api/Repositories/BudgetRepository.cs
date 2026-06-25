@@ -39,7 +39,7 @@ public class BudgetRepository
     public async Task<int> CreateAsync(int userId, int year, int month)
     {
         return await _db.Connection.QuerySingleAsync<int>(
-            "INSERT INTO Budgets (UserId, [Year], [Month], CreatedAt, UpdatedAt) VALUES (@UserId, @Year, @Month, GETUTCDATE(), GETUTCDATE()); SELECT CAST(SCOPE_IDENTITY() AS INT)",
+            "INSERT INTO Budgets (UserId, [Year], [Month], CreatedAt, UpdatedAt) VALUES (@UserId, @Year, @Month, SYSUTCDATETIME(), SYSUTCDATETIME()); SELECT CAST(SCOPE_IDENTITY() AS INT)",
             new { UserId = userId, Year = year, Month = month },
             _db.CurrentTransaction);
     }

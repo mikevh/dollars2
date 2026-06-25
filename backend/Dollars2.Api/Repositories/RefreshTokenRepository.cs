@@ -16,7 +16,7 @@ public class RefreshTokenRepository
     public async Task<RefreshToken?> GetValidTokenAsync(string token)
     {
         return await _db.Connection.QuerySingleOrDefaultAsync<RefreshToken>(
-            "SELECT Id, UserId, Token, ExpiresAt, CreatedAt, UpdatedAt FROM RefreshTokens WHERE Token = @Token AND ExpiresAt > GETUTCDATE()",
+            "SELECT Id, UserId, Token, ExpiresAt, CreatedAt, UpdatedAt FROM RefreshTokens WHERE Token = @Token AND ExpiresAt > SYSUTCDATETIME()",
             new { Token = token },
             _db.CurrentTransaction);
     }
@@ -24,7 +24,7 @@ public class RefreshTokenRepository
     public async Task CreateAsync(int userId, string token, DateTime expiresAt)
     {
         await _db.Connection.ExecuteAsync(
-            "INSERT INTO RefreshTokens (UserId, Token, ExpiresAt, CreatedAt, UpdatedAt) VALUES (@UserId, @Token, @ExpiresAt, GETUTCDATE(), GETUTCDATE())",
+            "INSERT INTO RefreshTokens (UserId, Token, ExpiresAt, CreatedAt, UpdatedAt) VALUES (@UserId, @Token, @ExpiresAt, SYSUTCDATETIME(), SYSUTCDATETIME())",
             new { UserId = userId, Token = token, ExpiresAt = expiresAt },
             _db.CurrentTransaction);
     }

@@ -176,9 +176,9 @@ public class BudgetService
 
         var groups = await _groupRepo.GetByBudgetIdAsync(budgetId);
         var validIds = groups.Select(g => g.Id).ToHashSet();
-        if (ids.Any(id => !validIds.Contains(id)))
+        if (ids.Length != validIds.Count || ids.Any(id => !validIds.Contains(id)))
         {
-            return DollarsApiResponse<bool>.Fail("One or more group IDs do not belong to this budget.", "INVALID_GROUP_IDS");
+            return DollarsApiResponse<bool>.Fail("Must include all group IDs for this budget.", "INVALID_GROUP_IDS");
         }
 
         _dbSession.BeginTransaction();
@@ -285,9 +285,9 @@ public class BudgetService
 
         var lineItems = await _lineItemRepo.GetByGroupIdAsync(groupId);
         var validIds = lineItems.Select(li => li.Id).ToHashSet();
-        if (ids.Any(id => !validIds.Contains(id)))
+        if (ids.Length != validIds.Count || ids.Any(id => !validIds.Contains(id)))
         {
-            return DollarsApiResponse<bool>.Fail("One or more line item IDs do not belong to this group.", "INVALID_LINE_ITEM_IDS");
+            return DollarsApiResponse<bool>.Fail("Must include all line item IDs for this group.", "INVALID_LINE_ITEM_IDS");
         }
 
         _dbSession.BeginTransaction();

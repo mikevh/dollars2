@@ -71,16 +71,7 @@ cd backend/Dollars2.Api && dotnet build
 
 ## Code Review Backlog (2026-06-19)
 
-Critical items (1-5) were fixed in commit e1d84ba. Remaining:
-
-### Medium
-- Reorder endpoints accept partial ID lists — need `ids.Length != validIds.Count` check
-- Transaction request models lack `[Required]`/`[Range]` validation attributes
-- No index on RefreshToken.Token column
-- Refresh token expiry double-stacks (JWT 30d + 30d = 60d) — needs own config
-- `DollarsControllerBase.UserId` uses null-forgiving `!` — should return 401 on missing claim
-- Unused npm packages: `@dnd-kit/sortable`, `@dnd-kit/utilities`
-- `GETUTCDATE()` vs `SYSUTCDATETIME()` inconsistency across repos
+Critical items (1-5) fixed in e1d84ba. Medium items (6-12) fixed in subsequent commits. Remaining:
 
 ### Low
 - Early migrations (000-005) lack `IF NOT EXISTS` guards

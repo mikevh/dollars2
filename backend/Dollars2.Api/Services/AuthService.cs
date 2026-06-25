@@ -72,8 +72,9 @@ public class AuthService
         var jwt = GenerateJwt(user);
         var refreshToken = GenerateRefreshToken();
         var expiresAt = DateTime.UtcNow.AddDays(_config.GetValue<int>("Jwt:ExpirationDays"));
+        var refreshExpirationDays = _config.GetValue<int?>("Jwt:RefreshExpirationDays") ?? 30;
 
-        await _refreshTokenRepo.CreateAsync(user.Id, refreshToken, expiresAt.AddDays(30));
+        await _refreshTokenRepo.CreateAsync(user.Id, refreshToken, DateTime.UtcNow.AddDays(refreshExpirationDays));
 
         return DollarsApiResponse<AuthResponse>.Success(new AuthResponse
         {

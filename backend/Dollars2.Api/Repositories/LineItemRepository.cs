@@ -32,7 +32,7 @@ public class LineItemRepository
     public async Task<int> CreateAsync(int groupId, string name, decimal plannedAmount, int sortOrder, int? previousLineItemId = null)
     {
         return await _db.Connection.QuerySingleAsync<int>(
-            "INSERT INTO LineItems (GroupId, Name, PlannedAmount, SortOrder, PreviousLineItemId, CreatedAt, UpdatedAt) VALUES (@GroupId, @Name, @PlannedAmount, @SortOrder, @PreviousLineItemId, GETUTCDATE(), GETUTCDATE()); SELECT CAST(SCOPE_IDENTITY() AS INT)",
+            "INSERT INTO LineItems (GroupId, Name, PlannedAmount, SortOrder, PreviousLineItemId, CreatedAt, UpdatedAt) VALUES (@GroupId, @Name, @PlannedAmount, @SortOrder, @PreviousLineItemId, SYSUTCDATETIME(), SYSUTCDATETIME()); SELECT CAST(SCOPE_IDENTITY() AS INT)",
             new { GroupId = groupId, Name = name, PlannedAmount = plannedAmount, SortOrder = sortOrder, PreviousLineItemId = previousLineItemId },
             _db.CurrentTransaction);
     }
@@ -70,7 +70,7 @@ public class LineItemRepository
     public async Task UpdateAsync(int id, string name, decimal plannedAmount)
     {
         await _db.Connection.ExecuteAsync(
-            "UPDATE LineItems SET Name = @Name, PlannedAmount = @PlannedAmount, UpdatedAt = GETUTCDATE() WHERE Id = @Id",
+            "UPDATE LineItems SET Name = @Name, PlannedAmount = @PlannedAmount, UpdatedAt = SYSUTCDATETIME() WHERE Id = @Id",
             new { Id = id, Name = name, PlannedAmount = plannedAmount },
             _db.CurrentTransaction);
     }
@@ -86,7 +86,7 @@ public class LineItemRepository
     public async Task UpdateSortOrderAsync(int id, int sortOrder)
     {
         await _db.Connection.ExecuteAsync(
-            "UPDATE LineItems SET SortOrder = @SortOrder, UpdatedAt = GETUTCDATE() WHERE Id = @Id",
+            "UPDATE LineItems SET SortOrder = @SortOrder, UpdatedAt = SYSUTCDATETIME() WHERE Id = @Id",
             new { Id = id, SortOrder = sortOrder },
             _db.CurrentTransaction);
     }
