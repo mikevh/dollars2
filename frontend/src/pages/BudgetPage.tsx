@@ -19,6 +19,7 @@ export default function BudgetPage() {
   )
   const [draggingTransaction, setDraggingTransaction] = useState<TransactionResponse | null>(null)
   const [selectedLineItemId, setSelectedLineItemId] = useState<number | null>(null)
+  const [crossMonthPending, setCrossMonthPending] = useState<{ transaction: TransactionResponse; lineItemId: number } | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -61,6 +62,16 @@ export default function BudgetPage() {
     setDraggingTransaction(event.active.data.current?.transaction ?? null)
   }
 
+  const doAssign = async (transaction: TransactionResponse, lineItemId: number) => {
+    const result = await dispatch(assignTransaction({ id: transaction.id, lineItemId }))
+    if (assignTransaction.rejected.match(result)) {
+      toast.error(result.payload as string)
+    } else {
+      dispatch(applyTransactionAssignment({ lineItemId, amount: transaction.amount }))
+      dispatch(fetchCounts())
+    }
+  }
+
   const handleDragEnd = async (event: DragEndEvent) => {
     setDraggingTransaction(null)
 
@@ -75,13 +86,14 @@ export default function BudgetPage() {
       return
     }
 
-    const result = await dispatch(assignTransaction({ id: transaction.id, lineItemId }))
-    if (assignTransaction.rejected.match(result)) {
-      toast.error(result.payload as string)
-    } else {
-      dispatch(applyTransactionAssignment({ lineItemId, amount: transaction.amount }))
-      dispatch(fetchCounts())
+    const txDate = new Date(transaction.date.slice(0, 10) + 'T00:00:00')
+    const isCrossMonth = txDate.getFullYear() !== currentYear || txDate.getMonth() + 1 !== currentMonth
+    if (isCrossMonth) {
+      setCrossMonthPending({ transaction, lineItemId })
+      return
     }
+
+    await doAssign(transaction, lineItemId)
   }
 
   return (
@@ -135,6 +147,41 @@ export default function BudgetPage() {
           </div>
         </div>
       </div>
+
+      {crossMonthPending && (() => {
+        const txDate = new Date(crossMonthPending.transaction.date.slice(0, 10) + 'T00:00:00')
+        const txMonthName = txDate.toLocaleString('default', { month: 'long' })
+        const budgetMonthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long' })
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setCrossMonthPending(null)} />
+            <div className="relative w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+              <h2 className="mb-2 text-base font-semibold text-gray-900 dark:text-white">Cross-month assignment</h2>
+              <p className="mb-5 text-sm text-gray-600 dark:text-gray-300">
+                This transaction is from <strong>{txMonthName}</strong> but you're viewing <strong>{budgetMonthName}</strong>. Assign it anyway?
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setCrossMonthPending(null)}
+                  className="rounded px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    const { transaction, lineItemId } = crossMonthPending
+                    setCrossMonthPending(null)
+                    await doAssign(transaction, lineItemId)
+                  }}
+                  className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Assign anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       <DragOverlay dropAnimation={null}>
         {draggingTransaction && (
