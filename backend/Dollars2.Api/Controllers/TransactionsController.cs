@@ -16,6 +16,13 @@ public class TransactionsController : DollarsControllerBase
         _transactionService = transactionService;
     }
 
+    [HttpGet("counts")]
+    public async Task<IActionResult> GetCounts()
+    {
+        var result = await _transactionService.GetCountsAsync(GetUserId());
+        return Ok(result);
+    }
+
     [HttpGet("new")]
     public async Task<IActionResult> GetNew()
     {

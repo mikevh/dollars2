@@ -6,6 +6,7 @@ import {
   fetchTrackedTransactions,
   fetchDeletedTransactions,
   fetchPendingTransactions,
+  fetchCounts,
   softDeleteTransaction,
   restoreTransaction,
   hardDeleteTransaction,
@@ -28,11 +29,12 @@ interface TransactionPaneProps {
 
 export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps) {
   const dispatch = useAppDispatch()
-  const { transactions, loading, error, activeTab } = useAppSelector((state) => state.transactions)
+  const { transactions, loading, error, activeTab, counts } = useAppSelector((state) => state.transactions)
   const { currentYear, currentMonth } = useAppSelector((state) => state.budget)
   const [editingTransaction, setEditingTransaction] = useState<TransactionResponse | null | 'create'>(null)
 
   const fetchCurrentTab = () => {
+    dispatch(fetchCounts())
     if (activeTab === 'new') {
       dispatch(fetchNewTransactions())
     } else if (activeTab === 'tracked') {
@@ -79,19 +81,31 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
   return (
     <div className="flex h-full flex-col">
       <div className="flex border-b border-gray-200 dark:border-gray-700">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => dispatch(setActiveTab(tab.key))}
-            className={`flex-1 px-4 py-2 text-sm font-medium ${
-              activeTab === tab.key
-                ? 'border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {tabs.map((tab) => {
+          const count = counts[tab.key]
+          return (
+            <button
+              key={tab.key}
+              onClick={() => dispatch(setActiveTab(tab.key))}
+              className={`flex flex-1 items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium ${
+                activeTab === tab.key
+                  ? 'border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              {tab.label}
+              {count > 0 && (
+                <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium leading-none ${
+                  activeTab === tab.key
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                }`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       <div className="flex-1 overflow-y-auto">

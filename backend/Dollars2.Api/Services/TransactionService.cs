@@ -21,6 +21,12 @@ public class TransactionService
         _accountRepo = accountRepo;
     }
 
+    public async Task<DollarsApiResponse<TransactionCountsResponse>> GetCountsAsync(int userId)
+    {
+        var counts = await _transactionRepo.GetCountsAsync(userId);
+        return DollarsApiResponse<TransactionCountsResponse>.Success(counts);
+    }
+
     public async Task<DollarsApiResponse<List<TransactionResponse>>> GetNewAsync(int userId)
     {
         var transactions = await _transactionRepo.GetNewAsync(userId);

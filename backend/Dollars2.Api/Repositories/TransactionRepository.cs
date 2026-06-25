@@ -71,6 +71,35 @@ public class TransactionRepository
             _db.CurrentTransaction);
     }
 
+    public async Task<TransactionCountsResponse> GetCountsAsync(int userId)
+    {
+        var trackedFromDate = DateTime.UtcNow.AddMonths(-2);
+        using var multi = await _db.Connection.QueryMultipleAsync(
+            @"SELECT COUNT(*) FROM Transactions t
+              LEFT JOIN TransactionAssignments ta ON ta.TransactionId = t.Id
+              WHERE t.UserId = @UserId AND t.IsDeleted = 0 AND t.IsPending = 0 AND ta.Id IS NULL;
+
+              SELECT COUNT(*) FROM Transactions t
+              WHERE t.UserId = @UserId AND t.IsDeleted = 0 AND t.Date >= @TrackedFromDate
+                AND EXISTS (SELECT 1 FROM TransactionAssignments ta WHERE ta.TransactionId = t.Id);
+
+              SELECT COUNT(*) FROM Transactions
+              WHERE UserId = @UserId AND IsDeleted = 1;
+
+              SELECT COUNT(*) FROM Transactions
+              WHERE UserId = @UserId AND IsPending = 1 AND IsDeleted = 0;",
+            new { UserId = userId, TrackedFromDate = trackedFromDate },
+            _db.CurrentTransaction);
+
+        return new TransactionCountsResponse
+        {
+            New = await multi.ReadSingleAsync<int>(),
+            Tracked = await multi.ReadSingleAsync<int>(),
+            Deleted = await multi.ReadSingleAsync<int>(),
+            Pending = await multi.ReadSingleAsync<int>(),
+        };
+    }
+
     public async Task<int> CreateAsync(int userId, DateTime date, string description, decimal amount, string? notes, bool isManual)
     {
         return await _db.Connection.QuerySingleAsync<int>(

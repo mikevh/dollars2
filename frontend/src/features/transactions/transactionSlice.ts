@@ -4,11 +4,19 @@ import type { TransactionResponse } from '../../types/transaction'
 
 type TransactionTab = 'new' | 'tracked' | 'deleted' | 'pending'
 
+interface TransactionCounts {
+  new: number
+  tracked: number
+  deleted: number
+  pending: number
+}
+
 interface TransactionState {
   transactions: TransactionResponse[]
   loading: boolean
   error: string | null
   activeTab: TransactionTab
+  counts: TransactionCounts
 }
 
 const initialState: TransactionState = {
@@ -16,6 +24,7 @@ const initialState: TransactionState = {
   loading: false,
   error: null,
   activeTab: 'new',
+  counts: { new: 0, tracked: 0, deleted: 0, pending: 0 },
 }
 
 export const fetchNewTransactions = createAsyncThunk(
@@ -106,6 +115,17 @@ export const hardDeleteTransaction = createAsyncThunk(
   }
 )
 
+export const fetchCounts = createAsyncThunk(
+  'transactions/fetchCounts',
+  async (_, { rejectWithValue }) => {
+    const result = await api.get<TransactionCounts>('/api/transactions/counts')
+    if (result.error) {
+      return rejectWithValue(result.error.message)
+    }
+    return result.data!
+  }
+)
+
 export const assignTransaction = createAsyncThunk(
   'transactions/assign',
   async ({ id, lineItemId }: { id: number; lineItemId: number }, { rejectWithValue }) => {
@@ -168,6 +188,9 @@ const transactionSlice = createSlice({
       })
       .addCase(assignTransaction.fulfilled, (state, action) => {
         state.transactions = state.transactions.filter((t) => t.id !== action.payload)
+      })
+      .addCase(fetchCounts.fulfilled, (state, action) => {
+        state.counts = action.payload
       })
   },
 })
