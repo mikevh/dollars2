@@ -16,8 +16,8 @@ public class BudgetRepository
     public async Task<Budget?> GetByMonthAsync(int userId, int year, int month)
     {
         return await _db.Connection.QuerySingleOrDefaultAsync<Budget>(
-            "SELECT Id, UserId, [Year], [Month], CreatedAt, UpdatedAt FROM Budgets WHERE UserId = @UserId AND [Year] = @Year AND [Month] = @Month",
-            new { UserId = userId, Year = year, Month = month },
+            "SELECT Id, UserId, [Year], [Month], CreatedAt, UpdatedAt FROM Budgets WHERE UserId = @userId AND [Year] = @year AND [Month] = @month",
+            new { userId, year, month },
             _db.CurrentTransaction);
     }
 
@@ -31,16 +31,16 @@ public class BudgetRepository
     public async Task<Budget?> GetByIdAsync(int id)
     {
         return await _db.Connection.QuerySingleOrDefaultAsync<Budget>(
-            "SELECT Id, UserId, [Year], [Month], CreatedAt, UpdatedAt FROM Budgets WHERE Id = @Id",
-            new { Id = id },
+            "SELECT Id, UserId, [Year], [Month], CreatedAt, UpdatedAt FROM Budgets WHERE Id = @id",
+            new { id },
             _db.CurrentTransaction);
     }
 
     public async Task<int> CreateAsync(int userId, int year, int month)
     {
         return await _db.Connection.QuerySingleAsync<int>(
-            "INSERT INTO Budgets (UserId, [Year], [Month], CreatedAt, UpdatedAt) VALUES (@UserId, @Year, @Month, SYSUTCDATETIME(), SYSUTCDATETIME()); SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { UserId = userId, Year = year, Month = month },
+            "INSERT INTO Budgets (UserId, [Year], [Month], CreatedAt, UpdatedAt) VALUES (@userId, @year, @month, SYSUTCDATETIME(), SYSUTCDATETIME()); SELECT CAST(SCOPE_IDENTITY() AS INT)",
+            new { userId, year, month },
             _db.CurrentTransaction);
     }
 }

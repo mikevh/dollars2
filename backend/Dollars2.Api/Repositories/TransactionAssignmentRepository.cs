@@ -16,16 +16,16 @@ public class TransactionAssignmentRepository
     public async Task<IEnumerable<TransactionAssignment>> GetByTransactionIdAsync(int transactionId)
     {
         return await _db.Connection.QueryAsync<TransactionAssignment>(
-            "SELECT Id, TransactionId, LineItemId, Amount, CreatedAt, UpdatedAt FROM TransactionAssignments WHERE TransactionId = @TransactionId",
-            new { TransactionId = transactionId },
+            "SELECT Id, TransactionId, LineItemId, Amount, CreatedAt, UpdatedAt FROM TransactionAssignments WHERE TransactionId = @transactionId",
+            new { transactionId },
             _db.CurrentTransaction);
     }
 
     public async Task<IEnumerable<TransactionAssignment>> GetByLineItemIdAsync(int lineItemId)
     {
         return await _db.Connection.QueryAsync<TransactionAssignment>(
-            "SELECT Id, TransactionId, LineItemId, Amount, CreatedAt, UpdatedAt FROM TransactionAssignments WHERE LineItemId = @LineItemId",
-            new { LineItemId = lineItemId },
+            "SELECT Id, TransactionId, LineItemId, Amount, CreatedAt, UpdatedAt FROM TransactionAssignments WHERE LineItemId = @lineItemId",
+            new { lineItemId },
             _db.CurrentTransaction);
     }
 
@@ -33,25 +33,25 @@ public class TransactionAssignmentRepository
     {
         return await _db.Connection.QuerySingleAsync<int>(
             @"INSERT INTO TransactionAssignments (TransactionId, LineItemId, Amount, CreatedAt, UpdatedAt)
-              VALUES (@TransactionId, @LineItemId, @Amount, SYSUTCDATETIME(), SYSUTCDATETIME());
+              VALUES (@transactionId, @lineItemId, @amount, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { TransactionId = transactionId, LineItemId = lineItemId, Amount = amount },
+            new { transactionId, lineItemId, amount },
             _db.CurrentTransaction);
     }
 
     public async Task DeleteByLineItemIdAsync(int lineItemId)
     {
         await _db.Connection.ExecuteAsync(
-            "DELETE FROM TransactionAssignments WHERE LineItemId = @LineItemId",
-            new { LineItemId = lineItemId },
+            "DELETE FROM TransactionAssignments WHERE LineItemId = @lineItemId",
+            new { lineItemId },
             _db.CurrentTransaction);
     }
 
     public async Task DeleteByTransactionIdAsync(int transactionId)
     {
         await _db.Connection.ExecuteAsync(
-            "DELETE FROM TransactionAssignments WHERE TransactionId = @TransactionId",
-            new { TransactionId = transactionId },
+            "DELETE FROM TransactionAssignments WHERE TransactionId = @transactionId",
+            new { transactionId },
             _db.CurrentTransaction);
     }
 
@@ -60,8 +60,8 @@ public class TransactionAssignmentRepository
         return await _db.Connection.QuerySingleAsync<decimal>(
             @"SELECT COALESCE(SUM(ta.Amount), 0) FROM TransactionAssignments ta
               INNER JOIN Transactions t ON t.Id = ta.TransactionId
-              WHERE ta.LineItemId = @LineItemId AND t.IsDeleted = 0 AND ta.Amount < 0",
-            new { LineItemId = lineItemId },
+              WHERE ta.LineItemId = @lineItemId AND t.IsDeleted = 0 AND ta.Amount < 0",
+            new { lineItemId },
             _db.CurrentTransaction);
     }
 
@@ -70,8 +70,8 @@ public class TransactionAssignmentRepository
         return await _db.Connection.QuerySingleAsync<decimal>(
             @"SELECT COALESCE(SUM(ta.Amount), 0) FROM TransactionAssignments ta
               INNER JOIN Transactions t ON t.Id = ta.TransactionId
-              WHERE ta.LineItemId = @LineItemId AND t.IsDeleted = 0 AND ta.Amount > 0",
-            new { LineItemId = lineItemId },
+              WHERE ta.LineItemId = @lineItemId AND t.IsDeleted = 0 AND ta.Amount > 0",
+            new { lineItemId },
             _db.CurrentTransaction);
     }
 }

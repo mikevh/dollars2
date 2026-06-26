@@ -16,16 +16,23 @@ public class UserRepository
     public async Task<User?> GetByEmailAsync(string email)
     {
         return await _db.Connection.QuerySingleOrDefaultAsync<User>(
-            "SELECT Id, Email, CreatedAt, UpdatedAt FROM Users WHERE Email = @Email",
-            new { Email = email },
+            "SELECT Id, Email, CreatedAt, UpdatedAt FROM Users WHERE Email = @email",
+            new { email },
             _db.CurrentTransaction);
     }
 
     public async Task<User?> GetByIdAsync(int id)
     {
         return await _db.Connection.QuerySingleOrDefaultAsync<User>(
-            "SELECT Id, Email, CreatedAt, UpdatedAt FROM Users WHERE Id = @Id",
-            new { Id = id },
+            "SELECT Id, Email, CreatedAt, UpdatedAt FROM Users WHERE Id = @id",
+            new { id },
             _db.CurrentTransaction);
+    }
+
+    public async Task<IEnumerable<int>> GetAllIdsAsync()
+    {
+        return await _db.Connection.QueryAsync<int>(
+            "SELECT Id FROM Users",
+            transaction: _db.CurrentTransaction);
     }
 }

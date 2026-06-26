@@ -1,5 +1,6 @@
 using System.Text;
 using Dollars2.Api.Data;
+using Dollars2.Api.Providers;
 using Dollars2.Api.Repositories;
 using Dollars2.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -24,6 +25,13 @@ builder.Services.AddScoped<TransactionAssignmentRepository>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<TransactionService>();
+builder.Services.AddScoped<SyncLogRepository>();
+builder.Services.AddHttpClient("simplefin", client =>
+    client.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddScoped<IBankSyncProvider, SimplefinProvider>();
+builder.Services.AddScoped<BankSyncService>();
+builder.Services.AddSingleton<SyncLockService>();
+builder.Services.AddHostedService<BankSyncHostedService>();
 
 var frontendUrl = builder.Configuration["Cors:FrontendUrl"]
     ?? throw new InvalidOperationException("Cors:FrontendUrl is not configured.");

@@ -16,8 +16,16 @@ public class AccountRepository
     public async Task<Account?> GetByIdAsync(int id)
     {
         return await _db.Connection.QuerySingleOrDefaultAsync<Account>(
-            "SELECT Id, UserId, Name, SourceType, ConnectionDetailsJson, CreatedAt, UpdatedAt FROM Accounts WHERE Id = @Id",
-            new { Id = id },
+            "SELECT Id, UserId, Name, SourceType, ConnectionDetailsJson, CreatedAt, UpdatedAt FROM Accounts WHERE Id = @id",
+            new { id },
+            _db.CurrentTransaction);
+    }
+
+    public async Task<IEnumerable<Account>> GetByUserIdAsync(int userId)
+    {
+        return await _db.Connection.QueryAsync<Account>(
+            "SELECT Id, UserId, Name, SourceType, ConnectionDetailsJson, CreatedAt, UpdatedAt FROM Accounts WHERE UserId = @userId",
+            new { userId },
             _db.CurrentTransaction);
     }
 }

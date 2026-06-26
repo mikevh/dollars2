@@ -14,6 +14,10 @@ public class DbSession : IDisposable
 
     public IDbTransaction BeginTransaction()
     {
+        if (CurrentTransaction is not null)
+        {
+            throw new InvalidOperationException("A transaction is already in progress.");
+        }
         if (Connection.State != ConnectionState.Open)
         {
             Connection.Open();
