@@ -36,7 +36,7 @@ public class BankSyncService
         _logger = logger;
     }
 
-    public async Task<IEnumerable<SyncResult>> SyncForUserAsync(int userId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<SyncResult>> SyncForUserAsync(int userId, bool enforceMinInterval = false, CancellationToken cancellationToken = default)
     {
         var accounts = await _accountRepo.GetByUserIdAsync(userId);
         var results = new List<SyncResult>();
@@ -44,19 +44,54 @@ public class BankSyncService
         // TODO: For users with multiple SimpleFIN accounts, this makes one HTTP request per
         // account even though the SimpleFIN API returns all accounts in a single response.
         // Fix when adding a second account: fetch once per provider per user and distribute.
-        foreach (var account in accounts)
+        var providerGroups = accounts
+            .Where(a => a.SourceType != SyncConstants.SourceTypeManual)
+            .GroupBy(a => a.SourceType);
+
+        foreach (var group in providerGroups)
         {
-            if (account.SourceType == SyncConstants.SourceTypeManual)
+            var sourceType = group.Key;
+            var provider = GetProvider(sourceType);
+
+            if (provider is not null && enforceMinInterval
+                && await IsWithinMinIntervalAsync(userId, sourceType, provider.MinSyncInterval))
             {
+                _logger.LogInformation(
+                    "Skipping scheduled {SourceType} sync for user {UserId} — last successful sync is within the {MinInterval} minimum interval",
+                    sourceType, userId, provider.MinSyncInterval);
+                foreach (var account in group)
+                {
+                    results.Add(new SyncResult
+                    {
+                        AccountId = account.Id,
+                        AccountName = account.Name,
+                        Status = SyncConstants.StatusSkipped,
+                        TransactionCount = 0,
+                    });
+                }
                 continue;
             }
-            _logger.LogInformation("Syncing account {AccountId} ({AccountName}) for user {UserId}", account.Id, account.Name, userId);
-            var result = await SyncAccountAsync(account, cancellationToken);
-            results.Add(result);
-            _logger.LogInformation("Completed sync for account {AccountId} ({AccountName}): {Status}, {TransactionCount} new transactions", account.Id, account.Name, result.Status, result.TransactionCount);
+
+            foreach (var account in group)
+            {
+                _logger.LogInformation("Syncing account {AccountId} ({AccountName}) for user {UserId}", account.Id, account.Name, userId);
+                var result = await SyncAccountAsync(account, cancellationToken);
+                results.Add(result);
+                _logger.LogInformation("Completed sync for account {AccountId} ({AccountName}): {Status}, {TransactionCount} new transactions", account.Id, account.Name, result.Status, result.TransactionCount);
+            }
         }
 
         return results;
+    }
+
+    private async Task<bool> IsWithinMinIntervalAsync(int userId, string sourceType, TimeSpan minInterval)
+    {
+        var lastSuccess = await _syncLogRepo.GetLastSuccessfulForUserProviderAsync(userId, sourceType);
+        if (lastSuccess is null)
+        {
+            return false;
+        }
+        return DateTime.UtcNow - lastSuccess.SyncedAt < minInterval;
     }
 
     public async Task SyncAllUsersAsync(IEnumerable<int> userIds, CancellationToken cancellationToken = default)
@@ -73,7 +108,7 @@ public class BankSyncService
             }
             try
             {
-                await SyncForUserAsync(userId, cancellationToken);
+                await SyncForUserAsync(userId, enforceMinInterval: true, cancellationToken);
             }
             finally
             {

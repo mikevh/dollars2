@@ -33,6 +33,18 @@ public class SyncLogRepository
             _db.CurrentTransaction);
     }
 
+    public async Task<SyncLog?> GetLastSuccessfulForUserProviderAsync(int userId, string sourceType)
+    {
+        return await _db.Connection.QuerySingleOrDefaultAsync<SyncLog>(
+            @"SELECT TOP 1 sl.Id, sl.AccountId, sl.SyncedAt, sl.Status, sl.TransactionCount, sl.ErrorMessage
+              FROM SyncLog sl
+              INNER JOIN Accounts a ON a.Id = sl.AccountId
+              WHERE a.UserId = @userId AND a.SourceType = @sourceType AND sl.Status = 'Success'
+              ORDER BY sl.SyncedAt DESC",
+            new { userId, sourceType },
+            _db.CurrentTransaction);
+    }
+
     public async Task<IEnumerable<SyncLog>> GetLatestPerAccountAsync(IEnumerable<int> accountIds)
     {
         return await _db.Connection.QueryAsync<SyncLog>(

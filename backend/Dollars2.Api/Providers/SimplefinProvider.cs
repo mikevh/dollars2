@@ -11,11 +11,15 @@ public class SimplefinProvider : IBankSyncProvider
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<SimplefinProvider> _logger;
 
-    public SimplefinProvider(IHttpClientFactory httpClientFactory, ILogger<SimplefinProvider> logger)
+    public SimplefinProvider(IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<SimplefinProvider> logger)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        var hours = config.GetValue<double?>("SimpleFin:MinSyncIntervalHours") ?? 6;
+        MinSyncInterval = TimeSpan.FromHours(hours);
     }
+
+    public TimeSpan MinSyncInterval { get; }
 
     public async Task<IEnumerable<SyncedTransaction>> FetchTransactionsAsync(Account account, DateTime? since, CancellationToken cancellationToken = default)
     {

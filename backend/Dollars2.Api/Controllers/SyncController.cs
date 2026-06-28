@@ -33,7 +33,7 @@ public class SyncController : DollarsControllerBase
         }
         try
         {
-            var results = await _syncService.SyncForUserAsync(userId, HttpContext.RequestAborted);
+            var results = await _syncService.SyncForUserAsync(userId, cancellationToken: HttpContext.RequestAborted);
             return Ok(DollarsApiResponse<IEnumerable<SyncResult>>.Success(results));
         }
         finally

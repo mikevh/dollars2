@@ -6,7 +6,9 @@ public class BankSyncHostedService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BankSyncHostedService> _logger;
-    private readonly TimeSpan _interval = TimeSpan.FromHours(12);
+    // Runs frequently; per-provider MinSyncInterval throttles how often each
+    // provider is actually synced for a given user.
+    private readonly TimeSpan _interval = TimeSpan.FromHours(1);
 
     public BankSyncHostedService(IServiceScopeFactory scopeFactory, ILogger<BankSyncHostedService> logger)
     {
