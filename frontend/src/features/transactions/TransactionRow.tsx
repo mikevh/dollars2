@@ -31,7 +31,7 @@ export default function TransactionRow({ transaction, actions, draggable, onClic
       } ${isDragging ? 'opacity-50' : ''}`}
     >
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm text-gray-900 dark:text-white">{transaction.description}</div>
+        <div className="truncate text-sm text-gray-900 dark:text-white">{transaction.payee || transaction.description}</div>
         <div className="flex gap-2 text-xs text-gray-400 dark:text-gray-500">
           <span>{new Date(transaction.date.slice(0, 10) + 'T00:00:00').toLocaleDateString()}</span>
           {transaction.isManual && <span>manual</span>}

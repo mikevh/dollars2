@@ -32,6 +32,15 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
   const { transactions, loading, error, activeTab, counts } = useAppSelector((state) => state.transactions)
   const { currentYear, currentMonth } = useAppSelector((state) => state.budget)
   const [editingTransaction, setEditingTransaction] = useState<TransactionResponse | null | 'create'>(null)
+  const [search, setSearch] = useState('')
+
+  const query = search.trim().toLowerCase()
+  const filteredTransactions = query
+    ? transactions.filter((t) => {
+        const fields = [t.payee, t.description, t.memo, Math.abs(t.amount).toFixed(2)]
+        return fields.some((field) => field?.toLowerCase().includes(query))
+      })
+    : transactions
 
   const fetchCurrentTab = () => {
     dispatch(fetchCounts())
@@ -51,6 +60,10 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
   useEffect(() => {
     fetchCurrentTab()
   }, [dispatch, activeTab, currentYear, currentMonth])
+
+  useEffect(() => {
+    setSearch('')
+  }, [activeTab])
 
   const handleSoftDelete = async (id: number) => {
     const result = await dispatch(softDeleteTransaction({ id }))
@@ -108,6 +121,16 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
         })}
       </div>
 
+      <div className="border-b border-gray-200 p-2 dark:border-gray-700">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search transactions..."
+          className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+        />
+      </div>
+
       <div className="flex-1 overflow-y-auto">
         {loading && (
           <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">Loading...</div>
@@ -117,11 +140,13 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
           <div className="py-8 text-center text-sm text-red-500">{error}</div>
         )}
 
-        {!loading && !error && transactions.length === 0 && (
-          <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">No transactions</div>
+        {!loading && !error && filteredTransactions.length === 0 && (
+          <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+            {query ? 'No matching transactions' : 'No transactions'}
+          </div>
         )}
 
-        {!loading && !error && transactions.map((t) => (
+        {!loading && !error && filteredTransactions.map((t) => (
           <TransactionRow
             key={t.id}
             transaction={t}
