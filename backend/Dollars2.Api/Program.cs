@@ -11,9 +11,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+var cs = builder.Configuration.GetConnectionString("DefaultConnection");
 
-builder.Services.AddScoped(sp =>
-    new DbSession(new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"))));
+if (string.IsNullOrWhiteSpace(cs) || cs == "<dotnet user secret>")
+{
+    throw new ApplicationException("ConnectionStrings:DefaultConnection is not initialized");
+}
+
+builder.Services.AddScoped(sp => new DbSession(new SqlConnection(cs)));
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<RefreshTokenRepository>();
 builder.Services.AddScoped<BudgetRepository>();

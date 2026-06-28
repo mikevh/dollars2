@@ -6,6 +6,8 @@ public record SyncedTransaction(
     string ProviderTransactionId,
     DateTime Date,
     string Description,
+    string Payee,
+    string Memo,
     decimal Amount,
     bool IsPending);
 

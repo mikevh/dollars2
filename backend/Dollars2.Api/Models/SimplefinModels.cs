@@ -6,6 +6,9 @@ namespace Dollars2.Api.Models;
 public class SimplefinConnectionDetails
 {
     public string AccountId { get; set; } = "";
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
+    public string Url { get; set; } = "";
 }
 
 internal class SimplefinAccountSet
@@ -48,6 +51,12 @@ internal class SimplefinTransaction
 
     [JsonPropertyName("description")]
     public string Description { get; set; } = "";
+
+    [JsonPropertyName("payee")]
+    public string Payee { get; set; } = "";
+
+    [JsonPropertyName("memo")]
+    public string Memo { get; set; } = "";
 
     [JsonPropertyName("pending")]
     public bool Pending { get; set; }

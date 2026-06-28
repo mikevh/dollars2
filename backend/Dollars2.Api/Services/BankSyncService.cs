@@ -119,7 +119,7 @@ public class BankSyncService
                     {
                         await _transactionRepo.CreateFromSyncAsync(
                             account.UserId, account.Id, t.ProviderTransactionId,
-                            t.Date, t.Description, t.Amount, t.IsPending);
+                            t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.IsPending);
                         count++;
                     }
                     else if (!existing.IsDeleted)
@@ -127,10 +127,12 @@ public class BankSyncService
                         var changed = (existing.IsPending && !t.IsPending)
                                    || existing.Amount != t.Amount
                                    || existing.Description != t.Description
+                                   || existing.Payee != t.Payee
+                                   || existing.Memo != t.Memo
                                    || existing.Date.Date != t.Date;
                         if (changed)
                         {
-                            await _transactionRepo.UpdateFromSyncAsync(existing.Id, t.Date, t.Description, t.Amount, t.IsPending);
+                            await _transactionRepo.UpdateFromSyncAsync(existing.Id, t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.IsPending);
                         }
                     }
                 }

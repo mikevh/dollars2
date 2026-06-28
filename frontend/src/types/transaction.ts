@@ -4,6 +4,8 @@ export interface TransactionResponse {
   accountName: string | null
   date: string
   description: string
+  payee: string
+  memo: string
   amount: number
   notes: string | null
   isDeleted: boolean

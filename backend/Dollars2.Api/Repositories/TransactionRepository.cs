@@ -16,7 +16,7 @@ public class TransactionRepository
     public async Task<Transaction?> GetByIdAsync(int id)
     {
         return await _db.Connection.QuerySingleOrDefaultAsync<Transaction>(
-            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE Id = @id",
+            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Payee, Memo, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE Id = @id",
             new { id },
             _db.CurrentTransaction);
     }
@@ -24,7 +24,7 @@ public class TransactionRepository
     public async Task<IEnumerable<Transaction>> GetNewAsync(int userId)
     {
         return await _db.Connection.QueryAsync<Transaction>(
-            @"SELECT t.Id, t.AccountId, t.UserId, t.ProviderTransactionId, t.Date, t.Description, t.Amount, t.Notes, t.IsDeleted, t.IsPending, t.IsManual, t.CreatedAt, t.UpdatedAt
+            @"SELECT t.Id, t.AccountId, t.UserId, t.ProviderTransactionId, t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.Notes, t.IsDeleted, t.IsPending, t.IsManual, t.CreatedAt, t.UpdatedAt
               FROM Transactions t
               LEFT JOIN TransactionAssignments ta ON ta.TransactionId = t.Id
               WHERE t.UserId = @userId AND t.IsDeleted = 0 AND t.IsPending = 0
@@ -37,7 +37,7 @@ public class TransactionRepository
     public async Task<IEnumerable<Transaction>> GetTrackedAsync(int userId, DateTime fromDate)
     {
         return await _db.Connection.QueryAsync<Transaction>(
-            @"SELECT t.Id, t.AccountId, t.UserId, t.ProviderTransactionId, t.Date, t.Description, t.Amount, t.Notes, t.IsDeleted, t.IsPending, t.IsManual, t.CreatedAt, t.UpdatedAt
+            @"SELECT t.Id, t.AccountId, t.UserId, t.ProviderTransactionId, t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.Notes, t.IsDeleted, t.IsPending, t.IsManual, t.CreatedAt, t.UpdatedAt
               FROM Transactions t
               WHERE t.UserId = @userId AND t.IsDeleted = 0 AND t.Date >= @fromDate
                 AND EXISTS (SELECT 1 FROM TransactionAssignments ta WHERE ta.TransactionId = t.Id)
@@ -49,7 +49,7 @@ public class TransactionRepository
     public async Task<IEnumerable<Transaction>> GetDeletedAsync(int userId)
     {
         return await _db.Connection.QueryAsync<Transaction>(
-            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE UserId = @userId AND IsDeleted = 1 ORDER BY Date DESC",
+            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Payee, Memo, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE UserId = @userId AND IsDeleted = 1 ORDER BY Date DESC",
             new { userId },
             _db.CurrentTransaction);
     }
@@ -57,7 +57,7 @@ public class TransactionRepository
     public async Task<IEnumerable<Transaction>> GetPendingAsync(int userId)
     {
         return await _db.Connection.QueryAsync<Transaction>(
-            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE UserId = @userId AND IsPending = 1 AND IsDeleted = 0 ORDER BY Date DESC",
+            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Payee, Memo, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE UserId = @userId AND IsPending = 1 AND IsDeleted = 0 ORDER BY Date DESC",
             new { userId },
             _db.CurrentTransaction);
     }
@@ -65,7 +65,7 @@ public class TransactionRepository
     public async Task<IEnumerable<Transaction>> GetByLineItemIdAsync(int lineItemId)
     {
         return await _db.Connection.QueryAsync<Transaction>(
-            @"SELECT t.Id, t.AccountId, t.UserId, t.ProviderTransactionId, t.Date, t.Description, t.Amount, t.Notes, t.IsDeleted, t.IsPending, t.IsManual, t.CreatedAt, t.UpdatedAt
+            @"SELECT t.Id, t.AccountId, t.UserId, t.ProviderTransactionId, t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.Notes, t.IsDeleted, t.IsPending, t.IsManual, t.CreatedAt, t.UpdatedAt
               FROM Transactions t
               INNER JOIN TransactionAssignments ta ON ta.TransactionId = t.Id
               WHERE ta.LineItemId = @lineItemId AND t.IsDeleted = 0
@@ -156,26 +156,36 @@ public class TransactionRepository
     public async Task<Transaction?> GetByProviderTransactionIdAsync(int accountId, string providerTransactionId)
     {
         return await _db.Connection.QuerySingleOrDefaultAsync<Transaction>(
-            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE AccountId = @accountId AND ProviderTransactionId = @providerTransactionId",
+            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Payee, Memo, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE AccountId = @accountId AND ProviderTransactionId = @providerTransactionId",
             new { accountId, providerTransactionId },
             _db.CurrentTransaction);
     }
 
-    public async Task<int> CreateFromSyncAsync(int userId, int accountId, string providerTransactionId, DateTime date, string description, decimal amount, bool isPending)
+    public async Task<int> CreateFromSyncAsync(
+        int userId, 
+        int accountId, 
+        string providerTransactionId, 
+        DateTime date, 
+        string description, 
+        string payee,
+        string memo,
+        decimal amount, 
+        bool isPending)
     {
         return await _db.Connection.QuerySingleAsync<int>(
-            @"INSERT INTO Transactions (UserId, AccountId, ProviderTransactionId, Date, Description, Amount, IsPending, IsManual, CreatedAt, UpdatedAt)
-              VALUES (@userId, @accountId, @providerTransactionId, @date, @description, @amount, @isPending, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+            @"INSERT INTO Transactions 
+    (UserId, AccountId, ProviderTransactionId, Date, Description, Payee, Memo, Amount, IsPending, IsManual, CreatedAt, UpdatedAt) VALUES 
+   (@userId, @accountId, @providerTransactionId, @date, @description, @payee, @memo, @amount, @isPending, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { userId, accountId, providerTransactionId, date, description, amount, isPending },
+            new { userId, accountId, providerTransactionId, date, description, payee, memo, amount, isPending },
             _db.CurrentTransaction);
     }
 
-    public async Task UpdateFromSyncAsync(int id, DateTime date, string description, decimal amount, bool isPending)
+    public async Task UpdateFromSyncAsync(int id, DateTime date, string description, string payee, string memo, decimal amount, bool isPending)
     {
         await _db.Connection.ExecuteAsync(
-            "UPDATE Transactions SET Date = @date, Description = @description, Amount = @amount, IsPending = @isPending, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id",
-            new { id, date, description, amount, isPending },
+            "UPDATE Transactions SET Date = @date, Description = @description, Payee = @payee, Memo = @memo, Amount = @amount, IsPending = @isPending, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id",
+            new { id, date, description, payee, memo, amount, isPending },
             _db.CurrentTransaction);
     }
 

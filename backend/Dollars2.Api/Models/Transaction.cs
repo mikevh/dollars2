@@ -8,6 +8,8 @@ public class Transaction
     public string? ProviderTransactionId { get; set; }
     public DateTime Date { get; set; }
     public string Description { get; set; } = "";
+    public string Payee { get; set; } = "";
+    public string Memo { get; set; } = "";
     public decimal Amount { get; set; }
     public string? Notes { get; set; }
     public bool IsDeleted { get; set; }

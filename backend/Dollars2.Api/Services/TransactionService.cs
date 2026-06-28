@@ -343,6 +343,8 @@ public class TransactionService
             AccountName = accountName,
             Date = t.Date,
             Description = t.Description,
+            Payee = t.Payee,
+            Memo = t.Memo,
             Amount = t.Amount,
             Notes = t.Notes,
             IsDeleted = t.IsDeleted,

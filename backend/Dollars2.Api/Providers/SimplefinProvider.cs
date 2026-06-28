@@ -8,49 +8,43 @@ namespace Dollars2.Api.Providers;
 
 public class SimplefinProvider : IBankSyncProvider
 {
-    private readonly string? _accessUrl;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<SimplefinProvider> _logger;
 
-    public SimplefinProvider(IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<SimplefinProvider> logger)
+    public SimplefinProvider(IHttpClientFactory httpClientFactory, ILogger<SimplefinProvider> logger)
     {
-        _accessUrl = config["SimpleFin:AccessUrl"];
         _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
     public async Task<IEnumerable<SyncedTransaction>> FetchTransactionsAsync(Account account, DateTime? since, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_accessUrl))
-        {
-            throw new InvalidOperationException("SimpleFin:AccessUrl is not configured.");
-        }
-
         var connectionDetails = JsonSerializer.Deserialize<SimplefinConnectionDetails>(
             account.ConnectionDetailsJson ?? "{}",
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-        if (connectionDetails is null || string.IsNullOrEmpty(connectionDetails.AccountId))
+        if (connectionDetails is null
+            || string.IsNullOrEmpty(connectionDetails.AccountId)
+            || string.IsNullOrEmpty(connectionDetails.Url)
+            || string.IsNullOrEmpty(connectionDetails.Username)
+            || string.IsNullOrEmpty(connectionDetails.Password))
         {
             _logger.LogWarning("Account {AccountId} has missing or invalid SimpleFIN connection details.", account.Id);
             throw new InvalidOperationException($"Account {account.Id} has missing or invalid SimpleFIN connection details.");
         }
 
-        var uri = new Uri(_accessUrl);
-        var base64Credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes(uri.UserInfo));
-        var port = uri.IsDefaultPort ? "" : $":{uri.Port}";
-        var cleanUrl = $"{uri.Scheme}://{uri.Host}{port}{uri.AbsolutePath}";
+        var url = connectionDetails.Url;
+        var base64Credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{connectionDetails.Username}:{connectionDetails.Password}"));
 
-        var requestUrl = cleanUrl;
         if (since.HasValue)
         {
             var startDate = ((DateTimeOffset)DateTime.SpecifyKind(since.Value, DateTimeKind.Utc)).ToUnixTimeSeconds();
-            requestUrl += $"?start-date={startDate}";
+            url += $"?start-date={startDate}";
         }
 
         _logger.LogTrace("Fetching transactions for account {AccountId} from SimpleFIN", account.Id);
         var http = _httpClientFactory.CreateClient("simplefin");
-        using var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64Credentials);
 
         using var response = await http.SendAsync(request, cancellationToken);
@@ -89,7 +83,7 @@ public class SimplefinProvider : IBankSyncProvider
                 ? DateTime.UtcNow.Date
                 : DateTimeOffset.FromUnixTimeSeconds(t.Posted).UtcDateTime.Date;
 
-            result.Add(new SyncedTransaction(t.Id, date, t.Description, amount, t.Pending));
+            result.Add(new SyncedTransaction(t.Id, date, t.Description, t.Payee, t.Memo, amount, t.Pending));
         }
 
         return result;

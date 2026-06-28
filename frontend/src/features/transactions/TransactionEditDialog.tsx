@@ -279,6 +279,20 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
             )}
           </div>
 
+          {transaction?.payee && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Payee</label>
+              <div className="text-sm text-gray-900 dark:text-white">{transaction.payee}</div>
+            </div>
+          )}
+
+          {transaction?.memo && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Memo</label>
+              <div className="text-sm text-gray-900 dark:text-white">{transaction.memo}</div>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Amount</label>
