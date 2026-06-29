@@ -11,8 +11,7 @@ public class BankSyncService
     private readonly AccountRepository _accountRepo;
     private readonly TransactionRepository _transactionRepo;
     private readonly SyncLogRepository _syncLogRepo;
-    private readonly IBankSyncProvider _bankSyncProvider;
-    private readonly IConfiguration _config;
+    private readonly IReadOnlyDictionary<string, IBankSyncProvider> _providers;
     private readonly SyncLockService _syncLock;
     private readonly ILogger<BankSyncService> _logger;
 
@@ -21,8 +20,7 @@ public class BankSyncService
         AccountRepository accountRepo,
         TransactionRepository transactionRepo,
         SyncLogRepository syncLogRepo,
-        IBankSyncProvider bankSyncProvider,
-        IConfiguration config,
+        IEnumerable<IBankSyncProvider> providers,
         SyncLockService syncLock,
         ILogger<BankSyncService> logger)
     {
@@ -30,8 +28,7 @@ public class BankSyncService
         _accountRepo = accountRepo;
         _transactionRepo = transactionRepo;
         _syncLogRepo = syncLogRepo;
-        _bankSyncProvider = bankSyncProvider;
-        _config = config;
+        _providers = providers.ToDictionary(p => p.SourceType, StringComparer.OrdinalIgnoreCase);
         _syncLock = syncLock;
         _logger = logger;
     }
@@ -141,13 +138,13 @@ public class BankSyncService
             // Deduplication via ProviderTransactionId prevents double-imports.
             var since = (lastSync?.SyncedAt ?? DateTime.UtcNow.AddDays(-30)).AddHours(-12);
 
-            var transactions = (await provider.FetchTransactionsAsync(account, since, cancellationToken)).ToList();
+            var syncResult = await provider.FetchTransactionsAsync(account, since, cancellationToken);
             var count = 0;
 
             _dbSession.BeginTransaction();
             try
             {
-                foreach (var t in transactions)
+                foreach (var t in syncResult.Upserts)
                 {
                     var existing = await _transactionRepo.GetByProviderTransactionIdAsync(account.Id, t.ProviderTransactionId);
                     if (existing is null)
@@ -170,6 +167,16 @@ public class BankSyncService
                             await _transactionRepo.UpdateFromSyncAsync(existing.Id, t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.IsPending);
                         }
                     }
+                }
+
+                foreach (var removedId in syncResult.RemovedProviderTransactionIds)
+                {
+                    await _transactionRepo.SoftDeleteByProviderTransactionIdAsync(account.Id, removedId);
+                }
+
+                if (syncResult.UpdatedConnectionDetailsJson is not null)
+                {
+                    await _accountRepo.UpdateConnectionDetailsJsonAsync(account.Id, syncResult.UpdatedConnectionDetailsJson);
                 }
 
                 await _syncLogRepo.CreateAsync(account.Id, SyncConstants.StatusSuccess, count, null);
@@ -214,10 +221,10 @@ public class BankSyncService
 
     private IBankSyncProvider? GetProvider(string sourceType)
     {
-        return sourceType switch
+        if (_providers.TryGetValue(sourceType, out var provider) && provider.Enabled)
         {
-            SyncConstants.SourceTypeSimpleFin when _config.GetValue<bool>("SimpleFin:Enabled") => _bankSyncProvider,
-            _ => null,
-        };
+            return provider;
+        }
+        return null;
     }
 }

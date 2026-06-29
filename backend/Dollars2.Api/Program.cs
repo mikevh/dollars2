@@ -3,6 +3,7 @@ using Dollars2.Api.Data;
 using Dollars2.Api.Providers;
 using Dollars2.Api.Repositories;
 using Dollars2.Api.Services;
+using Going.Plaid;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
@@ -34,6 +35,8 @@ builder.Services.AddScoped<SyncLogRepository>();
 builder.Services.AddHttpClient("simplefin", client =>
     client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddScoped<IBankSyncProvider, SimplefinProvider>();
+builder.Services.AddPlaid(builder.Configuration);
+builder.Services.AddScoped<IBankSyncProvider, PlaidProvider>();
 builder.Services.AddScoped<BankSyncService>();
 builder.Services.AddSingleton<SyncLockService>();
 builder.Services.AddHostedService<BankSyncHostedService>();

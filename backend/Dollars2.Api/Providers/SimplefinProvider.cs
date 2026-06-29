@@ -15,13 +15,18 @@ public class SimplefinProvider : IBankSyncProvider
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        Enabled = config.GetValue<bool>("SimpleFin:Enabled");
         var hours = config.GetValue<double?>("SimpleFin:MinSyncIntervalHours") ?? 6;
         MinSyncInterval = TimeSpan.FromHours(hours);
     }
 
+    public string SourceType => "SimpleFIN";
+
+    public bool Enabled { get; }
+
     public TimeSpan MinSyncInterval { get; }
 
-    public async Task<IEnumerable<SyncedTransaction>> FetchTransactionsAsync(Account account, DateTime? since, CancellationToken cancellationToken = default)
+    public async Task<ProviderSyncResult> FetchTransactionsAsync(Account account, DateTime? since, CancellationToken cancellationToken = default)
     {
         var connectionDetails = JsonSerializer.Deserialize<SimplefinConnectionDetails>(
             account.ConnectionDetailsJson ?? "{}",
@@ -71,7 +76,7 @@ public class SimplefinProvider : IBankSyncProvider
         if (simplefinAccount is null)
         {
             _logger.LogWarning("No matching account found in SimpleFIN response for account {AccountId} with SimpleFIN AccountId {SimplefinAccountId}.", account.Id, connectionDetails.AccountId);
-            return Enumerable.Empty<SyncedTransaction>();
+            return new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null);
         }
 
         var result = new List<SyncedTransaction>();
@@ -90,6 +95,6 @@ public class SimplefinProvider : IBankSyncProvider
             result.Add(new SyncedTransaction(t.Id, date, t.Description, t.Payee, t.Memo, amount, t.Pending));
         }
 
-        return result;
+        return new ProviderSyncResult(result, Array.Empty<string>(), null);
     }
 }

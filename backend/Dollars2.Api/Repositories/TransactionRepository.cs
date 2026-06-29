@@ -196,4 +196,12 @@ public class TransactionRepository
             new { id, isPending },
             _db.CurrentTransaction);
     }
+
+    public async Task<int> SoftDeleteByProviderTransactionIdAsync(int accountId, string providerTransactionId)
+    {
+        return await _db.Connection.ExecuteAsync(
+            "UPDATE Transactions SET IsDeleted = 1, UpdatedAt = SYSUTCDATETIME() WHERE AccountId = @accountId AND ProviderTransactionId = @providerTransactionId AND IsDeleted = 0",
+            new { accountId, providerTransactionId },
+            _db.CurrentTransaction);
+    }
 }

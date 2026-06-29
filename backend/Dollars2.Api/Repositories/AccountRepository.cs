@@ -28,4 +28,12 @@ public class AccountRepository
             new { userId },
             _db.CurrentTransaction);
     }
+
+    public async Task UpdateConnectionDetailsJsonAsync(int id, string connectionDetailsJson)
+    {
+        await _db.Connection.ExecuteAsync(
+            "UPDATE Accounts SET ConnectionDetailsJson = @connectionDetailsJson, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id",
+            new { id, connectionDetailsJson },
+            _db.CurrentTransaction);
+    }
 }

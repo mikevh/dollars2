@@ -18,7 +18,7 @@ public class BankSyncHostedService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+        await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
