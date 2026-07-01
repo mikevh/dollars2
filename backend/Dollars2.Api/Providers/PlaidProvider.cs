@@ -91,7 +91,7 @@ public class PlaidProvider : IBankSyncProvider
                     $"Plaid /transactions/sync failed for account {account.Id}: {error?.ErrorCode} - {error?.ErrorMessage}");
             }
 
-            added.AddRange(response.Added);
+            added.AddRange(response.Added); // response.Add = List<Entity.Transaction> ... has an accouint id. there's transactions from multiple accounts in this list. they need to be propoeryly assocsatied with the stored accoutnt... key checking and savings
             modified.AddRange(response.Modified);
             removed.AddRange(response.Removed);
 
