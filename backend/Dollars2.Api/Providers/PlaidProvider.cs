@@ -42,16 +42,41 @@ public class PlaidProvider : IBankSyncProvider
 
     public TimeSpan MinSyncInterval { get; }
 
-    public async Task<ProviderSyncResult> FetchTransactionsAsync(Account account, DateTime? since, CancellationToken cancellationToken = default)
+    public string GetConnectionKey(Account account)
     {
         var details = JsonSerializer.Deserialize<PlaidConnectionDetails>(
             account.ConnectionDetailsJson ?? "{}",
             JsonOptions);
 
-        if (details is null || string.IsNullOrEmpty(details.AccessToken))
+        // The Plaid Item access token backs one /transactions/sync stream shared by every account
+        // in the Item. Fall back to a per-account key when the token is missing so a broken account
+        // is synced (and fails) on its own rather than derailing a healthy group.
+        return string.IsNullOrEmpty(details?.AccessToken)
+            ? $"account:{account.Id}"
+            : details.AccessToken;
+    }
+
+    public async Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
+        IReadOnlyList<Account> accounts,
+        DateTime? since,
+        CancellationToken cancellationToken = default)
+    {
+        // All accounts share one access token (that's the connection key), but each carries its own
+        // Plaid account_id filter and its own copy of the cursor.
+        var parsed = accounts
+            .Select(a => (Account: a, Details: JsonSerializer.Deserialize<PlaidConnectionDetails>(
+                a.ConnectionDetailsJson ?? "{}", JsonOptions)))
+            .ToList();
+
+        var accessToken = parsed
+            .Select(p => p.Details?.AccessToken)
+            .FirstOrDefault(t => !string.IsNullOrEmpty(t));
+
+        if (string.IsNullOrEmpty(accessToken))
         {
-            _logger.LogWarning("Account {AccountId} has missing or invalid Plaid connection details.", account.Id);
-            throw new InvalidOperationException($"Account {account.Id} is missing a Plaid access token.");
+            _logger.LogWarning("Plaid connection for accounts {AccountIds} has no access token.",
+                string.Join(", ", accounts.Select(a => a.Id)));
+            throw new InvalidOperationException("Plaid connection is missing an access token.");
         }
 
         if (string.IsNullOrEmpty(_clientId) || string.IsNullOrEmpty(_secret))
@@ -63,15 +88,29 @@ public class PlaidProvider : IBankSyncProvider
             _environment,
             _clientId,
             _secret,
-            details.AccessToken,
+            accessToken,
             _httpClientFactory,
             _loggerFactory.CreateLogger<PlaidClient>(),
             ApiVersion.v20200914);
 
+        // The cursor belongs to the Item, not the account. Only reuse a stored cursor when every
+        // account in the group already agrees on the same non-empty value. Otherwise (a newly added
+        // account with no cursor, or cursors that diverged under the old per-account scheme) start
+        // from scratch so no account's history is missed; ProviderTransactionId dedup absorbs the
+        // re-fetch. After this run all accounts are written the same advanced cursor and converge.
+        var cursors = parsed.Select(p => p.Details?.Cursor).ToList();
+        var converged = cursors.All(c => !string.IsNullOrEmpty(c)) && cursors.Distinct().Count() == 1;
+        var cursor = converged ? cursors[0] : null;
+        if (!converged && accounts.Count > 1)
+        {
+            _logger.LogInformation(
+                "Plaid cursors for accounts {AccountIds} are not converged; performing a full resync to reconcile.",
+                string.Join(", ", accounts.Select(a => a.Id)));
+        }
+
         var added = new List<PlaidTransaction>();
         var modified = new List<PlaidTransaction>();
         var removed = new List<RemovedTransaction>();
-        var cursor = details.Cursor;
         bool hasMore;
 
         do
@@ -88,10 +127,10 @@ public class PlaidProvider : IBankSyncProvider
             {
                 var error = response.Error;
                 throw new InvalidOperationException(
-                    $"Plaid /transactions/sync failed for account {account.Id}: {error?.ErrorCode} - {error?.ErrorMessage}");
+                    $"Plaid /transactions/sync failed: {error?.ErrorCode} - {error?.ErrorMessage}");
             }
 
-            added.AddRange(response.Added); // response.Add = List<Entity.Transaction> ... has an accouint id. there's transactions from multiple accounts in this list. they need to be propoeryly assocsatied with the stored accoutnt... key checking and savings
+            added.AddRange(response.Added);
             modified.AddRange(response.Modified);
             removed.AddRange(response.Removed);
 
@@ -100,29 +139,35 @@ public class PlaidProvider : IBankSyncProvider
         }
         while (hasMore);
 
-        bool MatchesAccount(string? plaidAccountId) =>
-            string.IsNullOrEmpty(details.AccountId) || plaidAccountId == details.AccountId;
-
-        var upserts = added.Concat(modified)
-            .Where(t => MatchesAccount(t.AccountId))
-            .Select(MapTransaction)
-            .ToList();
-
-        var removedIds = removed
-            .Where(r => MatchesAccount(r.AccountId))
-            .Select(r => r.TransactionId)
-            .Where(id => !string.IsNullOrEmpty(id))
-            .Select(id => id!)
-            .ToList();
-
-        var updatedJson = JsonSerializer.Serialize(new PlaidConnectionDetails
+        var results = new Dictionary<int, ProviderSyncResult>();
+        foreach (var (account, details) in parsed)
         {
-            AccessToken = details.AccessToken,
-            AccountId = details.AccountId,
-            Cursor = cursor,
-        });
+            bool MatchesAccount(string? plaidAccountId) =>
+                string.IsNullOrEmpty(details?.AccountId) || plaidAccountId == details.AccountId;
 
-        return new ProviderSyncResult(upserts, removedIds, updatedJson);
+            var upserts = added.Concat(modified)
+                .Where(t => MatchesAccount(t.AccountId))
+                .Select(MapTransaction)
+                .ToList();
+
+            var removedIds = removed
+                .Where(r => MatchesAccount(r.AccountId))
+                .Select(r => r.TransactionId)
+                .Where(id => !string.IsNullOrEmpty(id))
+                .Select(id => id!)
+                .ToList();
+
+            var updatedJson = JsonSerializer.Serialize(new PlaidConnectionDetails
+            {
+                AccessToken = accessToken,
+                AccountId = details?.AccountId,
+                Cursor = cursor,
+            });
+
+            results[account.Id] = new ProviderSyncResult(upserts, removedIds, updatedJson);
+        }
+
+        return results;
     }
 
     private static SyncedTransaction MapTransaction(PlaidTransaction t)

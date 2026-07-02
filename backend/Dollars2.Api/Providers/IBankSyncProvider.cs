@@ -43,5 +43,26 @@ public interface IBankSyncProvider
     /// </summary>
     TimeSpan MinSyncInterval { get; }
 
-    Task<ProviderSyncResult> FetchTransactionsAsync(Account account, DateTime? since, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// A stable key identifying the upstream connection that a single provider API call covers
+    /// (e.g. a Plaid Item access token, or a SimpleFIN access URL). Stored accounts that share a
+    /// key are fetched together in one call and the results distributed among them, rather than
+    /// making one redundant call per account.
+    /// </summary>
+    string GetConnectionKey(Account account);
+
+    /// <summary>
+    /// Fetch transactions for a set of stored accounts that share one connection (as identified by
+    /// <see cref="GetConnectionKey"/>) using a single upstream call, returning a per-account result
+    /// keyed by <see cref="Account.Id"/>. Every account in <paramref name="accounts"/> is present in
+    /// the returned dictionary — with an empty result if it has no upstream activity.
+    /// </summary>
+    /// <param name="since">
+    /// The earliest point to fetch from, covering all accounts in the group. Providers that track
+    /// their own position (e.g. Plaid's sync cursor) may ignore it.
+    /// </param>
+    Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
+        IReadOnlyList<Account> accounts,
+        DateTime? since,
+        CancellationToken cancellationToken = default);
 }
