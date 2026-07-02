@@ -26,20 +26,47 @@ public class SimplefinProvider : IBankSyncProvider
 
     public TimeSpan MinSyncInterval { get; }
 
-    public async Task<ProviderSyncResult> FetchTransactionsAsync(Account account, DateTime? since, CancellationToken cancellationToken = default)
+    public string GetConnectionKey(Account account)
     {
-        var connectionDetails = JsonSerializer.Deserialize<SimplefinConnectionDetails>(
+        var details = JsonSerializer.Deserialize<SimplefinConnectionDetails>(
             account.ConnectionDetailsJson ?? "{}",
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-        if (connectionDetails is null
-            || string.IsNullOrEmpty(connectionDetails.AccountId)
-            || string.IsNullOrEmpty(connectionDetails.Url)
-            || string.IsNullOrEmpty(connectionDetails.Username)
-            || string.IsNullOrEmpty(connectionDetails.Password))
+        // A single SimpleFIN access URL returns every account it covers in one response. Group by
+        // that URL + username; fall back to a per-account key when unusable so a broken account is
+        // synced (and fails) on its own.
+        if (details is null || string.IsNullOrEmpty(details.Url))
         {
-            _logger.LogWarning("Account {AccountId} has missing or invalid SimpleFIN connection details.", account.Id);
-            throw new InvalidOperationException($"Account {account.Id} has missing or invalid SimpleFIN connection details.");
+            return $"account:{account.Id}";
+        }
+        return $"{details.Url}\n{details.Username}";
+    }
+
+    public async Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
+        IReadOnlyList<Account> accounts,
+        DateTime? since,
+        CancellationToken cancellationToken = default)
+    {
+        var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var parsed = accounts
+            .Select(a => (Account: a, Details: JsonSerializer.Deserialize<SimplefinConnectionDetails>(
+                a.ConnectionDetailsJson ?? "{}", jsonOptions)))
+            .ToList();
+
+        // Credentials are shared across the connection group (that's the key), so any account's
+        // details drive the single request.
+        var connectionDetails = parsed
+            .Select(p => p.Details)
+            .FirstOrDefault(d => d is not null
+                && !string.IsNullOrEmpty(d.Url)
+                && !string.IsNullOrEmpty(d.Username)
+                && !string.IsNullOrEmpty(d.Password));
+
+        if (connectionDetails is null)
+        {
+            _logger.LogWarning("SimpleFIN connection for accounts {AccountIds} has missing or invalid details.",
+                string.Join(", ", accounts.Select(a => a.Id)));
+            throw new InvalidOperationException("SimpleFIN connection has missing or invalid details.");
         }
 
         var url = connectionDetails.Url;
@@ -51,7 +78,8 @@ public class SimplefinProvider : IBankSyncProvider
             url += $"?start-date={startDate}";
         }
 
-        _logger.LogTrace("Fetching transactions for account {AccountId} from SimpleFIN", account.Id);
+        _logger.LogTrace("Fetching transactions for accounts {AccountIds} from SimpleFIN",
+            string.Join(", ", accounts.Select(a => a.Id)));
         var http = _httpClientFactory.CreateClient("simplefin");
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64Credentials);
@@ -69,32 +97,41 @@ public class SimplefinProvider : IBankSyncProvider
 
         foreach (var error in accountSet.Errlist)
         {
-            _logger.LogWarning("SimpleFIN returned error for account {AccountId}: {Error}", account.Id, error.ToString());
+            _logger.LogWarning("SimpleFIN returned error: {Error}", error.ToString());
         }
 
-        var simplefinAccount = accountSet.Accounts.FirstOrDefault(a => a.Id == connectionDetails.AccountId);
-        if (simplefinAccount is null)
+        var results = new Dictionary<int, ProviderSyncResult>();
+        foreach (var (account, details) in parsed)
         {
-            _logger.LogWarning("No matching account found in SimpleFIN response for account {AccountId} with SimpleFIN AccountId {SimplefinAccountId}.", account.Id, connectionDetails.AccountId);
-            return new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null);
-        }
-
-        var result = new List<SyncedTransaction>();
-        foreach (var t in simplefinAccount.Transactions)
-        {
-            if (!decimal.TryParse(t.Amount, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount))
+            var simplefinAccount = details is null
+                ? null
+                : accountSet.Accounts.FirstOrDefault(a => a.Id == details.AccountId);
+            if (simplefinAccount is null)
             {
-                _logger.LogWarning("Skipping transaction {TransactionId} for account {AccountId} with invalid amount: '{Amount}'", t.Id, account.Id, t.Amount);
+                _logger.LogWarning("No matching account found in SimpleFIN response for account {AccountId} with SimpleFIN AccountId {SimplefinAccountId}.", account.Id, details?.AccountId);
+                results[account.Id] = new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null);
                 continue;
             }
 
-            var date = t.Posted == 0
-                ? DateTime.UtcNow.Date
-                : DateTimeOffset.FromUnixTimeSeconds(t.Posted).UtcDateTime.Date;
+            var transactions = new List<SyncedTransaction>();
+            foreach (var t in simplefinAccount.Transactions)
+            {
+                if (!decimal.TryParse(t.Amount, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount))
+                {
+                    _logger.LogWarning("Skipping transaction {TransactionId} for account {AccountId} with invalid amount: '{Amount}'", t.Id, account.Id, t.Amount);
+                    continue;
+                }
 
-            result.Add(new SyncedTransaction(t.Id, date, t.Description, t.Payee, t.Memo, amount, t.Pending));
+                var date = t.Posted == 0
+                    ? DateTime.UtcNow.Date
+                    : DateTimeOffset.FromUnixTimeSeconds(t.Posted).UtcDateTime.Date;
+
+                transactions.Add(new SyncedTransaction(t.Id, date, t.Description, t.Payee, t.Memo, amount, t.Pending));
+            }
+
+            results[account.Id] = new ProviderSyncResult(transactions, Array.Empty<string>(), null);
         }
 
-        return new ProviderSyncResult(result, Array.Empty<string>(), null);
+        return results;
     }
 }

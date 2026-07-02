@@ -38,9 +38,6 @@ public class BankSyncService
         var accounts = await _accountRepo.GetByUserIdAsync(userId);
         var results = new List<SyncResult>();
 
-        // TODO: For users with multiple SimpleFIN accounts, this makes one HTTP request per
-        // account even though the SimpleFIN API returns all accounts in a single response.
-        // Fix when adding a second account: fetch once per provider per user and distribute.
         var providerGroups = accounts
             .Where(a => a.SourceType != SyncConstants.SourceTypeManual)
             .GroupBy(a => a.SourceType);
@@ -50,7 +47,17 @@ public class BankSyncService
             var sourceType = group.Key;
             var provider = GetProvider(sourceType);
 
-            if (provider is not null && enforceMinInterval
+            if (provider is null)
+            {
+                foreach (var account in group)
+                {
+                    _logger.LogWarning("No provider found for account {AccountId} ({AccountName}) with source type {SourceType}", account.Id, account.Name, account.SourceType);
+                    results.Add(SkippedResult(account));
+                }
+                continue;
+            }
+
+            if (enforceMinInterval
                 && await IsWithinMinIntervalAsync(userId, sourceType, provider.MinSyncInterval))
             {
                 _logger.LogInformation(
@@ -58,28 +65,31 @@ public class BankSyncService
                     sourceType, userId, provider.MinSyncInterval);
                 foreach (var account in group)
                 {
-                    results.Add(new SyncResult
-                    {
-                        AccountId = account.Id,
-                        AccountName = account.Name,
-                        Status = SyncConstants.StatusSkipped,
-                        TransactionCount = 0,
-                    });
+                    results.Add(SkippedResult(account));
                 }
                 continue;
             }
 
-            foreach (var account in group)
+            // A single upstream call can cover multiple stored accounts (e.g. a Plaid Item or a
+            // SimpleFIN access URL), so fetch once per connection and distribute the results.
+            var connectionGroups = group.GroupBy(a => provider.GetConnectionKey(a));
+            foreach (var connectionGroup in connectionGroups)
             {
-                _logger.LogInformation("Syncing account {AccountId} ({AccountName}) for user {UserId}", account.Id, account.Name, userId);
-                var result = await SyncAccountAsync(account, cancellationToken);
-                results.Add(result);
-                _logger.LogInformation("Completed sync for account {AccountId} ({AccountName}): {Status}, {TransactionCount} new transactions", account.Id, account.Name, result.Status, result.TransactionCount);
+                var connectionAccounts = connectionGroup.ToList();
+                results.AddRange(await SyncConnectionAsync(userId, provider, connectionAccounts, cancellationToken));
             }
         }
 
         return results;
     }
+
+    private static SyncResult SkippedResult(Account account) => new()
+    {
+        AccountId = account.Id,
+        AccountName = account.Name,
+        Status = SyncConstants.StatusSkipped,
+        TransactionCount = 0,
+    };
 
     private async Task<bool> IsWithinMinIntervalAsync(int userId, string sourceType, TimeSpan minInterval)
     {
@@ -115,32 +125,57 @@ public class BankSyncService
         _logger.LogInformation("Completed bank sync for {UserCount} users", userIdList.Count);
     }
 
-    private async Task<SyncResult> SyncAccountAsync(Account account, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<SyncResult>> SyncConnectionAsync(
+        int userId, IBankSyncProvider provider, IReadOnlyList<Account> accounts, CancellationToken cancellationToken)
     {
-        var provider = GetProvider(account.SourceType);
-        if (provider is null)
-        {
-            _logger.LogWarning("No provider found for account {AccountId} ({AccountName}) with source type {SourceType}", account.Id, account.Name, account.SourceType);
-            return new SyncResult
-            {
-                AccountId = account.Id,
-                AccountName = account.Name,
-                Status = SyncConstants.StatusSkipped,
-                TransactionCount = 0,
-            };
-        }
-
+        IReadOnlyDictionary<int, ProviderSyncResult> fetched;
         try
         {
-            var lastSync = await _syncLogRepo.GetLastSuccessfulAsync(account.Id);
-            _logger.LogInformation("Last successful sync for account {AccountId} ({AccountName}) was at {LastSyncTime}", account.Id, account.Name, lastSync?.SyncedAt);
-            // Overlap by 12 hours to avoid missing transactions posted near the boundary.
-            // Deduplication via ProviderTransactionId prevents double-imports.
-            var since = (lastSync?.SyncedAt ?? DateTime.UtcNow.AddDays(-30)).AddHours(-12);
+            // The provider's single upstream call covers the whole group, so fetch from the earliest
+            // point any account in it needs. Overlap by 12 hours to avoid missing transactions posted
+            // near the boundary; deduplication via ProviderTransactionId prevents double-imports.
+            DateTime? since = null;
+            foreach (var account in accounts)
+            {
+                var lastSync = await _syncLogRepo.GetLastSuccessfulAsync(account.Id);
+                _logger.LogInformation("Last successful sync for account {AccountId} ({AccountName}) was at {LastSyncTime}", account.Id, account.Name, lastSync?.SyncedAt);
+                var accountSince = (lastSync?.SyncedAt ?? DateTime.UtcNow.AddDays(-30)).AddHours(-12);
+                if (since is null || accountSince < since)
+                {
+                    since = accountSince;
+                }
+            }
 
-            var syncResult = await provider.FetchTransactionsAsync(account, since, cancellationToken);
+            _logger.LogInformation("Syncing {AccountCount} account(s) for user {UserId} via {SourceType}", accounts.Count, userId, provider.SourceType);
+            fetched = await provider.FetchTransactionsForConnectionAsync(accounts, since, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // A shared fetch failure fails every account in the connection group.
+            var failures = new List<SyncResult>();
+            foreach (var account in accounts)
+            {
+                failures.Add(await RecordFailureAsync(account, ex));
+            }
+            return failures;
+        }
+
+        var results = new List<SyncResult>();
+        foreach (var account in accounts)
+        {
+            var syncResult = fetched.TryGetValue(account.Id, out var r)
+                ? r
+                : new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null);
+            results.Add(await PersistAccountResultAsync(account, syncResult));
+        }
+        return results;
+    }
+
+    private async Task<SyncResult> PersistAccountResultAsync(Account account, ProviderSyncResult syncResult)
+    {
+        try
+        {
             var count = 0;
-
             _dbSession.BeginTransaction();
             try
             {
@@ -188,6 +223,7 @@ public class BankSyncService
                 throw;
             }
 
+            _logger.LogInformation("Completed sync for account {AccountId} ({AccountName}): {Status}, {TransactionCount} new transactions", account.Id, account.Name, SyncConstants.StatusSuccess, count);
             return new SyncResult
             {
                 AccountId = account.Id,
@@ -198,25 +234,30 @@ public class BankSyncService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Sync failed for account {AccountId} ({AccountName})", account.Id, account.Name);
-            try
-            {
-                await _syncLogRepo.CreateAsync(account.Id, SyncConstants.StatusFailure, 0, ex.Message);
-            }
-            catch (Exception logEx)
-            {
-                _logger.LogError(logEx, "Failed to write failure log for account {AccountId}", account.Id);
-            }
-
-            return new SyncResult
-            {
-                AccountId = account.Id,
-                AccountName = account.Name,
-                Status = SyncConstants.StatusFailure,
-                TransactionCount = 0,
-                ErrorMessage = ex.Message,
-            };
+            return await RecordFailureAsync(account, ex);
         }
+    }
+
+    private async Task<SyncResult> RecordFailureAsync(Account account, Exception ex)
+    {
+        _logger.LogError(ex, "Sync failed for account {AccountId} ({AccountName})", account.Id, account.Name);
+        try
+        {
+            await _syncLogRepo.CreateAsync(account.Id, SyncConstants.StatusFailure, 0, ex.Message);
+        }
+        catch (Exception logEx)
+        {
+            _logger.LogError(logEx, "Failed to write failure log for account {AccountId}", account.Id);
+        }
+
+        return new SyncResult
+        {
+            AccountId = account.Id,
+            AccountName = account.Name,
+            Status = SyncConstants.StatusFailure,
+            TransactionCount = 0,
+            ErrorMessage = ex.Message,
+        };
     }
 
     private IBankSyncProvider? GetProvider(string sourceType)
