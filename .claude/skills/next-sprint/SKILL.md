@@ -66,12 +66,20 @@ This repo starts with no test harness. Before writing tests, check and, if missi
 - Run the `code-review` skill on the diff and address findings. If any finding is deliberately
   deferred, capture it as a `followup_*` memory + a `MEMORY.md` index line before moving on.
 
-### 9. Commit, push, PR (full auto)
+### 9. Commit, push, PR, clean up (full auto)
 - Commit with a message in this repo's style (imperative, concise), ending with the
   `Co-Authored-By: Claude Opus 4.8` trailer.
 - Push the branch and open a PR against `master` with `gh`. PR body ends with the
   `🤖 Generated with [Claude Code]` line.
-- Report the PR URL. Leave the worktree for the user to clean up (or exit it if unchanged).
+- Report the PR URL.
+- Then remove the worktree: the branch and all commits are safely on the remote once pushed, so the
+  local worktree and branch are no longer needed. Verify the branch's HEAD commit exists on the
+  remote (`git branch -r --contains <sha>` shows `origin/<branch>`), then `ExitWorktree` with
+  `action: "remove"` (pass `discard_changes: true` — local `master` may be stale, so the merged/pushed
+  commit can look "unmerged" locally even though it is safe on the remote). Do NOT remove if the push
+  failed or there are uncommitted changes — leave the worktree and say so.
+- Note in your report that the PR branch lives on the remote; any review-requested changes need a
+  fresh checkout of that branch (the local worktree is gone).
 
 ## Notes
 - Stop and ask the user only when the pick is ambiguous, the scope needs splitting, or verification

@@ -51,6 +51,7 @@ public class BankSyncService
             {
                 foreach (var account in group)
                 {
+                    // todo: a provider that is disabled via settings should log out that instead of "not found" (or maybe we should just skip it silently)
                     _logger.LogWarning("No provider found for account {AccountId} ({AccountName}) with source type {SourceType}", account.Id, account.Name, account.SourceType);
                     results.Add(SkippedResult(account));
                 }
