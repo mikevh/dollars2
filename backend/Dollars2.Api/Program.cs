@@ -1,5 +1,6 @@
 using System.Text;
 using Dollars2.Api.Data;
+using Dollars2.Api.Logging;
 using Dollars2.Api.Providers;
 using Dollars2.Api.Repositories;
 using Dollars2.Api.Services;
@@ -7,8 +8,13 @@ using Going.Plaid;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var logFilePath = builder.Configuration["Logging:File:Path"] ?? "logs/dollars2-.log";
+builder.Host.UseSerilog((context, loggerConfig) =>
+    loggerConfig.ConfigureDollars2Logging(logFilePath));
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
