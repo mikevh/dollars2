@@ -26,6 +26,11 @@ its PR number. Small, single-concern sprints (see `CLAUDE.md` / the `next-sprint
 
 ## Someday / low priority
 
+- **Migrate `xunit` → `xunit.v3`** — the `xunit` 2.9.3 package is marked deprecated ("Legacy"; NuGet
+  points to `xunit.v3`). Not a vulnerability — v2 is still supported — so this is non-urgent. Involves
+  swapping `xunit`/`xunit.runner.visualstudio` for the v3 packages + `Microsoft.Testing.Platform`
+  wiring in `Dollars2.Tests`.
+
 Low-severity items from the 2026-06-19 full code review (all critical/medium already fixed):
 
 - Early migrations `000`–`005` lack `IF NOT EXISTS` guards (006+ have them).
