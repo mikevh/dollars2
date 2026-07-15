@@ -64,6 +64,8 @@ scoped override of the standing "never commit/push without instruction" gate
   trailer.
 - Push and open a PR against `master` (`gh`), linking the issue (`Closes #N`); PR body ends with the
   `🤖 Generated with [Claude Code]` line. Report the PR URL.
+- Leave the issue open — the `Closes #N` keyword closes it automatically when the PR is merged.
+  Don't close the issue manually at PR-open time.
 - Remove the worktree: confirm the HEAD commit is on the remote (`git branch -r --contains <sha>`
   shows `origin/<branch>`), then `ExitWorktree` `action: "remove"` with `discard_changes: true` (a
   pushed commit can look "unmerged" against a stale local `master`). Don't remove if the push failed
