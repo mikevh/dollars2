@@ -53,6 +53,11 @@ _(nothing in review)_
 
 ## Done
 
+- **PR #1** — Docker-based home-LAN deployment: Dockerfiles (frontend nginx, backend aspnet),
+  root `docker-compose.yml`, `.env.example`, and the `deploy` skill (SSH to `claw.tail303da.ts.net`,
+  `git pull`, `docker compose up -d --build`). First live deploy validated on the home server.
+  Follow-on fixes on master: reverted TypeScript 7→6 and regenerated the lockfile so the Docker
+  `npm ci` succeeds cross-platform; Plaid sync now fails early with a single error when creds are absent.
 - **PR #7** — Plaid cursor-divergence resync storm fixed (`ResolveGroupCursor`).
 - **PR #6** — Plaid removed transactions applied regardless of `account_id`; also fixed manual-entry
   `Payee`/`Memo` plumbing.
