@@ -18,8 +18,8 @@ PR. That is a scoped override of the standing "never commit/push without instruc
 
 ### 1. Pick the item
 - If the user named an item, use it.
-- Otherwise propose the next item from, in priority order: deferred code-review findings
-  (`followup_*` memories), the code-review backlog (`code_review_backlog` memory), then open TODOs
+- Otherwise propose the next item from, in priority order: open **GitHub Issues**
+  (`gh issue list`), deferred code-review findings (`followup_*` memories), then open TODOs
   in the code. Show your pick and one alternative; confirm before proceeding.
 - Restate the item as a single concern. If it's actually two, propose splitting and do only the
   first.

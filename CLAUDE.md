@@ -72,10 +72,10 @@ cd backend/Dollars2.Api && dotnet build
 
 ## Backlog
 
-The working task list — open tasks, deferred code-review findings, and shipped history — lives in
-`docs/backlog.md` (source-controlled and shared across machines). Read it at the start of a work
-session and keep it up to date as items move. It is the source of truth; treat auto-memory as a
-pointer to it, not a second copy.
+Work items are tracked in **GitHub Issues** (`gh issue list` / https://github.com/mikevh/dollars2/issues).
+Review open issues at the start of a work session; open new issues for follow-ups and deferred
+code-review findings. Labels: `bug`, `enhancement`, `documentation`, `tech-debt`, `testing`, `ci`,
+`wontfix`. Deliberately-deferred v1 decisions are recorded as issues closed with `wontfix`.
 
 ## Out of Scope (v1)
 
