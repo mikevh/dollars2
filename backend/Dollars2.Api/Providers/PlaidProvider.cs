@@ -139,6 +139,14 @@ public class PlaidProvider : IBankSyncProvider
         }
         while (hasMore);
 
+        // Removed items from /transactions/sync do not carry an account_id at the pinned API version
+        // (ApiVersion.v20200914), so they cannot be attributed to a specific account here. Applying the
+        // full removed set to every account in the Item is safe — and correct regardless of whether a
+        // future API version starts populating account_id — because SoftDeleteByProviderTransactionIdAsync
+        // is scoped by account.Id + provider transaction id and Plaid transaction ids are globally unique,
+        // so each account only soft-deletes rows that are actually its own.
+        var removedIds = CollectRemovedTransactionIds(removed);
+
         var results = new Dictionary<int, ProviderSyncResult>();
         foreach (var (account, details) in parsed)
         {
@@ -165,13 +173,6 @@ public class PlaidProvider : IBankSyncProvider
                 .Select(MapTransaction)
                 .ToList();
 
-            var removedIds = removed
-                .Where(r => MatchesAccount(r.AccountId))
-                .Select(r => r.TransactionId)
-                .Where(id => !string.IsNullOrEmpty(id))
-                .Select(id => id!)
-                .ToList();
-
             var updatedJson = JsonSerializer.Serialize(new PlaidConnectionDetails
             {
                 AccessToken = accessToken,
@@ -195,6 +196,19 @@ public class PlaidProvider : IBankSyncProvider
         accountCount > 1 && string.IsNullOrEmpty(accountId)
             ? "Plaid connection details are missing an account_id, which is required when multiple accounts share an access token."
             : null;
+
+    /// <summary>
+    /// Collects the provider transaction ids of every removed item in the Item's sync response,
+    /// dropping any without an id. Removed items are deliberately not filtered by account_id: at the
+    /// pinned API version they carry none, and the downstream soft-delete is already scoped by
+    /// account.Id + provider transaction id, so an id belonging to a sibling account is a no-op there.
+    /// </summary>
+    internal static List<string> CollectRemovedTransactionIds(IEnumerable<RemovedTransaction> removed) =>
+        removed
+            .Select(r => r.TransactionId)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Select(id => id!)
+            .ToList();
 
     private static SyncedTransaction MapTransaction(PlaidTransaction t)
     {

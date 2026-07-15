@@ -1,4 +1,5 @@
 using Dollars2.Api.Providers;
+using RemovedTransaction = Going.Plaid.Entity.RemovedTransaction;
 
 namespace Dollars2.Tests;
 
@@ -20,5 +21,25 @@ public class PlaidProviderTests
         var error = PlaidProvider.SharedTokenMissingAccountIdError(accountCount, accountId);
 
         Assert.Equal(expectError, error is not null);
+    }
+
+    // Regression test for the "removed transactions dropped" bug: at the pinned API version, removed
+    // items carry no account_id, so filtering them by account_id skipped every soft-delete for an
+    // account that had a specific account_id. Removed ids must be collected regardless of account_id
+    // (the DB soft-delete is scoped by account.Id), and blank ids dropped.
+    [Fact]
+    public void CollectRemovedTransactionIds_keeps_ids_without_account_id_and_drops_blanks()
+    {
+        var removed = new[]
+        {
+            new RemovedTransaction { TransactionId = "txn-1", AccountId = null },
+            new RemovedTransaction { TransactionId = "txn-2", AccountId = "acct-1" },
+            new RemovedTransaction { TransactionId = "", AccountId = null },
+            new RemovedTransaction { TransactionId = null, AccountId = null },
+        };
+
+        var ids = PlaidProvider.CollectRemovedTransactionIds(removed);
+
+        Assert.Equal(new[] { "txn-1", "txn-2" }, ids);
     }
 }
