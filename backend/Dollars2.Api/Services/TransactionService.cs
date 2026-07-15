@@ -87,14 +87,14 @@ public class TransactionService
         return DollarsApiResponse<List<TransactionResponse>>.Success(responses);
     }
 
-    public async Task<DollarsApiResponse<TransactionResponse>> CreateAsync(int userId, DateTime date, string description, decimal amount, string? notes)
+    public async Task<DollarsApiResponse<TransactionResponse>> CreateAsync(int userId, DateTime date, string description, decimal amount, string? notes, string? payee, string? memo)
     {
         if (amount == 0)
         {
             return DollarsApiResponse<TransactionResponse>.Fail("Amount cannot be zero.", "INVALID_AMOUNT");
         }
 
-        var id = await _transactionRepo.CreateAsync(userId, date, description, amount, notes, true);
+        var id = await _transactionRepo.CreateAsync(userId, date, description, payee ?? "", memo ?? "", amount, notes, true);
         var transaction = (await _transactionRepo.GetByIdAsync(id))!;
         return DollarsApiResponse<TransactionResponse>.Success(await BuildResponseAsync(transaction));
     }

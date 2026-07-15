@@ -103,13 +103,13 @@ public class TransactionRepository
         };
     }
 
-    public async Task<int> CreateAsync(int userId, DateTime date, string description, decimal amount, string? notes, bool isManual)
+    public async Task<int> CreateAsync(int userId, DateTime date, string description, string payee, string memo, decimal amount, string? notes, bool isManual)
     {
         return await _db.Connection.QuerySingleAsync<int>(
-            @"INSERT INTO Transactions (UserId, Date, Description, Amount, Notes, IsManual, CreatedAt, UpdatedAt)
-              VALUES (@userId, @date, @description, @amount, @notes, @isManual, SYSUTCDATETIME(), SYSUTCDATETIME());
+            @"INSERT INTO Transactions (UserId, Date, Description, Payee, Memo, Amount, Notes, IsManual, CreatedAt, UpdatedAt)
+              VALUES (@userId, @date, @description, @payee, @memo, @amount, @notes, @isManual, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { userId, date, description, amount, notes, isManual },
+            new { userId, date, description, payee, memo, amount, notes, isManual },
             _db.CurrentTransaction);
     }
 

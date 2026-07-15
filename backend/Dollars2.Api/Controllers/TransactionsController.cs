@@ -54,7 +54,7 @@ public class TransactionsController : DollarsControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateTransactionRequest request)
     {
-        var result = await _transactionService.CreateAsync(GetUserId(), request.Date, request.Description, request.Amount, request.Notes);
+        var result = await _transactionService.CreateAsync(GetUserId(), request.Date, request.Description, request.Amount, request.Notes, request.Payee, request.Memo);
         return Ok(result);
     }
 
