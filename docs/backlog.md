@@ -44,12 +44,11 @@ Low-severity items from the 2026-06-19 full code review (all critical/medium alr
 
 ## In review
 
-- **PR #7** — exclude unsyncable accounts from Plaid cursor convergence (fixes the cursor-divergence
-  resync storm).
+_(nothing in review)_
 
 ## Done
 
-- **PR #7 (open)** — Plaid cursor-divergence resync storm fixed (`ResolveGroupCursor`).
+- **PR #7** — Plaid cursor-divergence resync storm fixed (`ResolveGroupCursor`).
 - **PR #6** — Plaid removed transactions applied regardless of `account_id`; also fixed manual-entry
   `Payee`/`Memo` plumbing.
 - **PR #5** — Testcontainers ephemeral-MSSQL integration test infrastructure + first repository proof.
