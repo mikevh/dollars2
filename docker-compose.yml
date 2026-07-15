@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend/Dollars2.Api
+    ports:
+      - "5062:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: ${ConnectionStrings__DefaultConnection}
+      Jwt__Secret: ${Jwt__Secret}
+      Jwt__Issuer: Dollars2
+      Jwt__Audience: Dollars2
+      Cors__FrontendUrl: ${Cors__FrontendUrl}
+      Plaid__ClientId: ${Plaid__ClientId}
+      Plaid__Secret: ${Plaid__Secret}
+      Plaid__Environment: Production
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    ports:
+      - "8080:80"
+    restart: unless-stopped
