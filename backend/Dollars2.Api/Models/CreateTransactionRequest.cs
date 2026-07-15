@@ -15,4 +15,8 @@ public class CreateTransactionRequest
     public decimal Amount { get; set; }
 
     public string? Notes { get; set; }
+
+    public string? Payee { get; set; }
+
+    public string? Memo { get; set; }
 }

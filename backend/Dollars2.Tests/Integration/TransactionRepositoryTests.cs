@@ -33,6 +33,8 @@ public sealed class TransactionRepositoryTests
                 userId,
                 date,
                 description: "Coffee",
+                payee: "Blue Bottle",
+                memo: "latte",
                 amount: -4.50m,
                 notes: "morning",
                 isManual: true);
@@ -44,6 +46,8 @@ public sealed class TransactionRepositoryTests
             Assert.Equal(userId, loaded.UserId);
             Assert.Equal(date, loaded.Date);
             Assert.Equal("Coffee", loaded.Description);
+            Assert.Equal("Blue Bottle", loaded.Payee);
+            Assert.Equal("latte", loaded.Memo);
             Assert.Equal(-4.50m, loaded.Amount);
             Assert.Equal("morning", loaded.Notes);
             Assert.True(loaded.IsManual);
@@ -67,7 +71,7 @@ public sealed class TransactionRepositoryTests
             var repository = new TransactionRepository(db);
 
             var id = await repository.CreateAsync(
-                userId, new DateTime(2026, 7, 15), "Groceries", -60m, null, isManual: true);
+                userId, new DateTime(2026, 7, 15), "Groceries", "", "", -60m, null, isManual: true);
 
             await repository.SoftDeleteAsync(id);
 
