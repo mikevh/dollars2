@@ -61,6 +61,23 @@ public class PlaidProvider : IBankSyncProvider
         DateTime? since,
         CancellationToken cancellationToken = default)
     {
+        // Plaid API credentials come from configuration (the .env file). Without them no upstream call
+        // can succeed, so fail the whole connection group up front with a single clear error rather than
+        // doing work and throwing deep in the sync (which logs a stack trace per account).
+        if (string.IsNullOrEmpty(_clientId) || string.IsNullOrEmpty(_secret))
+        {
+            _logger.LogError(
+                "Plaid sync skipped for accounts {AccountIds}: Plaid:ClientId / Plaid:Secret are not configured.",
+                string.Join(", ", accounts.Select(a => a.Id)));
+            return accounts.ToDictionary(
+                a => a.Id,
+                a => new ProviderSyncResult(
+                    Array.Empty<SyncedTransaction>(),
+                    Array.Empty<string>(),
+                    null,
+                    "Plaid:ClientId / Plaid:Secret are not configured."));
+        }
+
         // All accounts share one access token (that's the connection key), but each carries its own
         // Plaid account_id filter and its own copy of the cursor.
         var parsed = accounts
@@ -77,11 +94,6 @@ public class PlaidProvider : IBankSyncProvider
             _logger.LogWarning("Plaid connection for accounts {AccountIds} has no access token.",
                 string.Join(", ", accounts.Select(a => a.Id)));
             throw new InvalidOperationException("Plaid connection is missing an access token.");
-        }
-
-        if (string.IsNullOrEmpty(_clientId) || string.IsNullOrEmpty(_secret))
-        {
-            throw new InvalidOperationException("Plaid:ClientId / Plaid:Secret are not configured.");
         }
 
         var client = new PlaidClient(
