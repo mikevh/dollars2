@@ -18,6 +18,10 @@ export default function Footer() {
   const navigate = useNavigate()
   const mode = useAppSelector((state) => state.theme.mode)
 
+  const buildId = import.meta.env.VITE_BUILD_ID || 'dev'
+  const buildDate = import.meta.env.VITE_BUILD_DATE
+  const buildLabel = buildDate ? `${buildId} · ${buildDate}` : buildId
+
   const cycleTheme = () => {
     const currentIndex = themeOrder.indexOf(mode)
     const next = themeOrder[(currentIndex + 1) % themeOrder.length]
@@ -40,6 +44,9 @@ export default function Footer() {
         >
           <FontAwesomeIcon icon={themeIcons[mode]} className="h-4 w-4" />
         </button>
+        <span className="text-xs opacity-50" title="Running build">
+          {buildLabel}
+        </span>
       </div>
 
       <div className="flex items-center gap-2">

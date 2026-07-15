@@ -24,9 +24,12 @@ Server connection details:
    ```
 
 2. Rebuild and restart the containers (reads `.env` in the same directory
-   automatically):
+   automatically). Stamp the frontend image with the deployed commit hash so
+   the UI footer shows the running build — `VITE_BUILD_ID` is evaluated on the
+   server, from its just-pulled checkout (note the escaped `\$(...)` so the
+   command substitution runs remotely, not on the local machine):
    ```
-   ssh m@claw.tail303da.ts.net "cd ~/dollars2 && docker compose up -d --build"
+   ssh m@claw.tail303da.ts.net "cd ~/dollars2 && VITE_BUILD_ID=\$(git rev-parse --short HEAD) docker compose up -d --build"
    ```
 
 3. Confirm both containers are up and report their status back to the user:

@@ -21,6 +21,7 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_BUILD_ID: ${VITE_BUILD_ID:-dev}
     ports:
       - "8080:80"
     restart: unless-stopped
