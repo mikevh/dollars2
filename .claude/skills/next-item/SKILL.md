@@ -5,94 +5,72 @@ description: Work one small single-concern item end-to-end in an isolated worktr
 
 # Next Item
 
-Take one unit of work from issue to open PR, in an isolated git worktree, following this
-project's conventions. One **small, single-concern** item per invocation (see
-`[[feedback-small-sprints]]` — err on the side of too small; split anything that smells like two
-concerns).
+Take one unit of work from issue to open PR in an isolated git worktree, following this project's
+conventions. One **small, single-concern** item per invocation (`[[feedback-small-sprints]]` — err
+toward too small; split anything that smells like two concerns).
 
-Invoking this skill IS the user's explicit instruction to go all the way through commit, push, and
-PR. That is a scoped override of the standing "never commit/push without instruction" gate
-(`[[feedback-commit-push]]`) — it applies only inside this workflow. Outside it, the gate still holds.
+Invoking this skill IS the user's instruction to go all the way through commit, push, and PR — a
+scoped override of the standing "never commit/push without instruction" gate
+(`[[feedback-commit-push]]`), valid only inside this workflow.
 
 ## Steps
 
 ### 1. Pick the item
-- If the user named an item (usually a GitHub issue number, e.g. "work #42"), use it.
-- Otherwise, list the open GitHub issues (`gh issue list`) and present them for the user to
-  choose from. Do NOT pick for them — wait for their choice before proceeding.
+- If the user named an item (usually a GitHub issue number), use it.
+- Otherwise list open issues (`gh issue list`) and let the user choose — don't pick for them.
 
 ### 2. Understand the item (interview if underspecified)
-- Read the chosen issue in full (`gh issue view <N> --comments`) plus the relevant `docs/*.md`
-  specs and the source it touches.
-- Judge whether the issue is well documented — i.e. whether you fully understand the desired
-  behavior, scope, and acceptance criteria from what's written.
-- **If it is NOT well documented, interview the user before writing any code.** Ask targeted
-  questions until you fully understand the intended behavior, edge cases, and what "done" means.
-  Verify your understanding back to the user explicitly. Do not begin implementation until the
-  ambiguity is resolved.
-- Restate the item as a single concern. If it's actually two, propose splitting and do only the
-  first.
+- Read the issue in full (`gh issue view <N> --comments`) plus the relevant `docs/*.md` specs and
+  the source it touches.
+- **If you don't fully understand the behavior, scope, and acceptance criteria, interview the user
+  before writing any code** — ask targeted questions, verify your understanding back, and don't
+  start until the ambiguity is resolved.
+- Restate the item as a single concern. If it's really two, propose splitting and do only the first.
 
 ### 3. Plan
-- Write a short plan: files to change, the approach, and what's explicitly out of scope for this
-  item.
-- Keep it to the smallest increment that is independently shippable.
+- Short plan: files to change, the approach, what's out of scope. Smallest independently shippable
+  increment.
 
 ### 4. Define verification
-- Before writing code, state concretely how "done" will be proven — the observable behavior that
-  must hold. This is the acceptance check the tests and `/verify` will target, and it is how you
-  know the item is complete.
-- If it can't be verified, the scope is wrong; narrow it until it can.
+- State concretely how "done" will be proven — the observable behavior the tests and `/verify` will
+  target. If it can't be verified, narrow the scope until it can.
 
-### 5. Enter a worktree
-- Do ALL work for this item in a dedicated git worktree off `master`, never in the primary
-  checkout. Use the EnterWorktree tool (or `git worktree add`).
-- Branch name: short kebab-case describing the concern.
+### 5. Record the refined spec on the issue
+- Fold the refined understanding into the GitHub issue before coding (`gh issue edit <N> --body ...`):
+  interview decisions, single-concern restatement, plan, and acceptance check. The issue body should
+  stand on its own as the spec.
 
-### 6. Ensure test infrastructure (first run only)
-This repo starts with no test harness. Before writing tests, check and, if missing, set it up:
-- **Backend:** create `backend/Dollars2.Tests` (xUnit), reference `Dollars2.Api`, add a `.sln` that
-  includes both projects so `dotnet test` works. Match .NET 10 / the API's target framework.
-- **Frontend:** add Vitest + `@testing-library/react` + `jsdom`, a `test` script in
-  `package.json`, and a `vitest.config.ts`.
-- Setting up the harness may be large enough to be its own item — if so, stop after this step,
-  report the harness is ready, and let the user re-invoke for the feature itself.
+### 6. Enter a worktree
+- Do ALL work in a dedicated worktree off `master`, never the primary checkout (EnterWorktree, or
+  `git worktree add`). Branch: short kebab-case describing the concern.
 
 ### 7. Implement
-- Follow the conventions in `CLAUDE.md`: curly braces on all conditionals; multi-mutation API calls
-  wrapped in a `DbSession` transaction; `DollarsApiResponse<T>` envelope; business-rule violations
-  return error results, not exceptions; secrets in user-secrets. New migrations use the
-  `ScriptName` tracking column and `IF NOT EXISTS` guards.
+- Follow `CLAUDE.md`: curly braces on all conditionals; multi-mutation API calls in a `DbSession`
+  transaction; `DollarsApiResponse<T>` envelope; business-rule violations return error results, not
+  exceptions; secrets in user-secrets; new migrations use `ScriptName` and `IF NOT EXISTS` guards.
 - Match surrounding style (inline-editing patterns, fixed-height rows, etc.).
 
 ### 8. Write tests
-- Cover the acceptance check from step 4 and the core logic paths of the change.
-- Run them: `cd backend && dotnet test`, and `cd frontend && npm test` (non-watch). Also
-  `npx tsc --noEmit` for the frontend and `dotnet build` for the backend.
+- Cover the step-4 acceptance check and the core logic paths.
+- Run: backend `dotnet test` and `dotnet build`; frontend `npm test` (non-watch) and `npx tsc --noEmit`.
 
 ### 9. Verify and review
-- Run the `verify` skill to exercise the change end-to-end (drive the real flow, not just tests)
-  and confirm the acceptance check from step 4 holds — this is how you confirm the item is done.
-- Run the `code-review` skill on the diff and address findings. If any finding is deliberately
-  deferred, capture it as a `followup_*` memory + a `MEMORY.md` index line before moving on.
+- Run the `verify` skill to exercise the change end-to-end and confirm the step-4 acceptance check holds.
+- Run `code-review` on the diff and address findings. Capture any deliberately deferred finding as a
+  `followup_*` memory + a `MEMORY.md` index line.
 
 ### 10. Commit, push, PR, clean up (full auto)
-- Commit with a message in this repo's style (imperative, concise), ending with the
-  `Co-Authored-By: Claude Opus 4.8` trailer.
-- Push the branch and open a PR against `master` with `gh`, linking the issue (e.g. `Closes #N`).
-  PR body ends with the `🤖 Generated with [Claude Code]` line.
-- Report the PR URL.
-- Then remove the worktree: the branch and all commits are safely on the remote once pushed, so the
-  local worktree and branch are no longer needed. Verify the branch's HEAD commit exists on the
-  remote (`git branch -r --contains <sha>` shows `origin/<branch>`), then `ExitWorktree` with
-  `action: "remove"` (pass `discard_changes: true` — local `master` may be stale, so the merged/pushed
-  commit can look "unmerged" locally even though it is safe on the remote). Do NOT remove if the push
-  failed or there are uncommitted changes — leave the worktree and say so.
-- Note in your report that the PR branch lives on the remote; any review-requested changes need a
-  fresh checkout of that branch (the local worktree is gone).
+- Commit in the repo's style (imperative, concise), ending with the `Co-Authored-By: Claude Opus 4.8`
+  trailer.
+- Push and open a PR against `master` (`gh`), linking the issue (`Closes #N`); PR body ends with the
+  `🤖 Generated with [Claude Code]` line. Report the PR URL.
+- Remove the worktree: confirm the HEAD commit is on the remote (`git branch -r --contains <sha>`
+  shows `origin/<branch>`), then `ExitWorktree` `action: "remove"` with `discard_changes: true` (a
+  pushed commit can look "unmerged" against a stale local `master`). Don't remove if the push failed
+  or changes are uncommitted — leave it and say so.
+- Note that the PR branch lives only on the remote; review changes need a fresh checkout.
 
 ## Notes
-- Stop and ask the user when: no item was named (present the issue list), the chosen issue is
-  underspecified (interview per step 2), the scope needs splitting, or verification can't be
-  defined — not for routine progress.
-- If the change touches only docs/tests with no runtime surface, skip the `verify` skill.
+- Stop and ask when: no item named (list issues), the issue is underspecified (interview), scope
+  needs splitting, or verification can't be defined — not for routine progress.
+- Skip the `verify` skill if the change is docs/tests only with no runtime surface.
