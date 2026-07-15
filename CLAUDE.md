@@ -70,11 +70,12 @@ cd backend/Dollars2.Api && dotnet build
 - Code review uncommitted changes before committing
 - Never commit or push unless explicitly told to — tell the user things are ready, wait for instruction
 
-## Code Review Backlog (2026-06-19)
+## Backlog
 
-All critical and medium items resolved. Low items: most fixed. Remaining known issues:
-- N+1 queries in `BuildBudgetResponseAsync` (has TODO — deferred, low impact at current scale)
-- No rate limiting on auth endpoints (v1 tradeoff)
+The working task list — open tasks, deferred code-review findings, and shipped history — lives in
+`docs/backlog.md` (source-controlled and shared across machines). Read it at the start of a work
+session and keep it up to date as items move. It is the source of truth; treat auto-memory as a
+pointer to it, not a second copy.
 
 ## Out of Scope (v1)
 
