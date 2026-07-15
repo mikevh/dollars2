@@ -5,7 +5,7 @@ across machines — read it at the start of a work session and update it as item
 short; link to `docs/*.md` specs or code paths for detail.
 
 Conventions: newest-relevant first within each section. When an item ships, move it to **Done** with
-its PR number. Small, single-concern sprints (see `CLAUDE.md` / the `next-sprint` skill).
+its PR number. Small, single-concern items (see `CLAUDE.md` / the `next-item` skill).
 
 ## Now (next up)
 
