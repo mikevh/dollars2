@@ -146,14 +146,14 @@ public class PlaidProvider : IBankSyncProvider
             // to attribute transactions. A blank account_id matches every transaction in the Item and
             // would pull siblings' activity into this account, so fail it rather than corrupt data. A
             // lone account on a token is unambiguous, so an empty account_id is still allowed there.
-            if (accounts.Count > 1 && string.IsNullOrEmpty(details?.AccountId))
+            var sharedTokenError = SharedTokenMissingAccountIdError(accounts.Count, details?.AccountId);
+            if (sharedTokenError is not null)
             {
                 _logger.LogWarning(
                     "Plaid account {AccountId} shares an access token with other accounts but has no account_id; skipping to avoid importing siblings' transactions.",
                     account.Id);
                 results[account.Id] = new ProviderSyncResult(
-                    Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null,
-                    "Plaid connection details are missing an account_id, which is required when multiple accounts share an access token.");
+                    Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null, sharedTokenError);
                 continue;
             }
 
@@ -184,6 +184,17 @@ public class PlaidProvider : IBankSyncProvider
 
         return results;
     }
+
+    /// <summary>
+    /// Returns a failure message when an account cannot be safely attributed within its connection
+    /// group, or null when it is fine to sync. A blank account_id is only a problem when more than one
+    /// stored account shares the access token, because then it would match (and import) every
+    /// sibling's transactions; a lone account on a token is unambiguous.
+    /// </summary>
+    internal static string? SharedTokenMissingAccountIdError(int accountCount, string? accountId) =>
+        accountCount > 1 && string.IsNullOrEmpty(accountId)
+            ? "Plaid connection details are missing an account_id, which is required when multiple accounts share an access token."
+            : null;
 
     private static SyncedTransaction MapTransaction(PlaidTransaction t)
     {
