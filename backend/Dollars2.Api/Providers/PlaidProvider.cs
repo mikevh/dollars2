@@ -94,14 +94,13 @@ public class PlaidProvider : IBankSyncProvider
             ApiVersion.v20200914);
 
         // The cursor belongs to the Item, not the account. Only reuse a stored cursor when every
-        // account in the group already agrees on the same non-empty value. Otherwise (a newly added
-        // account with no cursor, or cursors that diverged under the old per-account scheme) start
-        // from scratch so no account's history is missed; ProviderTransactionId dedup absorbs the
-        // re-fetch. After this run all accounts are written the same advanced cursor and converge.
-        var cursors = parsed.Select(p => p.Details?.Cursor).ToList();
-        var converged = cursors.All(c => !string.IsNullOrEmpty(c)) && cursors.Distinct().Count() == 1;
-        var cursor = converged ? cursors[0] : null;
-        if (!converged && accounts.Count > 1)
+        // account in the group already agrees on the same non-empty value; otherwise start from
+        // scratch so no account's history is missed (ProviderTransactionId dedup absorbs the
+        // re-fetch). After a successful run all synced accounts are written the same advanced cursor
+        // and converge.
+        var cursor = ResolveGroupCursor(
+            parsed.Select(p => (p.Details?.AccountId, p.Details?.Cursor)).ToList());
+        if (cursor is null && accounts.Count > 1)
         {
             _logger.LogInformation(
                 "Plaid cursors for accounts {AccountIds} are not converged; performing a full resync to reconcile.",
@@ -196,6 +195,29 @@ public class PlaidProvider : IBankSyncProvider
         accountCount > 1 && string.IsNullOrEmpty(accountId)
             ? "Plaid connection details are missing an account_id, which is required when multiple accounts share an access token."
             : null;
+
+    /// <summary>
+    /// Chooses the cursor to sync the Plaid Item from, or null to force a full resync. The cursor is
+    /// per-Item, mirrored onto each account, so a run reuses it only when every account it can actually
+    /// sync already agrees on the same non-empty value. Accounts that will be skipped this run (a blank
+    /// account_id on a shared token) can never advance their cursor, so they are excluded from the
+    /// decision — otherwise a single persistently misconfigured account would force a full resync of its
+    /// healthy siblings on every sync. A syncable account with an empty or divergent cursor (a new
+    /// account, or one recovering from a failed persist) still forces the full resync it needs.
+    /// </summary>
+    internal static string? ResolveGroupCursor(IReadOnlyList<(string? AccountId, string? Cursor)> group)
+    {
+        var syncableCursors = group
+            .Where(a => SharedTokenMissingAccountIdError(group.Count, a.AccountId) is null)
+            .Select(a => a.Cursor)
+            .ToList();
+
+        var converged = syncableCursors.Count > 0
+            && syncableCursors.All(c => !string.IsNullOrEmpty(c))
+            && syncableCursors.Distinct().Count() == 1;
+
+        return converged ? syncableCursors[0] : null;
+    }
 
     /// <summary>
     /// Collects the provider transaction ids of every removed item in the Item's sync response,

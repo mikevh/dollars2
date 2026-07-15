@@ -23,6 +23,84 @@ public class PlaidProviderTests
         Assert.Equal(expectError, error is not null);
     }
 
+    // Cursor convergence: the group reuses a stored cursor only when every account it can actually
+    // sync agrees on one non-empty value.
+    [Fact]
+    public void ResolveGroupCursor_reuses_shared_non_empty_cursor()
+    {
+        var group = new List<(string?, string?)>
+        {
+            ("acct-1", "cursor-x"),
+            ("acct-2", "cursor-x"),
+        };
+
+        Assert.Equal("cursor-x", PlaidProvider.ResolveGroupCursor(group));
+    }
+
+    [Fact]
+    public void ResolveGroupCursor_forces_full_resync_when_cursors_diverge()
+    {
+        var group = new List<(string?, string?)>
+        {
+            ("acct-1", "cursor-x"),
+            ("acct-2", "cursor-y"),
+        };
+
+        Assert.Null(PlaidProvider.ResolveGroupCursor(group));
+    }
+
+    [Fact]
+    public void ResolveGroupCursor_forces_full_resync_when_a_syncable_account_has_no_cursor()
+    {
+        // A newly added account (empty cursor) alongside an established one must backfill.
+        var group = new List<(string?, string?)>
+        {
+            ("acct-1", "cursor-x"),
+            ("acct-2", ""),
+        };
+
+        Assert.Null(PlaidProvider.ResolveGroupCursor(group));
+    }
+
+    // Regression test for the cursor-divergence resync storm: a persistently misconfigured account
+    // (blank account_id on a shared token) can never advance its cursor, so it must be excluded from
+    // the convergence decision — otherwise it forces a full resync of its healthy siblings every sync.
+    [Fact]
+    public void ResolveGroupCursor_ignores_a_misconfigured_account_so_healthy_siblings_converge()
+    {
+        var group = new List<(string?, string?)>
+        {
+            ("acct-1", "cursor-x"), // healthy, advanced
+            (null, ""),             // blank account_id on a shared token -> unsyncable, stale cursor
+        };
+
+        Assert.Equal("cursor-x", PlaidProvider.ResolveGroupCursor(group));
+    }
+
+    [Fact]
+    public void ResolveGroupCursor_reuses_cursor_for_a_lone_account_with_blank_account_id()
+    {
+        // A single account on a token is unambiguous, so a blank account_id is still syncable.
+        var group = new List<(string?, string?)>
+        {
+            (null, "cursor-x"),
+        };
+
+        Assert.Equal("cursor-x", PlaidProvider.ResolveGroupCursor(group));
+    }
+
+    [Fact]
+    public void ResolveGroupCursor_forces_full_resync_when_no_account_is_syncable()
+    {
+        var group = new List<(string?, string?)>
+        {
+            (null, "cursor-x"),
+            (null, "cursor-y"),
+        };
+
+        Assert.Null(PlaidProvider.ResolveGroupCursor(group));
+    }
+
     // Regression test for the "removed transactions dropped" bug: at the pinned API version, removed
     // items carry no account_id, so filtering them by account_id skipped every soft-delete for an
     // account that had a specific account_id. Removed ids must be collected regardless of account_id
