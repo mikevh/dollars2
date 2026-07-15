@@ -173,6 +173,15 @@ public class BankSyncService
 
     private async Task<SyncResult> PersistAccountResultAsync(Account account, ProviderSyncResult syncResult)
     {
+        if (syncResult.Error is not null)
+        {
+            // The shared upstream call succeeded, but this specific account can't be synced (e.g. its
+            // connection details are misconfigured). Record it as a failure so it surfaces instead of
+            // silently reporting a healthy empty sync.
+            _logger.LogWarning("Account {AccountId} ({AccountName}) could not be synced: {Error}", account.Id, account.Name, syncResult.Error);
+            return await RecordFailureAsync(account, syncResult.Error);
+        }
+
         try
         {
             var count = 0;
@@ -241,9 +250,14 @@ public class BankSyncService
     private async Task<SyncResult> RecordFailureAsync(Account account, Exception ex)
     {
         _logger.LogError(ex, "Sync failed for account {AccountId} ({AccountName})", account.Id, account.Name);
+        return await RecordFailureAsync(account, ex.Message);
+    }
+
+    private async Task<SyncResult> RecordFailureAsync(Account account, string errorMessage)
+    {
         try
         {
-            await _syncLogRepo.CreateAsync(account.Id, SyncConstants.StatusFailure, 0, ex.Message);
+            await _syncLogRepo.CreateAsync(account.Id, SyncConstants.StatusFailure, 0, errorMessage);
         }
         catch (Exception logEx)
         {
@@ -256,7 +270,7 @@ public class BankSyncService
             AccountName = account.Name,
             Status = SyncConstants.StatusFailure,
             TransactionCount = 0,
-            ErrorMessage = ex.Message,
+            ErrorMessage = errorMessage,
         };
     }
 

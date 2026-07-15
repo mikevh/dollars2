@@ -20,10 +20,16 @@ public record SyncedTransaction(
 /// If non-null, the provider's new connection state to persist on the account (e.g. a Plaid sync cursor).
 /// Providers that are stateless (e.g. SimpleFIN) return null.
 /// </param>
+/// <param name="Error">
+/// If non-null, this account could not be synced (e.g. misconfigured connection details) even though
+/// the shared upstream call succeeded. The account is recorded as a failure with this message instead
+/// of being persisted, so a broken account never masquerades as a healthy empty sync. Null on success.
+/// </param>
 public record ProviderSyncResult(
     IReadOnlyList<SyncedTransaction> Upserts,
     IReadOnlyList<string> RemovedProviderTransactionIds,
-    string? UpdatedConnectionDetailsJson);
+    string? UpdatedConnectionDetailsJson,
+    string? Error = null);
 
 public interface IBankSyncProvider
 {

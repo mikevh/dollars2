@@ -142,6 +142,21 @@ public class PlaidProvider : IBankSyncProvider
         var results = new Dictionary<int, ProviderSyncResult>();
         foreach (var (account, details) in parsed)
         {
+            // When several stored accounts share one access token, each must carry its own account_id
+            // to attribute transactions. A blank account_id matches every transaction in the Item and
+            // would pull siblings' activity into this account, so fail it rather than corrupt data. A
+            // lone account on a token is unambiguous, so an empty account_id is still allowed there.
+            if (accounts.Count > 1 && string.IsNullOrEmpty(details?.AccountId))
+            {
+                _logger.LogWarning(
+                    "Plaid account {AccountId} shares an access token with other accounts but has no account_id; skipping to avoid importing siblings' transactions.",
+                    account.Id);
+                results[account.Id] = new ProviderSyncResult(
+                    Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null,
+                    "Plaid connection details are missing an account_id, which is required when multiple accounts share an access token.");
+                continue;
+            }
+
             bool MatchesAccount(string? plaidAccountId) =>
                 string.IsNullOrEmpty(details?.AccountId) || plaidAccountId == details.AccountId;
 
