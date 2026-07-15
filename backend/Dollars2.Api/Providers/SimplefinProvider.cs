@@ -103,13 +103,22 @@ public class SimplefinProvider : IBankSyncProvider
         var results = new Dictionary<int, ProviderSyncResult>();
         foreach (var (account, details) in parsed)
         {
-            var simplefinAccount = details is null
-                ? null
-                : accountSet.Accounts.FirstOrDefault(a => a.Id == details.AccountId);
+            if (details is null || string.IsNullOrEmpty(details.AccountId))
+            {
+                _logger.LogWarning("SimpleFIN account {AccountId} has no configured SimpleFIN AccountId.", account.Id);
+                results[account.Id] = new ProviderSyncResult(
+                    Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null,
+                    "SimpleFIN connection details are missing an AccountId.");
+                continue;
+            }
+
+            var simplefinAccount = accountSet.Accounts.FirstOrDefault(a => a.Id == details.AccountId);
             if (simplefinAccount is null)
             {
-                _logger.LogWarning("No matching account found in SimpleFIN response for account {AccountId} with SimpleFIN AccountId {SimplefinAccountId}.", account.Id, details?.AccountId);
-                results[account.Id] = new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null);
+                _logger.LogWarning("No matching account found in SimpleFIN response for account {AccountId} with SimpleFIN AccountId {SimplefinAccountId}.", account.Id, details.AccountId);
+                results[account.Id] = new ProviderSyncResult(
+                    Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null,
+                    $"SimpleFIN returned no account matching AccountId '{details.AccountId}'.");
                 continue;
             }
 
