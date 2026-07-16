@@ -1,3 +1,193 @@
 @import "tailwindcss";
 
+/* Archivo is loaded via a <link> in index.html (keeps @import ordering clean
+   and lets the font preconnect/preload). */
+
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Modernist design-system tokens (light values). Registered with Tailwind's
+   @theme so utilities like bg-surface / text-text / text-accent-700 /
+   border-divider / font-heading are available app-wide. The .dark block below
+   overrides the color tokens with the derived dark ramp; because @theme keeps
+   var() references in the generated utilities, toggling the .dark class swaps
+   every token-driven color live.
+   ────────────────────────────────────────────────────────────────────────── */
+@theme {
+  --font-heading: "Archivo", system-ui, sans-serif;
+  --font-body: "Archivo", system-ui, sans-serif;
+
+  --color-bg: #f3f2f2;
+  --color-surface: #eae9e9;
+  --color-text: #201e1d;
+  --color-accent: #ec3013;
+  --color-divider: color-mix(in srgb, #201e1d 40%, transparent);
+
+  /* Tonal ramps — OKLCH-generated on one shared lightness scale. */
+  --color-neutral-100: #f8f4f4;
+  --color-neutral-200: #eae7e7;
+  --color-neutral-300: #d7d3d3;
+  --color-neutral-400: #bab6b6;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #7d7979;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b;
+
+  --color-accent-100: #fff2ef;
+  --color-accent-200: #ffe0d9;
+  --color-accent-300: #ffc4b8;
+  --color-accent-400: #ff9783;
+  --color-accent-500: #ff563c;
+  --color-accent-600: #dd2b0f;
+  --color-accent-700: #ae1800;
+  --color-accent-800: #7c1405;
+  --color-accent-900: #4d170e;
+
+  /* Elevation — namespaced (shadow-elev-*) to avoid clobbering Tailwind's own
+     shadow scale that not-yet-restyled screens still rely on. */
+  --shadow-elev-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
+  --shadow-elev-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
+  --shadow-elev-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+}
+
+/* Dark ground: the same ramps read back-to-front (a systematic OKLCH
+   inversion, not new hues) plus one near-black page background a step past
+   neutral-900 for bg/surface separation. --color-accent itself is unchanged. */
+.dark {
+  --color-bg: #18100e;
+  --color-surface: #2d2b2b;
+  --color-text: #f3f2f2;
+  --color-divider: color-mix(in srgb, #f3f2f2 22%, transparent);
+
+  --color-neutral-100: #2d2b2b;
+  --color-neutral-200: #444141;
+  --color-neutral-300: #605d5d;
+  --color-neutral-400: #7d7979;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #bab6b6;
+  --color-neutral-700: #d7d3d3;
+  --color-neutral-800: #eae7e7;
+  --color-neutral-900: #f8f4f4;
+
+  --color-accent-100: #4d170e;
+  --color-accent-200: #7c1405;
+  --color-accent-300: #ae1800;
+  --color-accent-400: #dd2b0f;
+  --color-accent-600: #ff9783;
+  --color-accent-700: #ffc4b8;
+  --color-accent-800: #ffe0d9;
+  --color-accent-900: #fff2ef;
+
+  --shadow-elev-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-elev-md: 0 4px 16px rgba(0, 0, 0, 0.55);
+  --shadow-elev-lg: 0 20px 48px rgba(0, 0, 0, 0.65);
+}
+
+@layer base {
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+    font-weight: 800;
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+}
+
+/* Reusable Modernist component classes (the subset the current slice uses;
+   more are ported as later redesign slices need them). */
+@layer components {
+  .text-muted {
+    color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  }
+
+  .field > label {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 5px;
+    color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  }
+
+  .input {
+    width: 100%;
+    min-height: 36px;
+    padding: 6px 10px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--color-text);
+    caret-color: var(--color-accent);
+    background: var(--color-surface);
+    border: 1px solid var(--color-divider);
+    border-radius: 0;
+  }
+  .input::placeholder {
+    color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  }
+  .input:hover {
+    border-color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  }
+  .input:focus-visible {
+    border-color: var(--color-accent);
+    /* keep the base :focus-visible accent outline; the design just pins its
+       offset to the border edge */
+    outline-offset: 0;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 14px;
+    line-height: 1.2;
+    color: var(--color-text);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0;
+    padding: 8px 14px;
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--color-accent);
+    color: var(--color-bg);
+  }
+  .btn-primary:not(:disabled):hover {
+    background: var(--color-accent-600);
+  }
+  .btn-primary:not(:disabled):active {
+    background: var(--color-accent-700);
+  }
+  .btn-block {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+  }
+}

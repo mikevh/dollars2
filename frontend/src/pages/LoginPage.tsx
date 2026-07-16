@@ -29,24 +29,23 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <h1 className="mb-6 text-center text-2xl font-semibold text-gray-900 dark:text-white">
-          Dollars2
-        </h1>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="mb-4">
-            <label
-              htmlFor="email"
-              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Email
-            </label>
+    <div className="flex min-h-screen items-center justify-center bg-bg p-4 text-text">
+      <div className="flex w-[360px] flex-col gap-4 border border-divider bg-surface px-6 py-8 shadow-elev-md">
+        <div>
+          <h1 className="mb-1 text-[28px] leading-tight">Dollars2</h1>
+          <p className="text-muted text-[13px]">
+            Zero-based budgeting, self-hosted.
+          </p>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <div className="field">
+            <label htmlFor="email">Email</label>
             <input
               id="email"
               type="email"
               autoFocus
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              placeholder="you@example.com"
+              className="input"
               {...register('email', {
                 required: 'Email is required',
                 pattern: {
@@ -56,15 +55,17 @@ export default function LoginPage() {
               })}
             />
             {errors.email && (
-              <p className="mt-1 text-sm text-red-500">{errors.email.message}</p>
+              <p className="mt-1 text-[12px] text-accent-700">
+                {errors.email.message}
+              </p>
             )}
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="btn btn-primary btn-block"
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
       </div>
