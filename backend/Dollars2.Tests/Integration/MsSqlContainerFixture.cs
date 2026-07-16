@@ -21,7 +21,7 @@ public sealed class MsSqlContainerFixture : IAsyncLifetime
 
     private string _connectionString = "";
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _container.StartAsync();
 
@@ -49,7 +49,7 @@ public sealed class MsSqlContainerFixture : IAsyncLifetime
         return new DbSession(new SqlConnection(_connectionString));
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await _container.DisposeAsync();
     }

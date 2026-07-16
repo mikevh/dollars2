@@ -41,7 +41,8 @@ public class SimplefinProviderTests
     {
         var provider = CreateProvider("""{"accounts":[{"id":"sf-1","transactions":[]}],"errlist":[]}""");
 
-        var results = await provider.FetchTransactionsForConnectionAsync(new[] { Account(1, accountId: null) }, since: null);
+        var results = await provider.FetchTransactionsForConnectionAsync(
+            new[] { Account(1, accountId: null) }, since: null, TestContext.Current.CancellationToken);
 
         Assert.NotNull(results[1].Error);
         Assert.Empty(results[1].Upserts);
@@ -52,7 +53,8 @@ public class SimplefinProviderTests
     {
         var provider = CreateProvider("""{"accounts":[{"id":"sf-other","transactions":[]}],"errlist":[]}""");
 
-        var results = await provider.FetchTransactionsForConnectionAsync(new[] { Account(1, accountId: "sf-missing") }, since: null);
+        var results = await provider.FetchTransactionsForConnectionAsync(
+            new[] { Account(1, accountId: "sf-missing") }, since: null, TestContext.Current.CancellationToken);
 
         Assert.NotNull(results[1].Error);
     }
@@ -69,7 +71,8 @@ public class SimplefinProviderTests
         var good = Account(1, accountId: "sf-good");
         var broken = Account(2, accountId: null);
 
-        var results = await provider.FetchTransactionsForConnectionAsync(new[] { good, broken }, since: null);
+        var results = await provider.FetchTransactionsForConnectionAsync(
+            new[] { good, broken }, since: null, TestContext.Current.CancellationToken);
 
         Assert.Null(results[1].Error);
         Assert.Single(results[1].Upserts);
