@@ -1,8 +1,8 @@
 # Backend
-backend/**/bin/
-backend/**/obj/
-backend/**/*.user
-backend/**/logs/
+**/backend/**/bin/
+**/backend/**/obj/
+**/backend/**/*.user
+**/backend/**/logs/
 
 # Frontend
 frontend/node_modules/
