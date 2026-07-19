@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Playwright UI screenshot output (scripts/ui-shot.mjs)
+.ui-shots
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
