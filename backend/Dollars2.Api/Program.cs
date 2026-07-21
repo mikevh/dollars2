@@ -13,8 +13,9 @@ using Serilog;
 var builder = WebApplication.CreateBuilder(args);
 
 var logFilePath = builder.Configuration["Logging:File:Path"] ?? "logs/dollars2-.log";
+var elasticsearchUri = builder.Configuration["Elasticsearch:Uri"];
 builder.Host.UseSerilog((context, loggerConfig) =>
-    loggerConfig.ConfigureDollars2Logging(logFilePath));
+    loggerConfig.ConfigureDollars2Logging(logFilePath, elasticsearchUri));
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
