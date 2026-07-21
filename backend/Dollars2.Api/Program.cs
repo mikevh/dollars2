@@ -9,13 +9,15 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var logFilePath = builder.Configuration["Logging:File:Path"] ?? "logs/dollars2-.log";
 var elasticsearchUri = builder.Configuration["Elasticsearch:Uri"];
+var minimumLevel = builder.Configuration.GetValue("Serilog:MinimumLevel", LogEventLevel.Information);
 builder.Host.UseSerilog((context, loggerConfig) =>
-    loggerConfig.ConfigureDollars2Logging(logFilePath, elasticsearchUri));
+    loggerConfig.ConfigureDollars2Logging(logFilePath, elasticsearchUri, minimumLevel));
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

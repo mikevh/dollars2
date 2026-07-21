@@ -23,13 +23,19 @@ public static class SerilogConfiguration
     /// the case for local development, tests, and CI where no Elasticsearch instance is running.
     /// Kept as an extension so the sinks can be exercised in a test without booting the whole app.
     /// </param>
+    /// <param name="minimumLevel">
+    /// App-wide minimum level floor (default <see cref="LogEventLevel.Information"/>); the
+    /// <c>Microsoft.AspNetCore</c> override stays pinned at Warning to keep framework noise down even
+    /// when the app floor is lowered to Verbose.
+    /// </param>
     public static LoggerConfiguration ConfigureDollars2Logging(
         this LoggerConfiguration config,
         string logFilePath,
-        string? elasticsearchUri = null)
+        string? elasticsearchUri = null,
+        LogEventLevel minimumLevel = LogEventLevel.Information)
     {
         config
-            .MinimumLevel.Information()
+            .MinimumLevel.Is(minimumLevel)
             .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
             .Enrich.FromLogContext()
             .WriteTo.Console()

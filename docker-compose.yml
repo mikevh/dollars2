@@ -11,6 +11,7 @@ services:
       Jwt__Issuer: Dollars2
       Jwt__Audience: Dollars2
       Cors__FrontendUrl: ${Cors__FrontendUrl}
+      Serilog__MinimumLevel: ${Serilog__MinimumLevel:-Information}
       Plaid__ClientId: ${Plaid__ClientId}
       Plaid__Secret: ${Plaid__Secret}
       Plaid__Environment: Production
