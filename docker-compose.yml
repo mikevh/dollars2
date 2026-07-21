@@ -14,6 +14,9 @@ services:
       Plaid__ClientId: ${Plaid__ClientId}
       Plaid__Secret: ${Plaid__Secret}
       Plaid__Environment: Production
+      Elasticsearch__Uri: http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
     restart: unless-stopped
 
   frontend:
@@ -25,3 +28,32 @@ services:
     ports:
       - "8080:80"
     restart: unless-stopped
+
+  # Log sink for the backend. Single-node with security disabled: this stack is only reachable on
+  # the home LAN / Tailscale network, never the public internet, so TLS + auth are out of scope.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.0.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      # Cap the heap so Elasticsearch fits comfortably on the small home server.
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    restart: unless-stopped
+
+  # Kibana: browse and search the logs Elasticsearch collects.
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.0.0
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+volumes:
+  esdata:
