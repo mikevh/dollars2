@@ -5,67 +5,53 @@ description: Deploy Dollars2 to the home LAN server by SSHing in, pulling latest
 
 # Deploy to home server
 
-Deploys the current `master` branch to the home LAN server by SSH, using
-`docker-compose.yml` at the repo root. The server already has Docker, a
-clone of this repo, and a real `.env` file (created once, not touched by
-git) with production secrets.
+Deploys the current `master` branch to the home LAN server. The actual work
+lives in `scripts/deploy.sh` at the repo root — a self-contained bash script
+that is the single source of truth for the deploy steps. This skill just runs
+it and interprets the result.
 
-Server connection details:
-
-- `<SSH_HOST>` — `claw.tail303da.ts.net` (Tailscale; LAN IP is `10.0.0.215`)
-- `<SSH_USER>` — `m`
-- `<REMOTE_REPO_PATH>` — `~/dollars2`
+The server already has Docker, a clone of this repo, and a real `.env` file
+(created once, not touched by git) with production secrets.
 
 ## Steps
 
-1. SSH in and pull the latest code:
+1. Run the deploy script from the repo root (works in Git Bash, WSL, macOS,
+   or Linux):
    ```
-   ssh m@claw.tail303da.ts.net "cd ~/dollars2 && git pull"
-   ```
-
-2. Rebuild and restart the containers (reads `.env` in the same directory
-   automatically). Stamp the frontend image with the deployed commit hash so
-   the UI footer shows the running build — `VITE_BUILD_ID` is evaluated on the
-   server, from its just-pulled checkout (note the escaped `\$(...)` so the
-   command substitution runs remotely, not on the local machine):
-   ```
-   ssh m@claw.tail303da.ts.net "cd ~/dollars2 && VITE_BUILD_ID=\$(git rev-parse --short HEAD) docker compose up -d --build"
+   ./scripts/deploy.sh
    ```
 
-3. Confirm both containers are up and report their status back to the user:
-   ```
-   ssh m@claw.tail303da.ts.net "cd ~/dollars2 && docker compose ps"
-   ```
+   The script performs, in order:
+   - `git pull` on the server (`m@claw.tail303da.ts.net:~/dollars2`)
+   - `docker compose up -d --build`, stamping `VITE_BUILD_ID` with the
+     server's just-pulled short commit hash so the UI footer shows the
+     running build
+   - `docker compose ps` to confirm both containers are up
+   - **Required health verification** — real HTTP requests over the Tailscale
+     network to the frontend (`http://claw.tail303da.ts.net:8080/`) and the
+     backend health endpoint (`http://claw.tail303da.ts.net:5062/api/health`),
+     both of which must return `200`. The script exits non-zero if either
+     fails.
+   - `docker image prune -f` to reclaim dangling-image disk space
 
-4. **Verify the deployment actually serves traffic — this step is required,
-   not optional.** Issue real HTTP requests to the frontend and backend and
-   confirm both return `200`. Run these from the machine executing the deploy
-   (i.e. NOT over `ssh` / `localhost`) so the check goes over the Tailscale
-   network — the same path a user takes. A `docker compose ps` showing "Up"
-   is not proof the app is reachable; containers can be up but not serving,
-   or removed entirely by an earlier `docker compose down`.
-   ```
-   # Frontend (nginx serving the SPA) — expect 200
-   curl -sS -m 10 -o /dev/null -w "frontend: %{http_code}\n" http://claw.tail303da.ts.net:8080/
+   Config (host, user, repo path, URLs) is overridable via environment
+   variables — see the header of `scripts/deploy.sh`.
 
-   # Backend health endpoint (anonymous, side-effect free) — expect 200 and {"status":"healthy"}
-   curl -sS -m 10 -w "\nbackend: %{http_code}\n" http://claw.tail303da.ts.net:5062/api/health
-   ```
-   Both must return `200` before you report the deploy as successful. If
-   either fails to connect or returns a non-200, the deploy is NOT done:
-   report the failure. Common causes — the containers aren't running (check
-   `docker compose ps`; if empty, a prior `docker compose down` left them
-   stopped — run `docker compose up -d`), the backend crashed on a bad `.env`
-   value (check `docker logs dollars2-backend-1`), or the port isn't
-   reachable over the tailnet.
+2. Report the outcome to the user. A `Deploy successful.` line with both
+   endpoints at `200` means it's done. Include the deployed commit hash.
 
-5. Optionally clean up old dangling images so disk usage doesn't grow
-   unbounded over repeated deploys:
-   ```
-   ssh m@claw.tail303da.ts.net "docker image prune -f"
-   ```
+## If it fails
 
-If any step fails (SSH connection refused, git conflict, build error, or the
-step 4 health checks), stop and report the exact error back to the user
-rather than retrying blindly - don't force-push, hard-reset, or discard
-changes on the server without asking first.
+The script exits non-zero and prints the failing step. Stop and report the
+exact error rather than retrying blindly — do **not** force-push, hard-reset,
+or discard changes on the server without asking first. Common causes:
+
+- **`npm ci` / build error** — usually the code on `master` is broken (e.g. a
+  `package-lock.json` out of sync). Fix it in the repo, push, and re-run.
+- **Health check returns non-200 or fails to connect** — the containers may
+  not be running (`ssh m@claw.tail303da.ts.net "cd ~/dollars2 && docker compose ps"`;
+  if empty, a prior `docker compose down` left them stopped — `docker compose up -d`),
+  the backend may have crashed on a bad `.env` value
+  (`docker logs dollars2-backend-1`), or the port isn't reachable over the
+  tailnet.
+- **SSH connection refused** — check Tailscale is up on both ends.
