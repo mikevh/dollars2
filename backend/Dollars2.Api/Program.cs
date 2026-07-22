@@ -41,6 +41,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<SyncLogRepository>();
+builder.Services.AddScoped<AccountBalanceRepository>();
 builder.Services.AddHttpClient("simplefin", client =>
     client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddScoped<IBankSyncProvider, SimplefinProvider>();

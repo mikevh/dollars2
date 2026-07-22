@@ -25,11 +25,16 @@ public record SyncedTransaction(
 /// the shared upstream call succeeded. The account is recorded as a failure with this message instead
 /// of being persisted, so a broken account never masquerades as a healthy empty sync. Null on success.
 /// </param>
+/// <param name="Balance">
+/// The account's current balance as reported by the provider, or null if the provider did not report a
+/// parseable balance. When non-null it is appended to the AccountBalances history on a successful sync.
+/// </param>
 public record ProviderSyncResult(
     IReadOnlyList<SyncedTransaction> Upserts,
     IReadOnlyList<string> RemovedProviderTransactionIds,
     string? UpdatedConnectionDetailsJson,
-    string? Error = null);
+    string? Error = null,
+    decimal? Balance = null);
 
 public interface IBankSyncProvider
 {

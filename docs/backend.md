@@ -67,6 +67,9 @@
 - Re-synced soft-deleted transactions: set isDeleted back to false
 - On sync failure: log and wait for next scheduled run (Polly retries in future versions)
 - Sync status exposed to frontend (last sync time, status per account)
+- On each successful account sync, the provider-reported current balance is appended to
+  `AccountBalances` (in the same per-account transaction as the transaction upserts and sync-log
+  entry), building a balance time-series. A null/unparseable balance records no row.
 
 ## Provider Abstraction
 

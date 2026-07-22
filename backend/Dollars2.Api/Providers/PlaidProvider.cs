@@ -3,6 +3,7 @@ using Dollars2.Api.Models;
 using Going.Plaid;
 using Going.Plaid.Transactions;
 using PlaidTransaction = Going.Plaid.Entity.Transaction;
+using PlaidAccount = Going.Plaid.Entity.Account;
 using RemovedTransaction = Going.Plaid.Entity.RemovedTransaction;
 
 namespace Dollars2.Api.Providers;
@@ -122,6 +123,9 @@ public class PlaidProvider : IBankSyncProvider
         var added = new List<PlaidTransaction>();
         var modified = new List<PlaidTransaction>();
         var removed = new List<RemovedTransaction>();
+        // Every /transactions/sync page carries the Item's current account snapshot (including balances);
+        // keep the latest so we can record each account's balance after the stream is drained.
+        IReadOnlyList<PlaidAccount> accountSnapshot = Array.Empty<PlaidAccount>();
         bool hasMore;
 
         do
@@ -144,6 +148,10 @@ public class PlaidProvider : IBankSyncProvider
             added.AddRange(response.Added);
             modified.AddRange(response.Modified);
             removed.AddRange(response.Removed);
+            if (response.Accounts.Count > 0)
+            {
+                accountSnapshot = response.Accounts;
+            }
 
             cursor = response.NextCursor;
             hasMore = response.HasMore;
@@ -191,7 +199,9 @@ public class PlaidProvider : IBankSyncProvider
                 Cursor = cursor,
             });
 
-            results[account.Id] = new ProviderSyncResult(upserts, removedIds, updatedJson);
+            var balance = ExtractCurrentBalance(accountSnapshot, details?.AccountId);
+
+            results[account.Id] = new ProviderSyncResult(upserts, removedIds, updatedJson, Balance: balance);
         }
 
         return results;
@@ -243,6 +253,27 @@ public class PlaidProvider : IBankSyncProvider
             .Where(id => !string.IsNullOrEmpty(id))
             .Select(id => id!)
             .ToList();
+
+    /// <summary>
+    /// Picks the current balance for a stored account from the Item's account snapshot. When the stored
+    /// account carries a Plaid account_id, the matching snapshot account is used; a lone account with a
+    /// blank account_id (unambiguous on its token) falls back to the single snapshot account. Returns
+    /// null when there is no unambiguous match or the provider reported no current balance.
+    /// </summary>
+    internal static decimal? ExtractCurrentBalance(IReadOnlyList<PlaidAccount> accounts, string? accountId)
+    {
+        PlaidAccount? match;
+        if (!string.IsNullOrEmpty(accountId))
+        {
+            match = accounts.FirstOrDefault(a => a.AccountId == accountId);
+        }
+        else
+        {
+            match = accounts.Count == 1 ? accounts[0] : null;
+        }
+
+        return match?.Balances?.Current;
+    }
 
     private static SyncedTransaction MapTransaction(PlaidTransaction t)
     {

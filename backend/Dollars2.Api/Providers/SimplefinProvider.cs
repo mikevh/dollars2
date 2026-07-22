@@ -138,7 +138,17 @@ public class SimplefinProvider : IBankSyncProvider
                 transactions.Add(new SyncedTransaction(t.Id, date, t.Description, t.Payee, t.Memo, amount, t.Pending));
             }
 
-            results[account.Id] = new ProviderSyncResult(transactions, Array.Empty<string>(), null);
+            decimal? balance = null;
+            if (decimal.TryParse(simplefinAccount.Balance, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedBalance))
+            {
+                balance = parsedBalance;
+            }
+            else if (!string.IsNullOrEmpty(simplefinAccount.Balance))
+            {
+                _logger.LogWarning("Skipping unparseable balance '{Balance}' for account {AccountId}", simplefinAccount.Balance, account.Id);
+            }
+
+            results[account.Id] = new ProviderSyncResult(transactions, Array.Empty<string>(), null, Balance: balance);
         }
 
         return results;

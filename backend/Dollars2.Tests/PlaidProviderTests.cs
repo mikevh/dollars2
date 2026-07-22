@@ -1,5 +1,7 @@
 using Dollars2.Api.Providers;
 using RemovedTransaction = Going.Plaid.Entity.RemovedTransaction;
+using PlaidAccount = Going.Plaid.Entity.Account;
+using AccountBalance = Going.Plaid.Entity.AccountBalance;
 
 namespace Dollars2.Tests;
 
@@ -119,5 +121,62 @@ public class PlaidProviderTests
         var ids = PlaidProvider.CollectRemovedTransactionIds(removed);
 
         Assert.Equal(new[] { "txn-1", "txn-2" }, ids);
+    }
+
+    // Balance capture: the stored account's current balance is pulled from the Item snapshot by
+    // matching account_id; a lone account with a blank account_id falls back to the sole snapshot
+    // account; anything ambiguous or absent yields null.
+    private static PlaidAccount SnapshotAccount(string accountId, decimal? current) => new()
+    {
+        AccountId = accountId,
+        Balances = new AccountBalance { Current = current },
+    };
+
+    [Fact]
+    public void ExtractCurrentBalance_matches_by_account_id()
+    {
+        var snapshot = new[]
+        {
+            SnapshotAccount("acct-1", 100.25m),
+            SnapshotAccount("acct-2", 999.99m),
+        };
+
+        Assert.Equal(100.25m, PlaidProvider.ExtractCurrentBalance(snapshot, "acct-1"));
+    }
+
+    [Fact]
+    public void ExtractCurrentBalance_falls_back_to_the_sole_account_when_account_id_is_blank()
+    {
+        var snapshot = new[] { SnapshotAccount("acct-1", 42.00m) };
+
+        Assert.Equal(42.00m, PlaidProvider.ExtractCurrentBalance(snapshot, null));
+    }
+
+    [Fact]
+    public void ExtractCurrentBalance_is_null_when_blank_account_id_is_ambiguous()
+    {
+        var snapshot = new[]
+        {
+            SnapshotAccount("acct-1", 1m),
+            SnapshotAccount("acct-2", 2m),
+        };
+
+        Assert.Null(PlaidProvider.ExtractCurrentBalance(snapshot, ""));
+    }
+
+    [Fact]
+    public void ExtractCurrentBalance_is_null_when_no_account_matches()
+    {
+        var snapshot = new[] { SnapshotAccount("acct-1", 1m) };
+
+        Assert.Null(PlaidProvider.ExtractCurrentBalance(snapshot, "acct-missing"));
+    }
+
+    [Fact]
+    public void ExtractCurrentBalance_is_null_when_provider_reports_no_current_balance()
+    {
+        var snapshot = new[] { SnapshotAccount("acct-1", null) };
+
+        Assert.Null(PlaidProvider.ExtractCurrentBalance(snapshot, "acct-1"));
     }
 }
