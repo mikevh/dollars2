@@ -82,8 +82,8 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
     <div
       ref={setNodeRef}
       onClick={(e) => { e.stopPropagation(); onSelect?.() }}
-      className={`flex h-10 cursor-pointer items-center justify-between border-b border-gray-100 px-4 last:border-b-0 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50 ${
-        isOver ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+      className={`flex h-11 cursor-pointer items-center justify-between border-b border-divider px-4 last:border-b-0 hover:bg-[color-mix(in_srgb,var(--color-text)_6%,transparent)] ${
+        isOver ? 'bg-accent-100 ring-1 ring-inset ring-accent' : ''
       }`}
     >
       <div className="flex items-center gap-2">
@@ -103,12 +103,12 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
               }
             }}
             autoFocus
-            className="rounded border border-gray-300 px-2 py-0.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="border border-divider bg-surface px-2 py-0.5 text-sm text-text"
           />
         ) : (
           <span
             onClick={(e) => { e.stopPropagation(); setEditingName(true) }}
-            className="cursor-text text-sm text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+            className="cursor-text text-sm text-text hover:text-accent-700"
           >
             {lineItem.name}
           </span>
@@ -116,7 +116,7 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
         {editingName && <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={(e) => { e.stopPropagation(); handleDelete() }}
-          className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
+          className="text-muted hover:text-accent-700"
           title="Delete item"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
@@ -124,7 +124,7 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
           </svg>
         </button>}
       </div>
-      <div className="flex gap-6 text-sm">
+      <div className="flex gap-6 text-sm tabular-nums">
         {editingAmount ? (
           <input
             type="number"
@@ -142,20 +142,20 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
             }}
             step="0.01"
             autoFocus
-            className="w-24 rounded border border-gray-300 px-2 py-0.5 text-right text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="w-24 border border-divider bg-surface px-2 py-0.5 text-right text-sm text-text"
           />
         ) : (
           <span
             onClick={(e) => { e.stopPropagation(); setEditingAmount(true) }}
-            className="w-24 cursor-text border border-transparent px-2 py-0.5 text-right text-gray-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
+            className="w-24 cursor-text border border-transparent px-2 py-0.5 text-right text-text hover:text-accent-700"
           >
             {formatCurrency(lineItem.plannedAmount)}
           </span>
         )}
-        <span className="w-24 border border-transparent px-2 py-0.5 text-right text-gray-500 dark:text-gray-400">
+        <span className="w-24 border border-transparent px-2 py-0.5 text-right text-muted">
           {formatCurrency(isIncome ? lineItem.receivedAmount : lineItem.spentAmount)}
         </span>
-        <span className={`w-24 border border-transparent px-2 py-0.5 text-right ${remaining < 0 ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
+        <span className={`w-24 border border-transparent px-2 py-0.5 text-right ${remaining < 0 ? 'text-accent-700' : 'text-text'}`}>
           {formatCurrency(remaining)}
         </span>
       </div>
