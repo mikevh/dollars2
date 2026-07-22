@@ -35,34 +35,32 @@ export default function Footer() {
   }
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-      <div className="flex items-center gap-3">
+    <footer className="fixed bottom-0 left-0 right-0 flex items-center justify-between border-t-2 border-divider bg-surface px-4 py-2 text-[12px] text-text">
+      <div className="flex items-center gap-2">
         <button
           onClick={cycleTheme}
-          className="rounded p-1 hover:text-gray-900 dark:hover:text-white"
+          className="btn btn-icon btn-ghost"
           title={`Theme: ${mode}`}
         >
-          <FontAwesomeIcon icon={themeIcons[mode]} className="h-4 w-4" />
+          <FontAwesomeIcon icon={themeIcons[mode]} className="h-[15px] w-[15px]" />
         </button>
-        <span className="text-xs opacity-50" title="Running build">
+        <span className="opacity-50" title="Running build">
           {buildLabel}
         </span>
       </div>
 
-      <div className="flex items-center gap-2">
-        <FontAwesomeIcon icon={faSync} className="h-3 w-3 opacity-50" />
-        <span className="opacity-50">Last synced: —</span>
+      <div className="flex items-center gap-1.5 opacity-50">
+        <FontAwesomeIcon icon={faSync} className="h-3 w-3" />
+        <span>Last synced: —</span>
       </div>
 
-      <div className="flex items-center gap-3">
-        <button
-          onClick={handleLogout}
-          className="rounded p-1 hover:text-gray-900 dark:hover:text-white"
-          title="Logout"
-        >
-          <FontAwesomeIcon icon={faSignOutAlt} className="h-4 w-4" />
-        </button>
-      </div>
+      <button
+        onClick={handleLogout}
+        className="btn btn-icon btn-ghost"
+        title="Logout"
+      >
+        <FontAwesomeIcon icon={faSignOutAlt} className="h-[15px] w-[15px]" />
+      </button>
     </footer>
   )
 }
