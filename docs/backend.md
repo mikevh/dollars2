@@ -41,6 +41,21 @@
 - Migrations tracking table to record applied scripts
 - Connection string in appsettings.json
 
+## Logging
+
+- Serilog, configured in one place: `Logging/SerilogConfiguration.ConfigureDollars2Logging`
+- Sinks:
+  - **Console** — always on
+  - **Rolling file** — `logs/dollars2-<date>.log`, daily rollover, 14 files retained
+  - **Elasticsearch** — added only when `Elasticsearch:Uri` is configured; ships logs to the
+    `logs-dollars2` data stream. Absent in local dev / tests / CI, so no Elasticsearch is required
+    to run or test the app. An unreachable Elasticsearch never takes the app down — console + file
+    logging continue regardless.
+- In the home-server deployment (`docker-compose.yml`), `Elasticsearch` and `Kibana` run as services
+  on the same host. The backend points at `http://elasticsearch:9200`; browse logs in Kibana on port
+  `5601`. Elasticsearch runs single-node with security disabled — the stack is only reachable on the
+  LAN / Tailscale network, so TLS and auth are out of scope.
+
 ## Bank Sync
 
 - `IHostedService` with a timer running every hour

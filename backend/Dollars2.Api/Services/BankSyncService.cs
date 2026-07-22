@@ -51,18 +51,15 @@ public class BankSyncService
             {
                 foreach (var account in group)
                 {
-                    // todo: a provider that is disabled via settings should log out that instead of "not found" (or maybe we should just skip it silently)
                     _logger.LogWarning("No provider found for account {AccountId} ({AccountName}) with source type {SourceType}", account.Id, account.Name, account.SourceType);
                     results.Add(SkippedResult(account));
                 }
                 continue;
             }
 
-            if (enforceMinInterval
-                && await IsWithinMinIntervalAsync(userId, sourceType, provider.MinSyncInterval))
+            if (enforceMinInterval && await IsWithinMinIntervalAsync(userId, sourceType, provider.MinSyncInterval))
             {
-                _logger.LogInformation(
-                    "Skipping scheduled {SourceType} sync for user {UserId} — last successful sync is within the {MinInterval} minimum interval",
+                _logger.LogInformation("Skipping scheduled {SourceType} sync for user {UserId} — last successful sync is within the {MinInterval} minimum interval",
                     sourceType, userId, provider.MinSyncInterval);
                 foreach (var account in group)
                 {
@@ -277,8 +274,14 @@ public class BankSyncService
 
     private IBankSyncProvider? GetProvider(string sourceType)
     {
-        if (_providers.TryGetValue(sourceType, out var provider) && provider.Enabled)
+        if (_providers.TryGetValue(sourceType, out var provider))
         {
+            if(!provider.Enabled)
+            {
+                _logger.LogWarning($"{sourceType} is disabled");
+                return null;
+            }
+
             return provider;
         }
         return null;
