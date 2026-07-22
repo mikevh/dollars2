@@ -98,52 +98,53 @@ export default function BudgetPage() {
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="min-h-screen bg-gray-50 pb-16 dark:bg-gray-900" onClick={() => setSelectedLineItemId(null)}>
-        <div className="mx-auto max-w-6xl px-4">
-          <MonthNav />
+      <div className="flex min-h-screen flex-col bg-bg pb-14 text-text" onClick={() => setSelectedLineItemId(null)}>
+        <MonthNav />
 
-          <div className="flex gap-6">
-            <div className="flex-1">
-              {loading && (
-                <div className="py-12 text-center text-gray-500 dark:text-gray-400">Loading...</div>
-              )}
+        <div className="mx-auto flex w-full max-w-[1180px] items-start gap-6 px-4 py-6">
+          <div className="min-w-0 flex-1">
+            {loading && (
+              <div className="text-muted py-12 text-center">Loading...</div>
+            )}
 
-              {!loading && error === 'BUDGET_NOT_FOUND' && (
-                <div className="py-12 text-center">
-                  <p className="mb-4 text-gray-500 dark:text-gray-400">
-                    No budget for this month.
-                  </p>
-                  {!isPastMonth && (
-                    <button
-                      onClick={handleCreateBudget}
-                      className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                    >
-                      Create Budget
-                    </button>
-                  )}
-                </div>
-              )}
+            {!loading && error === 'BUDGET_NOT_FOUND' && (
+              <div className="py-12 text-center">
+                <p className="text-muted mb-4">
+                  No budget for this month.
+                </p>
+                {!isPastMonth && (
+                  <button
+                    onClick={handleCreateBudget}
+                    className="btn btn-primary"
+                  >
+                    Create Budget
+                  </button>
+                )}
+              </div>
+            )}
 
-              {!loading && error && error !== 'BUDGET_NOT_FOUND' && (
-                <div className="py-12 text-center text-red-500">{error}</div>
-              )}
+            {!loading && error && error !== 'BUDGET_NOT_FOUND' && (
+              <div className="py-12 text-center text-accent-700">{error}</div>
+            )}
 
-              {!loading && budget && <BudgetPane budget={budget} onSelectLineItem={setSelectedLineItemId} />}
-            </div>
+            {!loading && budget && <BudgetPane budget={budget} onSelectLineItem={setSelectedLineItemId} />}
+          </div>
 
-            <div className="w-96 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800" onClick={(e) => e.stopPropagation()}>
-              {selectedLineItem ? (
-                <ActivityPane
-                  lineItem={selectedLineItem.lineItem}
-                  isIncome={selectedLineItem.isIncome}
-                  budgetMonth={currentMonth}
-                  onClose={() => setSelectedLineItemId(null)}
-                  onBudgetMutate={handleBudgetMutate}
-                />
-              ) : (
-                <TransactionPane onBudgetMutate={handleBudgetMutate} />
-              )}
-            </div>
+          <div
+            className="flex h-[calc(100vh-230px)] min-h-[460px] w-[380px] flex-none flex-col border border-divider bg-surface shadow-elev-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {selectedLineItem ? (
+              <ActivityPane
+                lineItem={selectedLineItem.lineItem}
+                isIncome={selectedLineItem.isIncome}
+                budgetMonth={currentMonth}
+                onClose={() => setSelectedLineItemId(null)}
+                onBudgetMutate={handleBudgetMutate}
+              />
+            ) : (
+              <TransactionPane onBudgetMutate={handleBudgetMutate} />
+            )}
           </div>
         </div>
       </div>
@@ -153,17 +154,17 @@ export default function BudgetPage() {
         const txMonthName = txDate.toLocaleString('default', { month: 'long' })
         const budgetMonthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long' })
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="fixed inset-0 bg-black/50" onClick={() => setCrossMonthPending(null)} />
-            <div className="relative w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
-              <h2 className="mb-2 text-base font-semibold text-gray-900 dark:text-white">Cross-month assignment</h2>
-              <p className="mb-5 text-sm text-gray-600 dark:text-gray-300">
-                This transaction is from <strong>{txMonthName}</strong> but you're viewing <strong>{budgetMonthName}</strong>. Assign it anyway?
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/60" onClick={() => setCrossMonthPending(null)} />
+            <div className="relative w-full max-w-[420px] border border-divider bg-surface p-6 text-text shadow-elev-lg">
+              <h2 className="mb-2 text-[18px]">Cross-month assignment</h2>
+              <p className="text-muted mb-5 text-[14px]">
+                This transaction is from <strong className="text-text">{txMonthName}</strong> but you're viewing <strong className="text-text">{budgetMonthName}</strong>. Assign it anyway?
               </p>
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => setCrossMonthPending(null)}
-                  className="rounded px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="btn btn-secondary"
                 >
                   Cancel
                 </button>
@@ -173,7 +174,7 @@ export default function BudgetPage() {
                     setCrossMonthPending(null)
                     await doAssign(transaction, lineItemId)
                   }}
-                  className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                  className="btn btn-primary"
                 >
                   Assign anyway
                 </button>
@@ -185,7 +186,7 @@ export default function BudgetPage() {
 
       <DragOverlay dropAnimation={null}>
         {draggingTransaction && (
-          <div className="w-96 rounded-lg border border-blue-300 bg-white shadow-lg dark:border-blue-600 dark:bg-gray-800">
+          <div className="w-[380px] border border-divider bg-surface shadow-elev-lg">
             <TransactionRow transaction={draggingTransaction} />
           </div>
         )}

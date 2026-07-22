@@ -190,4 +190,28 @@
     justify-content: flex-start;
     text-align: left;
   }
+  .btn-secondary {
+    border-color: var(--color-divider);
+  }
+  .btn-secondary:not(:disabled):hover {
+    background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  }
+  .btn-secondary:not(:disabled):active {
+    background: color-mix(in srgb, var(--color-text) 14%, transparent);
+  }
+  .btn-ghost {
+    color: var(--color-accent);
+    padding-inline: 4px;
+  }
+  .btn-ghost:not(:disabled):hover {
+    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  }
+  .btn-ghost:not(:disabled):active {
+    background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  }
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+  }
 }

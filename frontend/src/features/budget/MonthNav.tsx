@@ -13,19 +13,22 @@ export default function MonthNav() {
   const { currentYear, currentMonth } = useAppSelector((state) => state.budget)
 
   return (
-    <div className="flex items-center justify-center gap-4 py-4">
+    <div className="relative flex items-center justify-center gap-4 border-b-2 border-divider px-4 py-3">
+      <span className="absolute left-4 font-heading text-[16px] font-extrabold">Dollars2</span>
       <button
         onClick={() => dispatch(prevMonth())}
-        className="rounded p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+        className="btn btn-icon btn-secondary"
+        aria-label="Previous month"
       >
         <FontAwesomeIcon icon={faChevronLeft} />
       </button>
-      <h2 className="w-48 text-center text-lg font-semibold text-gray-900 dark:text-white">
+      <h2 className="w-[200px] text-center text-[18px]">
         {MONTH_NAMES[currentMonth - 1]} {currentYear}
       </h2>
       <button
         onClick={() => dispatch(nextMonth())}
-        className="rounded p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+        className="btn btn-icon btn-secondary"
+        aria-label="Next month"
       >
         <FontAwesomeIcon icon={faChevronRight} />
       </button>
