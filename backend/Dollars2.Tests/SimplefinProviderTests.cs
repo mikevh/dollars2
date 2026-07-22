@@ -78,4 +78,29 @@ public class SimplefinProviderTests
         Assert.Single(results[1].Upserts);
         Assert.NotNull(results[2].Error);
     }
+
+    [Fact]
+    public async Task Reported_balance_is_parsed_onto_the_result()
+    {
+        var provider = CreateProvider(
+            """{"accounts":[{"id":"sf-1","balance":"1234.56","transactions":[]}],"errlist":[]}""");
+
+        var results = await provider.FetchTransactionsForConnectionAsync(
+            new[] { Account(1, accountId: "sf-1") }, since: null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1234.56m, results[1].Balance);
+    }
+
+    [Fact]
+    public async Task Unparseable_balance_yields_a_null_balance_without_failing_the_sync()
+    {
+        var provider = CreateProvider(
+            """{"accounts":[{"id":"sf-1","balance":"n/a","transactions":[]}],"errlist":[]}""");
+
+        var results = await provider.FetchTransactionsForConnectionAsync(
+            new[] { Account(1, accountId: "sf-1") }, since: null, TestContext.Current.CancellationToken);
+
+        Assert.Null(results[1].Balance);
+        Assert.Null(results[1].Error);
+    }
 }

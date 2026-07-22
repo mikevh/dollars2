@@ -127,6 +127,20 @@ Unique constraint: (TransactionId, LineItemId)
 
 One entry per sync attempt per account (history, not just latest).
 
+### AccountBalances
+
+| Column | Type | Notes |
+|--------|------|-------|
+| Id | int | PK, identity |
+| AccountId | int | FK → Accounts |
+| Balance | decimal(18,2) | provider-reported current balance |
+| CreatedOn | datetime2 | when this balance was recorded (default SYSUTCDATETIME) |
+| UpdatedOn | datetime2 | equals CreatedOn on insert (append-only) |
+
+A new row is appended on every successful sync where the provider reports a parseable balance, so the
+table is a time-series of balances per account (history, not just latest). Indexed on `(AccountId,
+CreatedOn DESC)`.
+
 ## Relationships
 
 - Users → Budgets (1:many)
@@ -136,5 +150,6 @@ One entry per sync attempt per account (history, not just latest).
 - BudgetGroups → LineItems (1:many)
 - Accounts → Transactions (1:many)
 - Accounts → SyncLog (1:many)
+- Accounts → AccountBalances (1:many)
 - Transactions → TransactionAssignments (1:many)
 - LineItems → TransactionAssignments (1:many)

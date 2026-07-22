@@ -11,6 +11,7 @@ public class BankSyncService
     private readonly AccountRepository _accountRepo;
     private readonly TransactionRepository _transactionRepo;
     private readonly SyncLogRepository _syncLogRepo;
+    private readonly AccountBalanceRepository _accountBalanceRepo;
     private readonly IReadOnlyDictionary<string, IBankSyncProvider> _providers;
     private readonly SyncLockService _syncLock;
     private readonly ILogger<BankSyncService> _logger;
@@ -20,6 +21,7 @@ public class BankSyncService
         AccountRepository accountRepo,
         TransactionRepository transactionRepo,
         SyncLogRepository syncLogRepo,
+        AccountBalanceRepository accountBalanceRepo,
         IEnumerable<IBankSyncProvider> providers,
         SyncLockService syncLock,
         ILogger<BankSyncService> logger)
@@ -28,6 +30,7 @@ public class BankSyncService
         _accountRepo = accountRepo;
         _transactionRepo = transactionRepo;
         _syncLogRepo = syncLogRepo;
+        _accountBalanceRepo = accountBalanceRepo;
         _providers = providers.ToDictionary(p => p.SourceType, StringComparer.OrdinalIgnoreCase);
         _syncLock = syncLock;
         _logger = logger;
@@ -219,6 +222,11 @@ public class BankSyncService
                 if (syncResult.UpdatedConnectionDetailsJson is not null)
                 {
                     await _accountRepo.UpdateConnectionDetailsJsonAsync(account.Id, syncResult.UpdatedConnectionDetailsJson);
+                }
+
+                if (syncResult.Balance is not null)
+                {
+                    await _accountBalanceRepo.CreateAsync(account.Id, syncResult.Balance.Value);
                 }
 
                 await _syncLogRepo.CreateAsync(account.Id, SyncConstants.StatusSuccess, count, null);
