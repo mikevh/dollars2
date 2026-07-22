@@ -219,16 +219,16 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
       <div className="fixed inset-0 bg-black/50" />
       <div
-        className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800"
+        className="relative w-full max-w-md border border-divider bg-surface p-6 shadow-elev-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h2 className="font-heading text-lg font-extrabold uppercase tracking-wide text-text">
             {isCreate ? 'New Transaction' : 'Edit Transaction'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            className="text-muted hover:text-accent-700"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
               <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
@@ -239,121 +239,121 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
         <div className="flex flex-col gap-3">
           {isEditable ? (
             <div className="flex gap-4">
-              <label className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+              <label className="flex items-center gap-1.5 text-sm text-text">
                 <input
                   type="radio"
                   checked={isExpense}
                   onChange={() => setIsExpense(true)}
-                  className="accent-blue-600"
+                  className="accent-accent"
                 />
                 Expense
               </label>
-              <label className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+              <label className="flex items-center gap-1.5 text-sm text-text">
                 <input
                   type="radio"
                   checked={!isExpense}
                   onChange={() => setIsExpense(false)}
-                  className="accent-blue-600"
+                  className="accent-accent"
                 />
                 Income
               </label>
             </div>
           ) : (
-            <div className="text-sm text-gray-500 dark:text-gray-400">
+            <div className="text-sm text-muted">
               {transaction.amount < 0 ? 'Expense' : 'Income'}
             </div>
           )}
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Description</label>
+          <div className="field">
+            <label>Description</label>
             {isEditable ? (
               <input
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 autoFocus
-                className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                className="input"
               />
             ) : (
-              <div className="text-sm text-gray-900 dark:text-white">{description}</div>
+              <div className="text-sm text-text">{description}</div>
             )}
           </div>
 
           {transaction?.payee && (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Payee</label>
-              <div className="text-sm text-gray-900 dark:text-white">{transaction.payee}</div>
+            <div className="field">
+              <label>Payee</label>
+              <div className="text-sm text-text">{transaction.payee}</div>
             </div>
           )}
 
           {transaction?.memo && (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Memo</label>
-              <div className="text-sm text-gray-900 dark:text-white">{transaction.memo}</div>
+            <div className="field">
+              <label>Memo</label>
+              <div className="text-sm text-text">{transaction.memo}</div>
             </div>
           )}
 
           <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Amount</label>
+            <div className="field flex-1">
+              <label>Amount</label>
               {isEditable ? (
                 <input
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   step="0.01"
-                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="input"
                 />
               ) : (
-                <div className="text-sm text-gray-900 dark:text-white">{formatCurrency(parseFloat(amount))}</div>
+                <div className="text-sm text-text">{formatCurrency(parseFloat(amount))}</div>
               )}
             </div>
-            <div className="flex-1">
-              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Date</label>
+            <div className="field flex-1">
+              <label>Date</label>
               {isEditable ? (
                 <input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="input"
                 />
               ) : (
-                <div className="text-sm text-gray-900 dark:text-white">
+                <div className="text-sm text-text">
                   {new Date(date + 'T00:00:00').toLocaleDateString()}
                 </div>
               )}
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Notes</label>
+          <div className="field">
+            <label>Notes</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="input"
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Line Item</label>
+          <div className="field">
+            <label>Line Item</label>
             {pendingAssignments.length > 0 && (
-              <div className="mb-2 rounded border border-gray-200 dark:border-gray-600">
+              <div className="mb-2 border border-divider">
                 {pendingAssignments.map((a) => (
-                  <div key={a.lineItemId} className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-1.5 last:border-b-0 dark:border-gray-700">
-                    <span className="min-w-0 flex-1 truncate text-sm text-gray-900 dark:text-white">{a.lineItemName}</span>
+                  <div key={a.lineItemId} className="flex items-center justify-between gap-2 border-b border-divider px-3 py-1.5 last:border-b-0">
+                    <span className="min-w-0 flex-1 truncate text-sm text-text">{a.lineItemName}</span>
                     {isSplit && (
                       <input
                         type="number"
                         value={a.amount}
                         onChange={(e) => updateAssignmentAmount(a.lineItemId, e.target.value)}
                         step="0.01"
-                        className="w-24 rounded border border-gray-300 px-2 py-0.5 text-right text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        className="input w-24 text-right"
                       />
                     )}
                     <button
                       onClick={() => removeAssignment(a.lineItemId)}
-                      className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
+                      className="text-muted hover:text-accent-700"
                       title="Remove"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
@@ -365,7 +365,7 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
               </div>
             )}
             {isSplit && !sumMatches && (
-              <p className="mb-2 text-xs text-red-500">
+              <p className="mb-2 text-xs text-accent-700">
                 Split amounts must add up to {formatCurrency(absTotal)}
               </p>
             )}
@@ -385,7 +385,7 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
                     }
                   }
                 }}
-                className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                className="input"
               >
                 <option value="">Select a line item...</option>
                 {budget!.groups.map((group) => {
@@ -411,7 +411,7 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
             {!isCreate && originalAssignments.length === 0 && pendingAssignments.length === 0 && (
               <button
                 onClick={handleDelete}
-                className="rounded border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/20"
+                className="btn btn-secondary text-accent-700"
               >
                 Delete
               </button>
@@ -420,7 +420,7 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="rounded px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              className="btn btn-secondary"
             >
               Cancel
             </button>
@@ -428,7 +428,7 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
               <button
                 onClick={handleSave}
                 disabled={!canSave || saving}
-                className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="btn btn-primary"
               >
                 {saving ? 'Saving...' : 'Save'}
               </button>

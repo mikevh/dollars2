@@ -50,11 +50,11 @@ export default function ActivityPane({ lineItem, isIncome, budgetMonth, onClose,
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{lineItem.name}</h2>
+      <div className="flex items-center justify-between border-b-2 border-divider px-4 py-3">
+        <h2 className="font-heading text-sm font-extrabold uppercase tracking-wide text-text">{lineItem.name}</h2>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+          className="text-muted hover:text-accent-700"
           title="Close"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
@@ -63,26 +63,26 @@ export default function ActivityPane({ lineItem, isIncome, budgetMonth, onClose,
         </button>
       </div>
 
-      <div className="flex justify-between border-b border-gray-200 px-4 py-2 text-xs dark:border-gray-700">
+      <div className="flex justify-between border-b border-divider px-4 py-2 text-xs">
         <div>
-          <span className="text-gray-400 dark:text-gray-500">Planned </span>
-          <span className="font-medium text-gray-700 dark:text-gray-300">{formatCurrency(lineItem.plannedAmount)}</span>
+          <span className="font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-muted">Planned </span>
+          <span className="font-medium tabular-nums text-text">{formatCurrency(lineItem.plannedAmount)}</span>
         </div>
         <div>
-          <span className="text-gray-400 dark:text-gray-500">{isIncome ? 'Received' : 'Spent'} </span>
-          <span className="font-medium text-gray-700 dark:text-gray-300">{formatCurrency(spent)}</span>
+          <span className="font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-muted">{isIncome ? 'Received' : 'Spent'} </span>
+          <span className="font-medium tabular-nums text-text">{formatCurrency(spent)}</span>
         </div>
         {rollover !== 0 && (
           <div>
-            <span className="text-gray-400 dark:text-gray-500">Rollover </span>
-            <span className={`font-medium ${rollover < 0 ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+            <span className="font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-muted">Rollover </span>
+            <span className={`font-medium tabular-nums ${rollover < 0 ? 'text-accent-700' : 'text-text'}`}>
               {formatCurrency(rollover)}
             </span>
           </div>
         )}
         <div>
-          <span className="text-gray-400 dark:text-gray-500">Remaining </span>
-          <span className={`font-medium ${remaining < 0 ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+          <span className="font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-muted">Remaining </span>
+          <span className={`font-medium tabular-nums ${remaining < 0 ? 'text-accent-700' : 'text-text'}`}>
             {formatCurrency(remaining)}
           </span>
         </div>
@@ -90,21 +90,21 @@ export default function ActivityPane({ lineItem, isIncome, budgetMonth, onClose,
 
       <div className="flex-1 overflow-y-auto">
         {loading && (
-          <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">Loading...</div>
+          <div className="py-8 text-center text-sm text-muted">Loading...</div>
         )}
 
         {!loading && error && (
-          <div className="py-8 text-center text-sm text-red-500">{error}</div>
+          <div className="py-8 text-center text-sm text-accent-700">{error}</div>
         )}
 
         {!loading && !error && transactions.length === 0 && rollover === 0 && (
-          <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">No transactions</div>
+          <div className="py-8 text-center text-sm text-muted">No transactions</div>
         )}
 
         {!loading && !error && rollover !== 0 && (
-          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2 dark:border-gray-700">
-            <span className="text-sm italic text-gray-500 dark:text-gray-400">Rollover from {monthNames[(budgetMonth - 2 + 12) % 12]}</span>
-            <span className={`text-sm font-medium ${rollover > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+          <div className="flex items-center justify-between border-b border-divider px-4 py-2">
+            <span className="text-sm italic text-muted">Rollover from {monthNames[(budgetMonth - 2 + 12) % 12]}</span>
+            <span className={`text-sm font-medium tabular-nums ${rollover > 0 ? 'text-text' : 'text-accent-700'}`}>
               {rollover > 0 ? '+' : '-'}{formatCurrency(Math.abs(rollover))}
             </span>
           </div>
