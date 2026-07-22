@@ -38,9 +38,22 @@ echo "==> [4/5] Verifying HTTP endpoints over the tailnet"
 frontend_code="$(curl -sS -m 10 -o /dev/null -w "%{http_code}" "$FRONTEND_URL" || echo "000")"
 echo "frontend (${FRONTEND_URL}): ${frontend_code}"
 
-backend_response="$(curl -sS -m 10 -w $'\n%{http_code}' "$BACKEND_HEALTH_URL" || printf '\n000')"
-backend_code="$(printf '%s' "$backend_response" | tail -n1)"
-backend_body="$(printf '%s' "$backend_response" | sed '$d')"
+# The backend needs a few seconds to boot after its container starts (Kestrel
+# startup + the on-launch bank sync), while `docker compose up -d` returns as
+# soon as the container is started. Poll instead of checking once so a cold
+# backend doesn't fail the gate on a deploy that actually succeeded.
+backend_code="000"
+backend_body=""
+for attempt in $(seq 1 15); do
+  backend_response="$(curl -sS -m 10 -w $'\n%{http_code}' "$BACKEND_HEALTH_URL" || printf '\n000')"
+  backend_code="$(printf '%s' "$backend_response" | tail -n1)"
+  backend_body="$(printf '%s' "$backend_response" | sed '$d')"
+  if [ "$backend_code" = "200" ]; then
+    break
+  fi
+  echo "backend not ready (attempt ${attempt}/15, code ${backend_code}) — retrying in 2s"
+  sleep 2
+done
 echo "backend  (${BACKEND_HEALTH_URL}): ${backend_code} ${backend_body}"
 
 if [ "$frontend_code" != "200" ] || [ "$backend_code" != "200" ]; then
