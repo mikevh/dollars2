@@ -93,25 +93,26 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex border-b border-gray-200 dark:border-gray-700">
+      <div className="flex border-b-2 border-divider">
         {tabs.map((tab) => {
           const count = tab.showCount ? counts[tab.key] : 0
+          const isActive = activeTab === tab.key
           return (
             <button
               key={tab.key}
               onClick={() => dispatch(setActiveTab(tab.key))}
-              className={`flex flex-1 items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium ${
-                activeTab === tab.key
-                  ? 'border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-4 py-2.5 font-heading text-xs font-extrabold uppercase tracking-[0.08em] ${
+                isActive
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-muted hover:text-text'
               }`}
             >
               {tab.label}
               {count > 0 && (
-                <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium leading-none ${
-                  activeTab === tab.key
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                <span className={`px-1.5 py-0.5 text-[11px] font-bold leading-none tabular-nums ${
+                  isActive
+                    ? 'bg-accent text-bg'
+                    : 'border border-divider text-muted'
                 }`}>
                   {count}
                 </span>
@@ -121,27 +122,27 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
         })}
       </div>
 
-      <div className="border-b border-gray-200 p-2 dark:border-gray-700">
+      <div className="border-b border-divider p-2">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search transactions..."
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+          className="input"
         />
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {loading && (
-          <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">Loading...</div>
+          <div className="py-8 text-center text-sm text-muted">Loading...</div>
         )}
 
         {!loading && error && (
-          <div className="py-8 text-center text-sm text-red-500">{error}</div>
+          <div className="py-8 text-center text-sm text-accent-700">{error}</div>
         )}
 
         {!loading && !error && filteredTransactions.length === 0 && (
-          <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+          <div className="py-8 text-center text-sm text-muted">
             {query ? 'No matching transactions' : 'No transactions'}
           </div>
         )}
@@ -158,7 +159,7 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
                 {activeTab === 'new' && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleSoftDelete(t.id) }}
-                    className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
+                    className="text-muted hover:text-accent-700"
                     title="Delete"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
@@ -167,17 +168,17 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
                   </button>
                 )}
                 {activeTab === 'deleted' && (
-                  <div className="flex gap-1">
+                  <div className="flex gap-3">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleRestore(t.id) }}
-                      className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                      className="font-heading text-xs font-bold uppercase tracking-wide text-accent hover:text-accent-700"
                     >
                       Restore
                     </button>
                     {t.isManual && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleHardDelete(t.id) }}
-                        className="text-xs text-red-500 hover:text-red-600"
+                        className="font-heading text-xs font-bold uppercase tracking-wide text-muted hover:text-accent-700"
                       >
                         Delete
                       </button>
@@ -191,10 +192,10 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
       </div>
 
       {activeTab === 'new' && (
-        <div className="border-t border-gray-200 p-3 dark:border-gray-700">
+        <div className="border-t-2 border-divider p-2">
           <button
             onClick={() => setEditingTransaction('create')}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            className="btn btn-ghost"
           >
             + Add Transaction
           </button>
