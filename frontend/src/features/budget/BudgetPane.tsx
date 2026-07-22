@@ -46,12 +46,17 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
 
   return (
     <div>
-      <div className={`mb-6 rounded-lg border px-4 py-3 text-center text-sm font-medium ${
-        leftToBudget === 0
-          ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400'
-          : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400'
-      }`}>
-        {formatCurrency(leftToBudget)} left to budget
+      <div className="mb-6 flex items-baseline justify-between border-b-2 border-divider pb-4">
+        <span className="font-heading text-[13px] font-extrabold uppercase tracking-[0.08em] text-muted">
+          Left to budget
+        </span>
+        <span
+          className={`font-heading text-[22px] font-extrabold tabular-nums ${
+            leftToBudget === 0 ? 'text-text' : 'text-accent-700'
+          }`}
+        >
+          {formatCurrency(leftToBudget)}
+        </span>
       </div>
 
       {incomeGroup && <BudgetGroupCard group={incomeGroup} onSelectLineItem={onSelectLineItem} />}
@@ -75,26 +80,20 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
             }}
             placeholder="Group name"
             autoFocus
-            className="rounded border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            className="input max-w-[240px]"
           />
-          <button
-            onClick={handleAddGroup}
-            className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-          >
+          <button onClick={handleAddGroup} className="btn btn-primary">
             Add
           </button>
           <button
             onClick={() => { setAddingGroup(false); setNewGroupName('') }}
-            className="rounded px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="btn btn-secondary"
           >
             Cancel
           </button>
         </div>
       ) : (
-        <button
-          onClick={() => setAddingGroup(true)}
-          className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-        >
+        <button onClick={() => setAddingGroup(true)} className="btn btn-ghost">
           + Add Group
         </button>
       )}
