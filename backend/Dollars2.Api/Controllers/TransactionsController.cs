@@ -52,9 +52,35 @@ public class TransactionsController : DollarsControllerBase
     }
 
     [HttpGet("by-account/{accountId}")]
-    public async Task<IActionResult> GetByAccount(int accountId)
+    public async Task<IActionResult> GetByAccount(
+        int accountId,
+        [FromQuery] int page = 1,
+        [FromQuery] int size = 100,
+        [FromQuery] string sort = "date",
+        [FromQuery] string dir = "desc",
+        [FromQuery] string? q = null)
     {
-        var result = await _transactionService.GetByAccountAsync(accountId, GetUserId());
+        if (page < 1)
+        {
+            page = 1;
+        }
+        if (size < 1)
+        {
+            size = 100;
+        }
+        if (size > 500)
+        {
+            size = 500;
+        }
+        sort = sort?.ToLowerInvariant() switch
+        {
+            "description" => "description",
+            "amount" => "amount",
+            _ => "date",
+        };
+        dir = dir?.ToLowerInvariant() == "asc" ? "asc" : "desc";
+
+        var result = await _transactionService.GetByAccountAsync(accountId, GetUserId(), page, size, sort, dir, q);
         if (result.Error is not null)
         {
             return BadRequest(result);
