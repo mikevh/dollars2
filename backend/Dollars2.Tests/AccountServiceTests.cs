@@ -45,6 +45,13 @@ public class AccountServiceTests
         Status = status,
     };
 
+    private static AccountBalance Balance(int accountId, decimal balance) => new()
+    {
+        Id = accountId,
+        AccountId = accountId,
+        Balance = balance,
+    };
+
     [Fact]
     public void Accounts_sharing_a_connection_are_grouped_together()
     {
@@ -55,7 +62,7 @@ public class AccountServiceTests
             Account(3, "SimpleFIN", "chase", "credit"),
         };
 
-        var groups = AccountService.BuildGroups(accounts, Array.Empty<SyncLog>(), Providers);
+        var groups = AccountService.BuildGroups(accounts, Array.Empty<SyncLog>(), Array.Empty<AccountBalance>(), Providers);
 
         Assert.Equal(2, groups.Count);
         var keybank = Assert.Single(groups, g => g.Accounts.Count == 2);
@@ -72,6 +79,7 @@ public class AccountServiceTests
         var groups = AccountService.BuildGroups(
             new[] { Account(1, "SimpleFIN", "super-secret-access-token") },
             Array.Empty<SyncLog>(),
+            Array.Empty<AccountBalance>(),
             Providers);
 
         var group = Assert.Single(groups);
@@ -88,7 +96,7 @@ public class AccountServiceTests
             Account(3, "Manual", null, "envelope"),
         };
 
-        var groups = AccountService.BuildGroups(accounts, Array.Empty<SyncLog>(), Providers);
+        var groups = AccountService.BuildGroups(accounts, Array.Empty<SyncLog>(), Array.Empty<AccountBalance>(), Providers);
 
         var manual = Assert.Single(groups, g => g.SourceType == "Manual");
         Assert.Equal("manual", manual.ConnectionId);
@@ -106,7 +114,7 @@ public class AccountServiceTests
         var syncedAt = new DateTime(2026, 7, 20, 8, 0, 0, DateTimeKind.Utc);
         var logs = new[] { Log(1, syncedAt, "Success") };
 
-        var groups = AccountService.BuildGroups(accounts, logs, Providers);
+        var groups = AccountService.BuildGroups(accounts, logs, Array.Empty<AccountBalance>(), Providers);
 
         var group = Assert.Single(groups);
         var acct1 = group.Accounts.Single(a => a.Id == 1);
@@ -116,6 +124,26 @@ public class AccountServiceTests
         var acct2 = group.Accounts.Single(a => a.Id == 2);
         Assert.Null(acct2.LastSyncedAt);
         Assert.Null(acct2.LastStatus);
+    }
+
+    [Fact]
+    public void Latest_balance_is_attached_per_account()
+    {
+        var accounts = new[]
+        {
+            Account(1, "SimpleFIN", "keybank"),
+            Account(2, "SimpleFIN", "keybank"),
+        };
+        var balances = new[] { Balance(1, 1234.56m) };
+
+        var groups = AccountService.BuildGroups(accounts, Array.Empty<SyncLog>(), balances, Providers);
+
+        var group = Assert.Single(groups);
+        var acct1 = group.Accounts.Single(a => a.Id == 1);
+        Assert.Equal(1234.56m, acct1.Balance);
+        // Account with no stored balance reports null.
+        var acct2 = group.Accounts.Single(a => a.Id == 2);
+        Assert.Null(acct2.Balance);
     }
 
     [Fact]
@@ -129,7 +157,7 @@ public class AccountServiceTests
             Account(2, "Plaid", "item-a"),
         };
 
-        var groups = AccountService.BuildGroups(accounts, Array.Empty<SyncLog>(), Providers);
+        var groups = AccountService.BuildGroups(accounts, Array.Empty<SyncLog>(), Array.Empty<AccountBalance>(), Providers);
 
         Assert.Equal(2, groups.Count);
         Assert.All(groups, g => Assert.Single(g.Accounts));
@@ -138,7 +166,7 @@ public class AccountServiceTests
     [Fact]
     public void Empty_accounts_returns_no_groups()
     {
-        var groups = AccountService.BuildGroups(Array.Empty<Account>(), Array.Empty<SyncLog>(), Providers);
+        var groups = AccountService.BuildGroups(Array.Empty<Account>(), Array.Empty<SyncLog>(), Array.Empty<AccountBalance>(), Providers);
         Assert.Empty(groups);
     }
 }

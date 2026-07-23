@@ -28,4 +28,10 @@ public class AccountInfoResponse
 
     /// <summary>Status of the last sync attempt ("Success" / "Failure"), or null if never synced / manual.</summary>
     public string? LastStatus { get; set; }
+
+    /// <summary>
+    /// The account's most recently captured provider-reported balance, or null if none has been stored
+    /// (never synced, manual, or no balance was captured). Its "as of" time is <see cref="LastSyncedAt"/>.
+    /// </summary>
+    public decimal? Balance { get; set; }
 }

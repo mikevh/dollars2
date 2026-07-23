@@ -33,14 +33,14 @@ describe('AccountsPage', () => {
         connectionId: 'abc123',
         sourceType: 'SimpleFIN',
         accounts: [
-          { id: 1, name: 'Keybank Checking', lastSyncedAt: '2026-07-22T10:00:00Z', lastStatus: 'Success' },
-          { id: 2, name: 'Keybank Savings', lastSyncedAt: null, lastStatus: null },
+          { id: 1, name: 'Keybank Checking', lastSyncedAt: '2026-07-22T10:00:00Z', lastStatus: 'Success', balance: 1234.56 },
+          { id: 2, name: 'Keybank Savings', lastSyncedAt: null, lastStatus: null, balance: null },
         ],
       },
       {
         connectionId: 'manual',
         sourceType: 'Manual',
-        accounts: [{ id: 3, name: 'Cash', lastSyncedAt: null, lastStatus: null }],
+        accounts: [{ id: 3, name: 'Cash', lastSyncedAt: null, lastStatus: null, balance: null }],
       },
     ]
     getMock.mockResolvedValue({ data: groups, error: null })
@@ -56,6 +56,9 @@ describe('AccountsPage', () => {
     expect(manualHeader).toBeInTheDocument()
     expect(screen.getByText('Cash')).toBeInTheDocument()
 
+    // The account with a stored balance shows it formatted as currency; balance-less accounts show none.
+    expect(screen.getByText('$1,234.56')).toBeInTheDocument()
+
     // Never-synced accounts show a dash. Two accounts never synced (Savings + Cash).
     expect(screen.getAllByText('—')).toHaveLength(2)
   })
@@ -66,7 +69,7 @@ describe('AccountsPage', () => {
         {
           connectionId: 'abc123',
           sourceType: 'SimpleFIN',
-          accounts: [{ id: 1, name: 'Broken', lastSyncedAt: '2026-07-22T10:00:00Z', lastStatus: 'Failure' }],
+          accounts: [{ id: 1, name: 'Broken', lastSyncedAt: '2026-07-22T10:00:00Z', lastStatus: 'Failure', balance: null }],
         },
       ] satisfies AccountGroup[],
       error: null,

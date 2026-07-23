@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { fetchAccounts } from '../features/accounts/accountsSlice'
-import { formatRelativeTime } from '../utils/format'
+import { formatCurrency, formatRelativeTime } from '../utils/format'
 import type { AccountInfo } from '../types/account'
 
 function sourceTypeLabel(sourceType: string): string {
@@ -67,7 +67,14 @@ export default function AccountsPage() {
                       className="flex items-center justify-between px-4 py-2.5 text-[14px]"
                     >
                       <span>{account.name}</span>
-                      <LastSynced account={account} />
+                      <div className="flex flex-col items-end gap-0.5">
+                        {account.balance !== null && (
+                          <span className="font-medium tabular-nums">
+                            {formatCurrency(account.balance)}
+                          </span>
+                        )}
+                        <LastSynced account={account} />
+                      </div>
                     </li>
                   ))}
                 </ul>
