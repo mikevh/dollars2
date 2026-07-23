@@ -32,4 +32,20 @@ public class AccountBalanceRepository
             new { accountId },
             _db.CurrentTransaction);
     }
+
+    public async Task<IEnumerable<AccountBalance>> GetLatestPerAccountAsync(IEnumerable<int> accountIds)
+    {
+        return await _db.Connection.QueryAsync<AccountBalance>(
+            @"WITH Ranked AS (
+                SELECT Id, AccountId, Balance, CreatedOn, UpdatedOn,
+                       ROW_NUMBER() OVER (PARTITION BY AccountId ORDER BY CreatedOn DESC, Id DESC) AS rn
+                FROM AccountBalances
+                WHERE AccountId IN @accountIds
+              )
+              SELECT Id, AccountId, Balance, CreatedOn, UpdatedOn
+              FROM Ranked
+              WHERE rn = 1",
+            new { accountIds },
+            _db.CurrentTransaction);
+    }
 }

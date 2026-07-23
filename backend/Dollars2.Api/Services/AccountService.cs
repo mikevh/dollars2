@@ -10,15 +10,18 @@ public class AccountService
 {
     private readonly AccountRepository _accountRepo;
     private readonly SyncLogRepository _syncLogRepo;
+    private readonly AccountBalanceRepository _balanceRepo;
     private readonly IReadOnlyDictionary<string, IBankSyncProvider> _providers;
 
     public AccountService(
         AccountRepository accountRepo,
         SyncLogRepository syncLogRepo,
+        AccountBalanceRepository balanceRepo,
         IEnumerable<IBankSyncProvider> providers)
     {
         _accountRepo = accountRepo;
         _syncLogRepo = syncLogRepo;
+        _balanceRepo = balanceRepo;
         _providers = providers.ToDictionary(p => p.SourceType, StringComparer.OrdinalIgnoreCase);
     }
 
@@ -30,8 +33,10 @@ public class AccountService
             return Array.Empty<AccountGroupResponse>();
         }
 
-        var latestLogs = await _syncLogRepo.GetLatestPerAccountAsync(accounts.Select(a => a.Id));
-        return BuildGroups(accounts, latestLogs, _providers);
+        var accountIds = accounts.Select(a => a.Id).ToList();
+        var latestLogs = await _syncLogRepo.GetLatestPerAccountAsync(accountIds);
+        var latestBalances = await _balanceRepo.GetLatestPerAccountAsync(accountIds);
+        return BuildGroups(accounts, latestLogs, latestBalances, _providers);
     }
 
     /// <summary>
@@ -42,9 +47,11 @@ public class AccountService
     public static IReadOnlyList<AccountGroupResponse> BuildGroups(
         IReadOnlyList<Account> accounts,
         IEnumerable<SyncLog> latestLogs,
+        IEnumerable<AccountBalance> latestBalances,
         IReadOnlyDictionary<string, IBankSyncProvider> providers)
     {
         var logsByAccount = latestLogs.ToDictionary(l => l.AccountId);
+        var balancesByAccount = latestBalances.ToDictionary(b => b.AccountId);
         var groups = new List<AccountGroupResponse>();
 
         var syncable = accounts.Where(a => a.SourceType != SyncConstants.SourceTypeManual);
@@ -64,7 +71,7 @@ public class AccountService
                 {
                     ConnectionId = HashConnectionKey(bySource.Key, connection.Key),
                     SourceType = bySource.Key,
-                    Accounts = connection.Select(a => ToInfo(a, logsByAccount)).ToList(),
+                    Accounts = connection.Select(a => ToInfo(a, logsByAccount, balancesByAccount)).ToList(),
                 });
             }
         }
@@ -76,22 +83,27 @@ public class AccountService
             {
                 ConnectionId = "manual",
                 SourceType = SyncConstants.SourceTypeManual,
-                Accounts = manual.Select(a => ToInfo(a, logsByAccount)).ToList(),
+                Accounts = manual.Select(a => ToInfo(a, logsByAccount, balancesByAccount)).ToList(),
             });
         }
 
         return groups;
     }
 
-    private static AccountInfoResponse ToInfo(Account account, IReadOnlyDictionary<int, SyncLog> logsByAccount)
+    private static AccountInfoResponse ToInfo(
+        Account account,
+        IReadOnlyDictionary<int, SyncLog> logsByAccount,
+        IReadOnlyDictionary<int, AccountBalance> balancesByAccount)
     {
         logsByAccount.TryGetValue(account.Id, out var log);
+        balancesByAccount.TryGetValue(account.Id, out var balance);
         return new AccountInfoResponse
         {
             Id = account.Id,
             Name = account.Name,
             LastSyncedAt = log?.SyncedAt,
             LastStatus = log?.Status,
+            Balance = balance?.Balance,
         };
     }
 
