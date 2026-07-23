@@ -4,6 +4,7 @@ import { useAppSelector } from './app/hooks'
 import { useTheme } from './features/theme/useTheme'
 import LoginPage from './pages/LoginPage'
 import BudgetPage from './pages/BudgetPage'
+import AccountsPage from './pages/AccountsPage'
 import Footer from './components/Footer'
 
 function App() {
@@ -19,6 +20,16 @@ function App() {
           element={
             isAuthenticated ? (
               <BudgetPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/accounts"
+          element={
+            isAuthenticated ? (
+              <AccountsPage />
             ) : (
               <Navigate to="/login" replace />
             )

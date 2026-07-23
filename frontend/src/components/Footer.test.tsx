@@ -5,10 +5,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { store } from '../app/store'
 import Footer from './Footer'
 
-function renderFooter() {
+function renderFooter(initialPath = '/') {
   render(
     <Provider store={store}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialPath]}>
         <Footer />
       </MemoryRouter>
     </Provider>,
@@ -39,5 +39,19 @@ describe('Footer build id', () => {
     vi.stubEnv('VITE_BUILD_DATE', '')
     renderFooter()
     expect(screen.getByText('dev')).toBeInTheDocument()
+  })
+})
+
+describe('Footer navigation', () => {
+  it('links to the Accounts page from the budget page', () => {
+    renderFooter('/')
+    const link = screen.getByRole('link', { name: 'Accounts' })
+    expect(link).toHaveAttribute('href', '/accounts')
+  })
+
+  it('links back to the budget page from the Accounts page', () => {
+    renderFooter('/accounts')
+    const link = screen.getByRole('link', { name: 'Budget' })
+    expect(link).toHaveAttribute('href', '/')
   })
 })

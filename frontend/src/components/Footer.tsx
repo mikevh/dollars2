@@ -1,7 +1,7 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faSun, faMoon, faDesktop, faSync, faSignOutAlt } from '@fortawesome/free-solid-svg-icons'
+import { faSun, faMoon, faDesktop, faSync, faSignOutAlt, faBuildingColumns, faList } from '@fortawesome/free-solid-svg-icons'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { setTheme, type ThemeMode } from '../features/theme/themeSlice'
 import { logout } from '../features/auth/authSlice'
@@ -16,7 +16,10 @@ const themeIcons = {
 export default function Footer() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
   const mode = useAppSelector((state) => state.theme.mode)
+
+  const onAccounts = location.pathname === '/accounts'
 
   const buildId = import.meta.env.VITE_BUILD_ID || 'dev'
   const buildDate = import.meta.env.VITE_BUILD_DATE
@@ -54,13 +57,23 @@ export default function Footer() {
         <span>Last synced: —</span>
       </div>
 
-      <button
-        onClick={handleLogout}
-        className="btn btn-icon btn-ghost"
-        title="Logout"
-      >
-        <FontAwesomeIcon icon={faSignOutAlt} className="h-[15px] w-[15px]" />
-      </button>
+      <div className="flex items-center gap-1">
+        <Link
+          to={onAccounts ? '/' : '/accounts'}
+          className="btn btn-ghost text-[12px]"
+          title={onAccounts ? 'Budget' : 'Accounts'}
+        >
+          <FontAwesomeIcon icon={onAccounts ? faList : faBuildingColumns} className="h-[15px] w-[15px]" />
+          <span>{onAccounts ? 'Budget' : 'Accounts'}</span>
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="btn btn-icon btn-ghost"
+          title="Logout"
+        >
+          <FontAwesomeIcon icon={faSignOutAlt} className="h-[15px] w-[15px]" />
+        </button>
+      </div>
     </footer>
   )
 }
