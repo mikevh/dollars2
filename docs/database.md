@@ -39,6 +39,7 @@
 | Name | nvarchar(256) | |
 | SourceType | nvarchar(50) | "Plaid", "SimpleFIN", "Manual" |
 | ConnectionDetailsJson | nvarchar(max) | provider-specific config |
+| IncludeInBudget | bit | NOT NULL, default 1. When 0, the account's transactions are hidden from the budget transaction pane (see `accounts.md`) |
 | CreatedAt | datetime2 | |
 | UpdatedAt | datetime2 | |
 

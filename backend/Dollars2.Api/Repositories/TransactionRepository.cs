@@ -29,6 +29,7 @@ public class TransactionRepository
               LEFT JOIN TransactionAssignments ta ON ta.TransactionId = t.Id
               WHERE t.UserId = @userId AND t.IsDeleted = 0 AND t.IsPending = 0
                 AND ta.Id IS NULL
+                AND (t.AccountId IS NULL OR EXISTS (SELECT 1 FROM Accounts a WHERE a.Id = t.AccountId AND a.IncludeInBudget = 1))
               ORDER BY t.Date DESC",
             new { userId },
             _db.CurrentTransaction);
@@ -41,6 +42,7 @@ public class TransactionRepository
               FROM Transactions t
               WHERE t.UserId = @userId AND t.IsDeleted = 0 AND t.Date >= @fromDate
                 AND EXISTS (SELECT 1 FROM TransactionAssignments ta WHERE ta.TransactionId = t.Id)
+                AND (t.AccountId IS NULL OR EXISTS (SELECT 1 FROM Accounts a WHERE a.Id = t.AccountId AND a.IncludeInBudget = 1))
               ORDER BY t.Date DESC",
             new { userId, fromDate },
             _db.CurrentTransaction);
@@ -49,7 +51,11 @@ public class TransactionRepository
     public async Task<IEnumerable<Transaction>> GetDeletedAsync(int userId)
     {
         return await _db.Connection.QueryAsync<Transaction>(
-            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Payee, Memo, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE UserId = @userId AND IsDeleted = 1 ORDER BY Date DESC",
+            @"SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Payee, Memo, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt
+              FROM Transactions
+              WHERE UserId = @userId AND IsDeleted = 1
+                AND (AccountId IS NULL OR EXISTS (SELECT 1 FROM Accounts a WHERE a.Id = AccountId AND a.IncludeInBudget = 1))
+              ORDER BY Date DESC",
             new { userId },
             _db.CurrentTransaction);
     }
@@ -57,7 +63,11 @@ public class TransactionRepository
     public async Task<IEnumerable<Transaction>> GetPendingAsync(int userId)
     {
         return await _db.Connection.QueryAsync<Transaction>(
-            "SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Payee, Memo, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt FROM Transactions WHERE UserId = @userId AND IsPending = 1 AND IsDeleted = 0 ORDER BY Date DESC",
+            @"SELECT Id, AccountId, UserId, ProviderTransactionId, Date, Description, Payee, Memo, Amount, Notes, IsDeleted, IsPending, IsManual, CreatedAt, UpdatedAt
+              FROM Transactions
+              WHERE UserId = @userId AND IsPending = 1 AND IsDeleted = 0
+                AND (AccountId IS NULL OR EXISTS (SELECT 1 FROM Accounts a WHERE a.Id = AccountId AND a.IncludeInBudget = 1))
+              ORDER BY Date DESC",
             new { userId },
             _db.CurrentTransaction);
     }
@@ -91,17 +101,21 @@ public class TransactionRepository
         using var multi = await _db.Connection.QueryMultipleAsync(
             @"SELECT COUNT(*) FROM Transactions t
               LEFT JOIN TransactionAssignments ta ON ta.TransactionId = t.Id
-              WHERE t.UserId = @userId AND t.IsDeleted = 0 AND t.IsPending = 0 AND ta.Id IS NULL;
+              WHERE t.UserId = @userId AND t.IsDeleted = 0 AND t.IsPending = 0 AND ta.Id IS NULL
+                AND (t.AccountId IS NULL OR EXISTS (SELECT 1 FROM Accounts a WHERE a.Id = t.AccountId AND a.IncludeInBudget = 1));
 
               SELECT COUNT(*) FROM Transactions t
               WHERE t.UserId = @userId AND t.IsDeleted = 0 AND t.Date >= @trackedFromDate
-                AND EXISTS (SELECT 1 FROM TransactionAssignments ta WHERE ta.TransactionId = t.Id);
+                AND EXISTS (SELECT 1 FROM TransactionAssignments ta WHERE ta.TransactionId = t.Id)
+                AND (t.AccountId IS NULL OR EXISTS (SELECT 1 FROM Accounts a WHERE a.Id = t.AccountId AND a.IncludeInBudget = 1));
 
               SELECT COUNT(*) FROM Transactions
-              WHERE UserId = @userId AND IsDeleted = 1;
+              WHERE UserId = @userId AND IsDeleted = 1
+                AND (AccountId IS NULL OR EXISTS (SELECT 1 FROM Accounts a WHERE a.Id = AccountId AND a.IncludeInBudget = 1));
 
               SELECT COUNT(*) FROM Transactions
-              WHERE UserId = @userId AND IsPending = 1 AND IsDeleted = 0;",
+              WHERE UserId = @userId AND IsPending = 1 AND IsDeleted = 0
+                AND (AccountId IS NULL OR EXISTS (SELECT 1 FROM Accounts a WHERE a.Id = AccountId AND a.IncludeInBudget = 1));",
             new { userId, trackedFromDate },
             _db.CurrentTransaction);
 
