@@ -16,8 +16,18 @@ scoped override of the standing "never commit/push without instruction" gate
 ## Steps
 
 ### 1. Pick the item
-- If the user named an item (usually a GitHub issue number), use it.
-- Otherwise list open issues (`gh issue list`) and let the user choose — don't pick for them.
+Only work issues that have cleared the grooming bar — they carry the `groomed` label applied by the
+`groom` skill, which guarantees the issue body stands alone as a spec. Refuse to start on anything
+that hasn't passed that gate.
+
+- **Named case** (user says "work #N"): check the issue for the `groomed` label before starting
+  (`gh issue view <N> --json labels`). If it is **not** groomed, **hard block**: do not begin work,
+  tell the user the issue must be groomed first (point them at `/groom <N>`), and stop. There is no
+  proceed-anyway override.
+- **No-name case** (fallback listing): list only groomed issues
+  (`gh issue list --state open --label groomed`) and let the user choose from those — don't pick for
+  them. Ungroomed issues do not appear.
+- If the groomed listing is empty, say so and suggest running `/groom` to prepare an issue.
 
 ### 2. Understand the item (interview if underspecified)
 - Read the issue in full (`gh issue view <N> --comments`) plus the relevant `docs/*.md` specs and
@@ -73,6 +83,7 @@ scoped override of the standing "never commit/push without instruction" gate
 - Note that the PR branch lives only on the remote; review changes need a fresh checkout.
 
 ## Notes
-- Stop and ask when: no item named (list issues), the issue is underspecified (interview), scope
-  needs splitting, or verification can't be defined — not for routine progress.
+- Stop and ask when: no item named (list only groomed issues), a named issue lacks the `groomed`
+  label (hard block, direct to `/groom <N>`), the issue is underspecified (interview), scope needs
+  splitting, or verification can't be defined — not for routine progress.
 - Skip the `verify` skill if the change is docs/tests only with no runtime surface.
