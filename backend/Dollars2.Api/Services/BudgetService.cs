@@ -223,7 +223,7 @@ public class BudgetService
         return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item, group.IsIncome));
     }
 
-    public async Task<DollarsApiResponse<LineItemResponse>> UpdateLineItemAsync(int id, string name, decimal plannedAmount, int userId)
+    public async Task<DollarsApiResponse<LineItemResponse>> UpdateLineItemAsync(int id, string name, decimal plannedAmount, string? notes, int userId)
     {
         var item = await _lineItemRepo.GetByIdAsync(id);
         if (item is null)
@@ -236,9 +236,10 @@ public class BudgetService
             return DollarsApiResponse<LineItemResponse>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
         }
 
-        await _lineItemRepo.UpdateAsync(id, name, plannedAmount);
+        await _lineItemRepo.UpdateAsync(id, name, plannedAmount, notes);
         item.Name = name;
         item.PlannedAmount = plannedAmount;
+        item.Notes = notes;
 
         var group = (await _groupRepo.GetByIdAsync(item.GroupId))!;
         return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item, group.IsIncome));

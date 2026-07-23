@@ -1,13 +1,25 @@
-import { render, screen, fireEvent, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LineItemResponse } from '../../types/budget'
+import { api } from '../../api/client'
 import ActivityPane from './ActivityPane'
 
 // ActivityPane fetches its scoped transactions on mount; stub the client so the
 // list resolves empty and the component settles out of its loading state.
 vi.mock('../../api/client', () => ({
-  api: { get: vi.fn(() => Promise.resolve({ data: [], error: null })) },
+  api: {
+    get: vi.fn(() => Promise.resolve({ data: [], error: null })),
+    put: vi.fn(() => Promise.resolve({ data: {}, error: null })),
+  },
 }))
+
+vi.mock('react-hot-toast', () => ({
+  default: { error: vi.fn() },
+}))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 function makeLineItem(overrides: Partial<LineItemResponse> = {}): LineItemResponse {
   return {
@@ -78,5 +90,56 @@ describe('ActivityPane (Modernist restyle)', () => {
     const amount = within(row).getByText('+$30.00')
     expect(amount.className).toContain('text-text')
     expect(amount.className).not.toContain('text-accent-700')
+  })
+})
+
+describe('ActivityPane notes editor', () => {
+  it('seeds the textarea from lineItem.notes', () => {
+    renderPane(makeLineItem({ notes: 'water bill due the 5th' }))
+    expect(screen.getByLabelText('Notes')).toHaveValue('water bill due the 5th')
+  })
+
+  it('renders an empty textarea when notes is null', () => {
+    renderPane(makeLineItem({ notes: null }))
+    expect(screen.getByLabelText('Notes')).toHaveValue('')
+  })
+
+  it('hides Save/Cancel until the textarea is edited, then shows them', () => {
+    renderPane(makeLineItem({ notes: 'seed' }))
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'seed edited' } })
+
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+  })
+
+  it('Save issues the PUT with { name, plannedAmount, notes } and calls onBudgetMutate', async () => {
+    const onBudgetMutate = vi.fn()
+    renderPane(makeLineItem({ notes: null }), { onBudgetMutate })
+
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'new note' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(api.put).toHaveBeenCalledWith('/api/line-items/100', {
+      name: 'Rent',
+      plannedAmount: 200,
+      notes: 'new note',
+    })
+    await waitFor(() => expect(onBudgetMutate).toHaveBeenCalledTimes(1))
+  })
+
+  it('Cancel reverts the textarea to the saved value and hides the buttons', () => {
+    renderPane(makeLineItem({ notes: 'original' }))
+
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'changed' } })
+    expect(screen.getByLabelText('Notes')).toHaveValue('changed')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByLabelText('Notes')).toHaveValue('original')
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
   })
 })

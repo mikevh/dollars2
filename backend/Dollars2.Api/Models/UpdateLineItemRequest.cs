@@ -10,4 +10,6 @@ public class UpdateLineItemRequest
 
     [Range(0, double.MaxValue)]
     public decimal PlannedAmount { get; set; }
+
+    public string? Notes { get; set; }
 }
