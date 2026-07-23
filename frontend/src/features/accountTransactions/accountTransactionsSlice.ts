@@ -14,10 +14,30 @@ const initialState: AccountTransactionsState = {
   error: null,
 }
 
+export interface AccountTransactionsQuery {
+  accountId: number
+  page: number
+  size: number
+  sort: string
+  dir: string
+  q: string
+}
+
 export const fetchAccountTransactions = createAsyncThunk(
   'accountTransactions/fetch',
-  async (accountId: number, { rejectWithValue }) => {
-    const result = await api.get<AccountTransactions>(`/api/transactions/by-account/${accountId}`)
+  async ({ accountId, page, size, sort, dir, q }: AccountTransactionsQuery, { rejectWithValue }) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+      sort,
+      dir,
+    })
+    if (q) {
+      params.set('q', q)
+    }
+    const result = await api.get<AccountTransactions>(
+      `/api/transactions/by-account/${accountId}?${params.toString()}`
+    )
     if (result.error) {
       return rejectWithValue(result.error.message)
     }

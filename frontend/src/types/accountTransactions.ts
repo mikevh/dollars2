@@ -4,4 +4,5 @@ export interface AccountTransactions {
   accountId: number
   accountName: string
   transactions: TransactionResponse[]
+  totalCount: number
 }

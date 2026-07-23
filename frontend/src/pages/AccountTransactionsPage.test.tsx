@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -34,6 +34,13 @@ function tx(overrides: Partial<TransactionResponse>): TransactionResponse {
   }
 }
 
+function page(
+  transactions: TransactionResponse[],
+  totalCount = transactions.length
+): AccountTransactions {
+  return { accountId: 3, accountName: 'Keybank Checking', transactions, totalCount }
+}
+
 function renderPage(accountId = '3') {
   const store = configureStore({ reducer: { accountTransactions: accountTransactionsReducer } })
   render(
@@ -47,30 +54,37 @@ function renderPage(accountId = '3') {
   )
 }
 
+function lastUrl(): string {
+  return getMock.mock.calls.at(-1)![0] as string
+}
+
+function dirOf(url: string): string | null {
+  return new URLSearchParams(url.split('?')[1] ?? '').get('dir')
+}
+
 describe('AccountTransactionsPage', () => {
   beforeEach(() => {
     getMock.mockReset()
   })
 
-  it('requests transactions for the account in the route', async () => {
-    getMock.mockResolvedValue({
-      data: { accountId: 3, accountName: 'Keybank Checking', transactions: [] } satisfies AccountTransactions,
-      error: null,
-    })
+  it('requests the first page (size 100, date desc) for the account in the route', async () => {
+    getMock.mockResolvedValue({ data: page([]), error: null })
     renderPage('3')
-    await waitFor(() => expect(getMock).toHaveBeenCalledWith('/api/transactions/by-account/3'))
+    await waitFor(() =>
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/transactions/by-account/3?page=1&size=100&sort=date&dir=desc',
+      ),
+    )
   })
 
   it('renders the account name and a grid of its transactions', async () => {
-    const data: AccountTransactions = {
-      accountId: 3,
-      accountName: 'Keybank Checking',
-      transactions: [
+    getMock.mockResolvedValue({
+      data: page([
         tx({ id: 1, description: 'KROGER', amount: -52.1, assignments: [{ id: 10, lineItemId: 5, lineItemName: 'Groceries', amount: -52.1 }] }),
         tx({ id: 2, description: 'PAYCHECK', amount: 2000, assignments: [] }),
-      ],
-    }
-    getMock.mockResolvedValue({ data, error: null })
+      ]),
+      error: null,
+    })
 
     renderPage()
 
@@ -87,11 +101,7 @@ describe('AccountTransactionsPage', () => {
 
   it('marks soft-deleted transactions', async () => {
     getMock.mockResolvedValue({
-      data: {
-        accountId: 3,
-        accountName: 'Keybank Checking',
-        transactions: [tx({ id: 9, description: 'OLD CHARGE', isDeleted: true })],
-      } satisfies AccountTransactions,
+      data: page([tx({ id: 9, description: 'OLD CHARGE', isDeleted: true })]),
       error: null,
     })
 
@@ -102,11 +112,63 @@ describe('AccountTransactionsPage', () => {
     expect(row.className).toContain('line-through')
   })
 
-  it('shows an empty state when the account has no transactions', async () => {
-    getMock.mockResolvedValue({
-      data: { accountId: 3, accountName: 'Keybank Checking', transactions: [] } satisfies AccountTransactions,
-      error: null,
+  it('toggles sort when a sortable header is clicked and re-requests', async () => {
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    await waitFor(() => expect(lastUrl()).toContain('sort=date&dir=desc'))
+
+    fireEvent.click(screen.getByRole('button', { name: /description/i }))
+    await waitFor(() => expect(lastUrl()).toContain('sort=description'))
+    const firstDir = dirOf(lastUrl())
+
+    fireEvent.click(screen.getByRole('button', { name: /description/i }))
+    await waitFor(() => expect(dirOf(lastUrl())).not.toBe(firstDir))
+    expect(lastUrl()).toContain('sort=description')
+  })
+
+  it('does not make the budget item column sortable', async () => {
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    await screen.findByText('Budget item')
+    expect(screen.getByText('Budget item').closest('button')).toBeNull()
+  })
+
+  it('searches with a debounce and resets to the first page', async () => {
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    await waitFor(() => expect(lastUrl()).toContain('page=1'))
+
+    // Advance off page 1 first so the reset is observable.
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(lastUrl()).toContain('page=2'))
+
+    fireEvent.change(screen.getByLabelText('Search transactions'), {
+      target: { value: 'coffee' },
     })
+    await waitFor(() => {
+      expect(lastUrl()).toContain('q=coffee')
+      expect(lastUrl()).toContain('page=1')
+    })
+  })
+
+  it('pages with prev/next and reflects the total count', async () => {
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    await waitFor(() => expect(lastUrl()).toContain('page=1'))
+
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument()
+    expect(screen.getByText('1–100 of 250')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Prev' })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(lastUrl()).toContain('page=2'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Prev' }))
+    await waitFor(() => expect(lastUrl()).toContain('page=1'))
+  })
+
+  it('shows an empty state when the account has no transactions', async () => {
+    getMock.mockResolvedValue({ data: page([]), error: null })
     renderPage()
     expect(await screen.findByText('No transactions for this account.')).toBeInTheDocument()
   })
