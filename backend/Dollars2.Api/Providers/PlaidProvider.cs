@@ -97,8 +97,6 @@ public class PlaidProvider : IBankSyncProvider
             throw new InvalidOperationException("Plaid connection is missing an access token.");
         }
 
-        _logger.LogInformation("plaid client {environment}, {clientid}, {secret}, {accesstoken}", _environment, _clientId, _secret, accessToken);
-
         var client = new PlaidClient(
             _environment,
             _clientId,
@@ -139,7 +137,6 @@ public class PlaidProvider : IBankSyncProvider
                 Cursor = string.IsNullOrEmpty(cursor) ? null : cursor,
                 Count = 500,
             });
-            _logger.LogTrace("plaid response raw {cursor}, {json}", cursor, response.RawJson);            
 
             if (!response.IsSuccessStatusCode)
             {
