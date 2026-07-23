@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
+import toast from 'react-hot-toast'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
-import { fetchAccounts } from '../features/accounts/accountsSlice'
+import { fetchAccounts, syncConnection } from '../features/accounts/accountsSlice'
 import { formatCurrency, formatRelativeTime } from '../utils/format'
-import type { AccountInfo } from '../types/account'
+import type { AccountGroup, AccountInfo } from '../types/account'
 
 function sourceTypeLabel(sourceType: string): string {
   if (sourceType === 'Manual') {
@@ -26,6 +27,41 @@ function LastSynced({ account }: { account: AccountInfo }) {
       {failed ? 'sync failed ' : 'synced '}
       {formatRelativeTime(account.lastSyncedAt)}
     </span>
+  )
+}
+
+function SyncButton({ group }: { group: AccountGroup }) {
+  const dispatch = useAppDispatch()
+  const syncingConnectionId = useAppSelector((state) => state.accounts.syncingConnectionId)
+  const syncing = syncingConnectionId === group.connectionId
+  // A sync is in progress on another group; the server serializes per user, so disable the rest.
+  const otherSyncing = syncingConnectionId !== null && !syncing
+
+  const handleSync = async () => {
+    const result = await dispatch(syncConnection(group.connectionId))
+    if (syncConnection.rejected.match(result)) {
+      toast.error(result.payload as string)
+      return
+    }
+    const results = result.payload
+    const failures = results.filter((r) => r.status === 'Failure')
+    if (failures.length > 0) {
+      toast.error(`Sync failed for ${failures.map((f) => f.accountName).join(', ')}`)
+      return
+    }
+    const total = results.reduce((sum, r) => sum + r.transactionCount, 0)
+    toast.success(total > 0 ? `Synced ${total} new transaction${total === 1 ? '' : 's'}` : 'Synced — no new transactions')
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleSync}
+      disabled={syncing || otherSyncing}
+      className="text-[12px] font-semibold uppercase tracking-wide text-accent disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {syncing ? 'Syncing…' : 'Sync'}
+    </button>
   )
 }
 
@@ -57,8 +93,11 @@ export default function AccountsPage() {
           <div className="space-y-4">
             {groups.map((group) => (
               <div key={group.connectionId} className="border border-divider bg-surface shadow-elev-sm">
-                <div className="text-muted border-b-2 border-divider px-4 py-2 text-[12px] font-semibold uppercase tracking-wide">
-                  {sourceTypeLabel(group.sourceType)}
+                <div className="flex items-center justify-between border-b-2 border-divider px-4 py-2">
+                  <span className="text-muted text-[12px] font-semibold uppercase tracking-wide">
+                    {sourceTypeLabel(group.sourceType)}
+                  </span>
+                  {group.sourceType !== 'Manual' && <SyncButton group={group} />}
                 </div>
                 <ul>
                   {group.accounts.map((account) => (

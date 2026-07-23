@@ -12,3 +12,11 @@ export interface AccountGroup {
   sourceType: string
   accounts: AccountInfo[]
 }
+
+export interface SyncResult {
+  accountId: number
+  accountName: string
+  status: string
+  transactionCount: number
+  errorMessage: string | null
+}
