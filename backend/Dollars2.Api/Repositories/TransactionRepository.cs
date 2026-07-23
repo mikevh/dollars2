@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dapper;
 using Dollars2.Api.Data;
 using Dollars2.Api.Models;
@@ -72,15 +73,53 @@ public class TransactionRepository
             _db.CurrentTransaction);
     }
 
-    public async Task<IEnumerable<Transaction>> GetByAccountIdAsync(int accountId)
+    public async Task<(IReadOnlyList<Transaction> Rows, int TotalCount)> GetByAccountIdAsync(
+        int accountId, int page, int size, string sort, string dir, string? q)
     {
-        return await _db.Connection.QueryAsync<Transaction>(
-            @"SELECT t.Id, t.AccountId, t.UserId, t.ProviderTransactionId, t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.Notes, t.IsDeleted, t.IsPending, t.IsManual, t.CreatedAt, t.UpdatedAt
-              FROM Transactions t
-              WHERE t.AccountId = @accountId
-              ORDER BY t.Date DESC",
-            new { accountId },
+        // Whitelist sort column and direction — never interpolate raw input into ORDER BY.
+        var sortColumn = sort switch
+        {
+            "description" => "t.Description",
+            "amount" => "t.Amount",
+            _ => "t.Date",
+        };
+        var sortDir = dir == "asc" ? "ASC" : "DESC";
+
+        // Build the filter once and reuse it for both the count and the page so they can't diverge.
+        var where = "t.AccountId = @accountId";
+        string? like = null;
+        decimal? amount = null;
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            // Escape LIKE wildcards so the term matches as a literal substring.
+            var escaped = q.Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]");
+            like = $"%{escaped}%";
+            var amountClause = "";
+            if (decimal.TryParse(q, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
+            {
+                amount = Math.Abs(parsed);
+                amountClause = " OR ABS(t.Amount) = @amount";
+            }
+            where += $" AND (t.Payee LIKE @like OR t.Description LIKE @like{amountClause})";
+        }
+
+        var offset = (page - 1) * size;
+        var sql = $@"SELECT COUNT(*) FROM Transactions t WHERE {where};
+
+            SELECT t.Id, t.AccountId, t.UserId, t.ProviderTransactionId, t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.Notes, t.IsDeleted, t.IsPending, t.IsManual, t.CreatedAt, t.UpdatedAt
+            FROM Transactions t
+            WHERE {where}
+            ORDER BY {sortColumn} {sortDir}, t.Id {sortDir}
+            OFFSET @offset ROWS FETCH NEXT @size ROWS ONLY;";
+
+        using var multi = await _db.Connection.QueryMultipleAsync(
+            sql,
+            new { accountId, like, amount, offset, size },
             _db.CurrentTransaction);
+
+        var total = await multi.ReadSingleAsync<int>();
+        var rows = (await multi.ReadAsync<Transaction>()).ToList();
+        return (rows, total);
     }
 
     public async Task<IEnumerable<Transaction>> GetByLineItemIdAsync(int lineItemId)

@@ -107,7 +107,7 @@ public sealed class AccountIncludeInBudgetTests
             Assert.Equal(1, counts.Pending);
 
             // The per-account view still returns the excluded account's rows.
-            var perAccount = (await repository.GetByAccountIdAsync(excluded)).Select(t => t.Id).ToHashSet();
+            var perAccount = (await repository.GetByAccountIdAsync(excluded, 1, 100, "date", "desc", null)).Rows.Select(t => t.Id).ToHashSet();
             Assert.Contains(excludedNew, perAccount);
             Assert.Contains(excludedTracked, perAccount);
             Assert.Contains(excludedDeleted, perAccount);
