@@ -2,6 +2,7 @@ export interface BudgetResponse {
   id: number
   year: number
   month: number
+  accountBalanceTotal: number
   groups: BudgetGroupResponse[]
 }
 

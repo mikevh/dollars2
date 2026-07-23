@@ -11,14 +11,18 @@ public class BudgetService
     private readonly BudgetGroupRepository _groupRepo;
     private readonly LineItemRepository _lineItemRepo;
     private readonly TransactionAssignmentRepository _assignmentRepo;
+    private readonly AccountRepository _accountRepo;
+    private readonly AccountBalanceRepository _balanceRepo;
 
-    public BudgetService(DbSession dbSession, BudgetRepository budgetRepo, BudgetGroupRepository groupRepo, LineItemRepository lineItemRepo, TransactionAssignmentRepository assignmentRepo)
+    public BudgetService(DbSession dbSession, BudgetRepository budgetRepo, BudgetGroupRepository groupRepo, LineItemRepository lineItemRepo, TransactionAssignmentRepository assignmentRepo, AccountRepository accountRepo, AccountBalanceRepository balanceRepo)
     {
         _dbSession = dbSession;
         _budgetRepo = budgetRepo;
         _groupRepo = groupRepo;
         _lineItemRepo = lineItemRepo;
         _assignmentRepo = assignmentRepo;
+        _accountRepo = accountRepo;
+        _balanceRepo = balanceRepo;
     }
 
     public async Task<DollarsApiResponse<BudgetResponse>> GetBudgetAsync(int userId, int year, int month)
@@ -332,13 +336,43 @@ public class BudgetService
             });
         }
 
+        var accounts = (await _accountRepo.GetByUserIdAsync(budget.UserId)).ToList();
+        var includedIds = accounts.Where(a => a.IncludeInBudget).Select(a => a.Id).ToList();
+        var latestBalances = includedIds.Count > 0
+            ? await _balanceRepo.GetLatestPerAccountAsync(includedIds)
+            : Enumerable.Empty<AccountBalance>();
+
         return new BudgetResponse
         {
             Id = budget.Id,
             Year = budget.Year,
             Month = budget.Month,
+            AccountBalanceTotal = ComputeAccountBalanceTotal(accounts, latestBalances),
             Groups = groupResponses
         };
+    }
+
+    // Sum of the latest captured balance for each IncludeInBudget account. Accounts with no stored
+    // balance contribute 0; excluded accounts never affect the total.
+    public static decimal ComputeAccountBalanceTotal(IEnumerable<Account> accounts, IEnumerable<AccountBalance> latestBalances)
+    {
+        var balanceByAccount = latestBalances
+            .GroupBy(b => b.AccountId)
+            .ToDictionary(g => g.Key, g => g.First().Balance);
+
+        decimal total = 0;
+        foreach (var account in accounts)
+        {
+            if (!account.IncludeInBudget)
+            {
+                continue;
+            }
+            if (balanceByAccount.TryGetValue(account.Id, out var balance))
+            {
+                total += balance;
+            }
+        }
+        return total;
     }
 
     private async Task CopyBudgetStructureAsync(int sourceBudgetId, int targetBudgetId)

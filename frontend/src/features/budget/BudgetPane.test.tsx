@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { DndContext } from '@dnd-kit/core'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { store } from '../../app/store'
 import type { BudgetResponse } from '../../types/budget'
 import BudgetPane from './BudgetPane'
@@ -11,6 +11,7 @@ function makeBudget(): BudgetResponse {
     id: 1,
     year: 2026,
     month: 7,
+    accountBalanceTotal: 0,
     groups: [
       {
         id: 10,
@@ -63,6 +64,17 @@ function renderPane(budget: BudgetResponse) {
 }
 
 describe('BudgetPane (Modernist restyle)', () => {
+  // makeBudget() is July 2026; pin the clock so the current-month "Budget vs. accounts"
+  // row renders deterministically regardless of the wall clock.
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-15T12:00:00'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('renders the "Left to budget" line with income minus expenses', () => {
     renderPane(makeBudget())
     expect(screen.getByText('Left to budget')).toBeInTheDocument()
@@ -102,5 +114,41 @@ describe('BudgetPane (Modernist restyle)', () => {
     renderPane(makeBudget())
     fireEvent.click(screen.getByRole('button', { name: '+ Add Group' }))
     expect(screen.getByPlaceholderText('Group name')).toBeInTheDocument()
+  })
+
+  // budgetTotal for makeBudget() = income (4000+0-0) + housing (1500+0-1600) = 3900.
+  it('renders "Budget vs. accounts" as $0 in calm text when accounts match the budget', () => {
+    const budget = makeBudget()
+    budget.accountBalanceTotal = 3900 // equal to budgetTotal → $0 difference
+    renderPane(budget)
+    const label = screen.getByText('Budget vs. accounts')
+    const amount = label.nextElementSibling as HTMLElement
+    expect(amount).toHaveTextContent('$0.00')
+    expect(amount.className).toContain('text-text')
+    expect(amount.className).not.toContain('text-accent-700')
+  })
+
+  it('renders the "Budget vs. accounts" difference in accent text when they differ', () => {
+    const budget = makeBudget()
+    budget.accountBalanceTotal = 5000 // 5000 - 3900 = 1100 difference
+    renderPane(budget)
+    const label = screen.getByText('Budget vs. accounts')
+    const amount = label.nextElementSibling as HTMLElement
+    expect(amount).toHaveTextContent('$1,100.00')
+    expect(amount.className).toContain('text-accent-700')
+  })
+
+  it('hides the "Budget vs. accounts" row when viewing a past month', () => {
+    const budget = makeBudget()
+    budget.month = 6 // current month is 2026-07 → June is past
+    renderPane(budget)
+    expect(screen.queryByText('Budget vs. accounts')).not.toBeInTheDocument()
+  })
+
+  it('hides the "Budget vs. accounts" row when viewing a future month', () => {
+    const budget = makeBudget()
+    budget.month = 8 // current month is 2026-07 → August is future
+    renderPane(budget)
+    expect(screen.queryByText('Budget vs. accounts')).not.toBeInTheDocument()
   })
 })
