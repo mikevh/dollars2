@@ -1,4 +1,4 @@
-IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'RefreshTokens')
+IF NOT EXISTS (SELECT * FROM Migrations WHERE ScriptName = '002_create_refresh_tokens')
 BEGIN
     CREATE TABLE RefreshTokens (
         Id INT IDENTITY(1,1) PRIMARY KEY,
@@ -9,4 +9,6 @@ BEGIN
         UpdatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT FK_RefreshTokens_Users FOREIGN KEY (UserId) REFERENCES Users(Id)
     );
+
+    INSERT INTO Migrations (ScriptName) VALUES ('002_create_refresh_tokens');
 END

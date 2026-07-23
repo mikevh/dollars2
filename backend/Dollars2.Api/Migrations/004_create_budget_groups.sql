@@ -1,4 +1,4 @@
-IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'BudgetGroups')
+IF NOT EXISTS (SELECT * FROM Migrations WHERE ScriptName = '004_create_budget_groups')
 BEGIN
     CREATE TABLE BudgetGroups (
         Id INT IDENTITY(1,1) PRIMARY KEY,
@@ -10,4 +10,6 @@ BEGIN
         UpdatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT FK_BudgetGroups_Budgets FOREIGN KEY (BudgetId) REFERENCES Budgets(Id)
     );
+
+    INSERT INTO Migrations (ScriptName) VALUES ('004_create_budget_groups');
 END

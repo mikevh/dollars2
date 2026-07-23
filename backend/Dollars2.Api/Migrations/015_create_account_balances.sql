@@ -1,4 +1,4 @@
-IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'AccountBalances')
+IF NOT EXISTS (SELECT * FROM Migrations WHERE ScriptName = '015_create_account_balances')
 BEGIN
     CREATE TABLE AccountBalances (
         Id INT IDENTITY(1,1) PRIMARY KEY,
@@ -8,9 +8,8 @@ BEGIN
         UpdatedOn DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT FK_AccountBalances_Accounts FOREIGN KEY (AccountId) REFERENCES Accounts(Id)
     );
-END
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AccountBalances_AccountId_CreatedOn')
-BEGIN
     CREATE INDEX IX_AccountBalances_AccountId_CreatedOn ON AccountBalances (AccountId, CreatedOn DESC);
+
+    INSERT INTO Migrations (ScriptName) VALUES ('015_create_account_balances');
 END
