@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ChangeEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -24,8 +24,17 @@ import {
 import { formatCurrency } from '../utils/format'
 import type { TransactionResponse } from '../types/transaction'
 
-const PAGE_SIZE = 100
+const PAGE_SIZE_OPTIONS = [10, 50, 100, 500]
+const DEFAULT_PAGE_SIZE = 100
+const PAGE_SIZE_STORAGE_KEY = 'accountTxPageSize'
 const SEARCH_DEBOUNCE_MS = 300
+
+// A single global page-size preference shared across all account pages. Falls
+// back to the default when localStorage is empty or holds an unsupported value.
+function loadPageSize(): number {
+  const stored = Number(localStorage.getItem(PAGE_SIZE_STORAGE_KEY))
+  return PAGE_SIZE_OPTIONS.includes(stored) ? stored : DEFAULT_PAGE_SIZE
+}
 
 function formatDate(date: string): string {
   return new Date(date.slice(0, 10) + 'T00:00:00').toLocaleDateString()
@@ -65,7 +74,7 @@ export default function AccountTransactionsPage() {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }])
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
-    pageSize: PAGE_SIZE,
+    pageSize: loadPageSize(),
   })
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -91,14 +100,14 @@ export default function AccountTransactionsPage() {
         fetchAccountTransactions({
           accountId: id,
           page: pagination.pageIndex + 1,
-          size: PAGE_SIZE,
+          size: pagination.pageSize,
           sort,
           dir,
           q: debouncedSearch,
         })
       )
     }
-  }, [dispatch, accountId, pagination.pageIndex, sort, dir, debouncedSearch])
+  }, [dispatch, accountId, pagination.pageIndex, pagination.pageSize, sort, dir, debouncedSearch])
 
   useEffect(() => {
     return () => {
@@ -108,12 +117,19 @@ export default function AccountTransactionsPage() {
 
   const transactions = data?.transactions ?? []
   const totalCount = data?.totalCount ?? 0
-  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const pageCount = Math.max(1, Math.ceil(totalCount / pagination.pageSize))
 
   // Changing the sort returns to the first page.
   const handleSortingChange: OnChangeFn<SortingState> = (updater) => {
     setSorting(updater)
     setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+  }
+
+  // Persist the chosen size globally and return to the first page.
+  const handlePageSizeChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const size = Number(e.target.value)
+    localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(size))
+    setPagination({ pageIndex: 0, pageSize: size })
   }
 
   const table = useReactTable({
@@ -131,8 +147,8 @@ export default function AccountTransactionsPage() {
     getCoreRowModel: getCoreRowModel(),
   })
 
-  const rangeStart = totalCount === 0 ? 0 : pagination.pageIndex * PAGE_SIZE + 1
-  const rangeEnd = Math.min((pagination.pageIndex + 1) * PAGE_SIZE, totalCount)
+  const rangeStart = totalCount === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1
+  const rangeEnd = Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalCount)
 
   return (
     <div className="flex min-h-screen flex-col bg-bg pb-14 text-text">
@@ -267,9 +283,23 @@ export default function AccountTransactionsPage() {
 
             {transactions.length > 0 && (
               <div className="text-muted mt-3 flex items-center justify-between text-[13px]">
-                <span className="tabular-nums">
-                  {rangeStart}–{rangeEnd} of {totalCount}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="tabular-nums">
+                    {rangeStart}–{rangeEnd} of {totalCount}
+                  </span>
+                  <select
+                    value={pagination.pageSize}
+                    onChange={handlePageSizeChange}
+                    className="input w-auto text-[13px]"
+                    aria-label="Transactions per page"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size} / page
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
