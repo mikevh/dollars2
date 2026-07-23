@@ -62,9 +62,14 @@ function dirOf(url: string): string | null {
   return new URLSearchParams(url.split('?')[1] ?? '').get('dir')
 }
 
+function sizeOf(url: string): string | null {
+  return new URLSearchParams(url.split('?')[1] ?? '').get('size')
+}
+
 describe('AccountTransactionsPage', () => {
   beforeEach(() => {
     getMock.mockReset()
+    localStorage.clear()
   })
 
   it('requests the first page (size 100, date desc) for the account in the route', async () => {
@@ -165,6 +170,52 @@ describe('AccountTransactionsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Prev' }))
     await waitFor(() => expect(lastUrl()).toContain('page=1'))
+  })
+
+  it('offers page sizes 10 / 50 / 100 / 500 and defaults to 100', async () => {
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    const select = (await screen.findByLabelText('Transactions per page')) as HTMLSelectElement
+    expect(select.value).toBe('100')
+    expect(
+      Array.from(select.options).map((o) => o.value),
+    ).toEqual(['10', '50', '100', '500'])
+  })
+
+  it('re-fetches the chosen size, resets to page 1, and persists it', async () => {
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    await waitFor(() => expect(lastUrl()).toContain('page=1'))
+
+    // Move off page 1 so the reset is observable.
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(lastUrl()).toContain('page=2'))
+
+    fireEvent.change(screen.getByLabelText('Transactions per page'), {
+      target: { value: '10' },
+    })
+    await waitFor(() => {
+      expect(sizeOf(lastUrl())).toBe('10')
+      expect(lastUrl()).toContain('page=1')
+    })
+    expect(localStorage.getItem('accountTxPageSize')).toBe('10')
+    expect(screen.getByText('Page 1 of 25')).toBeInTheDocument()
+    expect(screen.getByText('1–10 of 250')).toBeInTheDocument()
+  })
+
+  it('restores the persisted page size on load', async () => {
+    localStorage.setItem('accountTxPageSize', '50')
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    await waitFor(() => expect(sizeOf(lastUrl())).toBe('50'))
+    expect((screen.getByLabelText('Transactions per page') as HTMLSelectElement).value).toBe('50')
+  })
+
+  it('falls back to 100 when the stored page size is garbage', async () => {
+    localStorage.setItem('accountTxPageSize', 'not-a-number')
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    await waitFor(() => expect(sizeOf(lastUrl())).toBe('100'))
   })
 
   it('shows an empty state when the account has no transactions', async () => {
