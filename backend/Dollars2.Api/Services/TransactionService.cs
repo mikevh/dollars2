@@ -87,6 +87,29 @@ public class TransactionService
         return DollarsApiResponse<List<TransactionResponse>>.Success(responses);
     }
 
+    public async Task<DollarsApiResponse<AccountTransactionsResponse>> GetByAccountAsync(int accountId, int userId)
+    {
+        var account = await _accountRepo.GetByIdAsync(accountId);
+        if (account is null || account.UserId != userId)
+        {
+            return DollarsApiResponse<AccountTransactionsResponse>.Fail("Account not found.", "ACCOUNT_NOT_FOUND");
+        }
+
+        var transactions = await _transactionRepo.GetByAccountIdAsync(accountId);
+        var responses = new List<TransactionResponse>();
+        foreach (var t in transactions)
+        {
+            responses.Add(await BuildResponseAsync(t));
+        }
+
+        return DollarsApiResponse<AccountTransactionsResponse>.Success(new AccountTransactionsResponse
+        {
+            AccountId = account.Id,
+            AccountName = account.Name,
+            Transactions = responses
+        });
+    }
+
     public async Task<DollarsApiResponse<TransactionResponse>> CreateAsync(int userId, DateTime date, string description, decimal amount, string? notes, string? payee, string? memo)
     {
         if (amount == 0)

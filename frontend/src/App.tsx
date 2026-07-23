@@ -5,6 +5,7 @@ import { useTheme } from './features/theme/useTheme'
 import LoginPage from './pages/LoginPage'
 import BudgetPage from './pages/BudgetPage'
 import AccountsPage from './pages/AccountsPage'
+import AccountTransactionsPage from './pages/AccountTransactionsPage'
 import Footer from './components/Footer'
 
 function App() {
@@ -30,6 +31,16 @@ function App() {
           element={
             isAuthenticated ? (
               <AccountsPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/accounts/:accountId"
+          element={
+            isAuthenticated ? (
+              <AccountTransactionsPage />
             ) : (
               <Navigate to="/login" replace />
             )
