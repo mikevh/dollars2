@@ -67,11 +67,11 @@ public class LineItemRepository
             _db.CurrentTransaction);
     }
 
-    public async Task UpdateAsync(int id, string name, decimal plannedAmount)
+    public async Task UpdateAsync(int id, string name, decimal plannedAmount, string? notes)
     {
         await _db.Connection.ExecuteAsync(
-            "UPDATE LineItems SET Name = @name, PlannedAmount = @plannedAmount, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id",
-            new { id, name, plannedAmount },
+            "UPDATE LineItems SET Name = @name, PlannedAmount = @plannedAmount, Notes = @notes, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id",
+            new { id, name, plannedAmount, notes },
             _db.CurrentTransaction);
     }
 

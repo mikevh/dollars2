@@ -32,7 +32,7 @@ public class LineItemsController : DollarsControllerBase
     [HttpPut("{lineItemId}")]
     public async Task<IActionResult> UpdateLineItem(int lineItemId, [FromBody] UpdateLineItemRequest request)
     {
-        var result = await _budgetService.UpdateLineItemAsync(lineItemId, request.Name, request.PlannedAmount, GetUserId());
+        var result = await _budgetService.UpdateLineItemAsync(lineItemId, request.Name, request.PlannedAmount, request.Notes, GetUserId());
         if (result.Error is not null)
         {
             return BadRequest(result);
