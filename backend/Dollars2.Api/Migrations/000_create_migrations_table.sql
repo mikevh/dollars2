@@ -6,3 +6,8 @@ BEGIN
         AppliedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
     );
 END
+
+IF NOT EXISTS (SELECT * FROM Migrations WHERE ScriptName = '000_create_migrations_table')
+BEGIN
+    INSERT INTO Migrations (ScriptName) VALUES ('000_create_migrations_table');
+END

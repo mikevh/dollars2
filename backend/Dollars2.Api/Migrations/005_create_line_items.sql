@@ -1,4 +1,4 @@
-IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'LineItems')
+IF NOT EXISTS (SELECT * FROM Migrations WHERE ScriptName = '005_create_line_items')
 BEGIN
     CREATE TABLE LineItems (
         Id INT IDENTITY(1,1) PRIMARY KEY,
@@ -11,4 +11,6 @@ BEGIN
         UpdatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT FK_LineItems_BudgetGroups FOREIGN KEY (GroupId) REFERENCES BudgetGroups(Id)
     );
+
+    INSERT INTO Migrations (ScriptName) VALUES ('005_create_line_items');
 END

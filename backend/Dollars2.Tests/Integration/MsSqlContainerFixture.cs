@@ -43,6 +43,9 @@ public sealed class MsSqlContainerFixture : IAsyncLifetime
         await MigrationRunner.ApplyAsync(_connectionString);
     }
 
+    /// <summary>Connection string to the migrated throwaway test database.</summary>
+    public string ConnectionString => _connectionString;
+
     /// <summary>Opens a fresh <see cref="DbSession"/> against the migrated test database.</summary>
     public DbSession CreateSession()
     {

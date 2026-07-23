@@ -1,4 +1,4 @@
-IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Budgets')
+IF NOT EXISTS (SELECT * FROM Migrations WHERE ScriptName = '003_create_budgets')
 BEGIN
     CREATE TABLE Budgets (
         Id INT IDENTITY(1,1) PRIMARY KEY,
@@ -10,4 +10,6 @@ BEGIN
         CONSTRAINT FK_Budgets_Users FOREIGN KEY (UserId) REFERENCES Users(Id),
         CONSTRAINT UQ_Budgets_UserId_Year_Month UNIQUE (UserId, [Year], [Month])
     );
+
+    INSERT INTO Migrations (ScriptName) VALUES ('003_create_budgets');
 END

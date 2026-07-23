@@ -37,8 +37,14 @@
 ## Database
 
 - Raw SQL migration scripts, numbered: `001_create_users.sql`, `002_create_budgets.sql`, etc.
-- Run manually against the DB
-- Migrations tracking table to record applied scripts
+- Each script guards on its own `Migrations` row (`IF NOT EXISTS (SELECT * FROM Migrations
+  WHERE ScriptName = 'NNN_...') BEGIN <DDL>; INSERT INTO Migrations (ScriptName) VALUES ('NNN_...'); END`),
+  so scripts are pure no-ops once applied and never probe object existence
+- Run manually via `scripts/migrate.ps1` (PowerShell + `sqlcmd`), which applies every
+  `Migrations/*.sql` in filename order; re-runnable, a fully-migrated DB produces no changes
+- For a DB migrated before the scripts were normalized (rows only for 006–010), run
+  `scripts/backfill_migrations.sql` **once** before `migrate.ps1`
+- Migrations tracking table (`Migrations`) records each applied script by `ScriptName`
 - Connection string in appsettings.json
 
 ## Logging

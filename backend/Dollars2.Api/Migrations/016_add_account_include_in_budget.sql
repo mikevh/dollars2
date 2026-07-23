@@ -1,7 +1,6 @@
-IF NOT EXISTS (
-    SELECT 1 FROM sys.columns
-    WHERE object_id = OBJECT_ID('Accounts') AND name = 'IncludeInBudget'
-)
+IF NOT EXISTS (SELECT * FROM Migrations WHERE ScriptName = '016_add_account_include_in_budget')
 BEGIN
     ALTER TABLE Accounts ADD IncludeInBudget bit NOT NULL DEFAULT 1;
+
+    INSERT INTO Migrations (ScriptName) VALUES ('016_add_account_include_in_budget');
 END
