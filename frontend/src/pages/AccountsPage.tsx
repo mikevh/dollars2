@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { fetchAccounts, syncConnection } from '../features/accounts/accountsSlice'
@@ -101,19 +102,22 @@ export default function AccountsPage() {
                 </div>
                 <ul>
                   {group.accounts.map((account) => (
-                    <li
-                      key={account.id}
-                      className="flex items-center justify-between px-4 py-2.5 text-[14px]"
-                    >
-                      <span>{account.name}</span>
-                      <div className="flex flex-col items-end gap-0.5">
-                        {account.balance !== null && (
-                          <span className="font-medium tabular-nums">
-                            {formatCurrency(account.balance)}
-                          </span>
-                        )}
-                        <LastSynced account={account} />
-                      </div>
+                    <li key={account.id}>
+                      <Link
+                        to={`/accounts/${account.id}`}
+                        className="flex items-center justify-between px-4 py-2.5 text-[14px] hover:bg-[color-mix(in_srgb,var(--color-text)_6%,transparent)]"
+                        title={`View ${account.name} transactions`}
+                      >
+                        <span>{account.name}</span>
+                        <div className="flex flex-col items-end gap-0.5">
+                          {account.balance !== null && (
+                            <span className="font-medium tabular-nums">
+                              {formatCurrency(account.balance)}
+                            </span>
+                          )}
+                          <LastSynced account={account} />
+                        </div>
+                      </Link>
                     </li>
                   ))}
                 </ul>

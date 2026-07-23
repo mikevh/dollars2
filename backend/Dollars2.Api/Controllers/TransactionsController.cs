@@ -51,6 +51,17 @@ public class TransactionsController : DollarsControllerBase
         return Ok(result);
     }
 
+    [HttpGet("by-account/{accountId}")]
+    public async Task<IActionResult> GetByAccount(int accountId)
+    {
+        var result = await _transactionService.GetByAccountAsync(accountId, GetUserId());
+        if (result.Error is not null)
+        {
+            return BadRequest(result);
+        }
+        return Ok(result);
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateTransactionRequest request)
     {

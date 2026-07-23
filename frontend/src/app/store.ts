@@ -4,6 +4,7 @@ import themeReducer from '../features/theme/themeSlice'
 import budgetReducer from '../features/budget/budgetSlice'
 import transactionReducer from '../features/transactions/transactionSlice'
 import accountsReducer from '../features/accounts/accountsSlice'
+import accountTransactionsReducer from '../features/accountTransactions/accountTransactionsSlice'
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     budget: budgetReducer,
     transactions: transactionReducer,
     accounts: accountsReducer,
+    accountTransactions: accountTransactionsReducer,
   },
 })
 

@@ -62,6 +62,17 @@ public class TransactionRepository
             _db.CurrentTransaction);
     }
 
+    public async Task<IEnumerable<Transaction>> GetByAccountIdAsync(int accountId)
+    {
+        return await _db.Connection.QueryAsync<Transaction>(
+            @"SELECT t.Id, t.AccountId, t.UserId, t.ProviderTransactionId, t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.Notes, t.IsDeleted, t.IsPending, t.IsManual, t.CreatedAt, t.UpdatedAt
+              FROM Transactions t
+              WHERE t.AccountId = @accountId
+              ORDER BY t.Date DESC",
+            new { accountId },
+            _db.CurrentTransaction);
+    }
+
     public async Task<IEnumerable<Transaction>> GetByLineItemIdAsync(int lineItemId)
     {
         return await _db.Connection.QueryAsync<Transaction>(
