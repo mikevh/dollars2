@@ -101,7 +101,7 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
             <button
               key={tab.key}
               onClick={() => dispatch(setActiveTab(tab.key))}
-              className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-4 py-2.5 font-heading text-xs font-extrabold uppercase tracking-[0.08em] ${
+              className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2.5 font-heading text-xs font-extrabold uppercase tracking-[0.08em] ${
                 isActive
                   ? 'border-accent text-accent'
                   : 'border-transparent text-muted hover:text-text'
