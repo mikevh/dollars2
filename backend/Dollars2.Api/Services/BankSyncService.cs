@@ -84,6 +84,64 @@ public class BankSyncService
         return results;
     }
 
+    /// <summary>
+    /// Syncs a single connection group (identified by the opaque connectionId emitted by
+    /// GET /api/accounts) immediately, bypassing MinSyncInterval — the per-group manual sync. Returns
+    /// null when no syncable connection matches (unknown id, or the "manual" group). Callers must hold
+    /// the per-user <see cref="SyncLockService"/>.
+    /// </summary>
+    public async Task<IReadOnlyList<SyncResult>?> SyncConnectionForUserAsync(int userId, string connectionId, CancellationToken cancellationToken = default)
+    {
+        var accounts = (await _accountRepo.GetByUserIdAsync(userId)).ToList();
+        var connectionAccounts = ResolveConnectionAccounts(accounts, connectionId, _providers);
+        if (connectionAccounts.Count == 0)
+        {
+            return null;
+        }
+
+        var provider = GetProvider(connectionAccounts[0].SourceType);
+        if (provider is null)
+        {
+            // Provider disabled or unregistered — mirror the full sync's skipped handling.
+            return connectionAccounts.Select(SkippedResult).ToList();
+        }
+
+        // Manual sync bypasses MinSyncInterval by design.
+        return await SyncConnectionAsync(userId, provider, connectionAccounts, cancellationToken);
+    }
+
+    /// <summary>
+    /// Resolves the opaque connectionId back to the syncable accounts in that connection group. Mirrors
+    /// <see cref="AccountService.BuildGroups"/> grouping so ids round-trip. Pure (no I/O) so it can be
+    /// unit-tested. Returns an empty list when no syncable group matches (unknown id, or "manual").
+    /// </summary>
+    public static IReadOnlyList<Account> ResolveConnectionAccounts(
+        IReadOnlyList<Account> accounts,
+        string connectionId,
+        IReadOnlyDictionary<string, IBankSyncProvider> providers)
+    {
+        var syncable = accounts.Where(a => a.SourceType != SyncConstants.SourceTypeManual);
+        foreach (var bySource in syncable.GroupBy(a => a.SourceType))
+        {
+            providers.TryGetValue(bySource.Key, out var provider);
+
+            // Fall back to a per-account key when the provider is unknown, mirroring how the grouping in
+            // AccountService and the sync isolate such accounts.
+            var byConnection = bySource.GroupBy(a =>
+                provider is not null ? provider.GetConnectionKey(a) : $"account:{a.Id}");
+
+            foreach (var connection in byConnection)
+            {
+                if (ConnectionKeyHasher.Hash(bySource.Key, connection.Key) == connectionId)
+                {
+                    return connection.ToList();
+                }
+            }
+        }
+
+        return Array.Empty<Account>();
+    }
+
     private static SyncResult SkippedResult(Account account) => new()
     {
         AccountId = account.Id,

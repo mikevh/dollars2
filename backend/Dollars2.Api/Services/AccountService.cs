@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Dollars2.Api.Models;
 using Dollars2.Api.Providers;
 using Dollars2.Api.Repositories;
@@ -69,7 +67,7 @@ public class AccountService
             {
                 groups.Add(new AccountGroupResponse
                 {
-                    ConnectionId = HashConnectionKey(bySource.Key, connection.Key),
+                    ConnectionId = ConnectionKeyHasher.Hash(bySource.Key, connection.Key),
                     SourceType = bySource.Key,
                     Accounts = connection.Select(a => ToInfo(a, logsByAccount, balancesByAccount)).ToList(),
                 });
@@ -105,14 +103,5 @@ public class AccountService
             LastStatus = log?.Status,
             Balance = balance?.Balance,
         };
-    }
-
-    // The raw connection key holds secrets (a Plaid access token, or a SimpleFIN access URL + username),
-    // so it must never leave the server. A one-way hash gives the frontend a stable identity for the
-    // group without exposing anything sensitive.
-    private static string HashConnectionKey(string sourceType, string connectionKey)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{sourceType}\n{connectionKey}"));
-        return Convert.ToHexString(bytes)[..16].ToLowerInvariant();
     }
 }
