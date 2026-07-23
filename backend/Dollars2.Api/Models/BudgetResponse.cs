@@ -5,6 +5,7 @@ public class BudgetResponse
     public int Id { get; set; }
     public int Year { get; set; }
     public int Month { get; set; }
+    public decimal AccountBalanceTotal { get; set; }
     public required List<BudgetGroupResponse> Groups { get; set; }
 }
 

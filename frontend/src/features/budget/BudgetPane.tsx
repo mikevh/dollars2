@@ -30,6 +30,21 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
 
   const leftToBudget = totalIncomePlanned - totalExpensesPlanned
 
+  const budgetTotal = budget.groups.reduce(
+    (sum, group) =>
+      sum +
+      group.lineItems.reduce(
+        (s, item) => s + item.plannedAmount + item.rolloverAmount - item.spentAmount,
+        0
+      ),
+    0
+  )
+  const budgetVsAccounts = budget.accountBalanceTotal - budgetTotal
+
+  const now = new Date()
+  const isCurrentMonth =
+    budget.year === now.getFullYear() && budget.month === now.getMonth() + 1
+
   const handleAddGroup = async () => {
     const name = newGroupName.trim()
     if (!name) {
@@ -46,17 +61,33 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
 
   return (
     <div>
-      <div className="mb-6 flex items-baseline justify-between border-b-2 border-divider pb-4">
-        <span className="font-heading text-[13px] font-extrabold uppercase tracking-[0.08em] text-muted">
-          Left to budget
-        </span>
-        <span
-          className={`font-heading text-[22px] font-extrabold tabular-nums ${
-            leftToBudget === 0 ? 'text-text' : 'text-accent-700'
-          }`}
-        >
-          {formatCurrency(leftToBudget)}
-        </span>
+      <div className="mb-6 border-b-2 border-divider pb-4">
+        <div className="flex items-baseline justify-between">
+          <span className="font-heading text-[13px] font-extrabold uppercase tracking-[0.08em] text-muted">
+            Left to budget
+          </span>
+          <span
+            className={`font-heading text-[22px] font-extrabold tabular-nums ${
+              leftToBudget === 0 ? 'text-text' : 'text-accent-700'
+            }`}
+          >
+            {formatCurrency(leftToBudget)}
+          </span>
+        </div>
+        {isCurrentMonth && (
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="font-heading text-[13px] font-extrabold uppercase tracking-[0.08em] text-muted">
+              Budget vs. accounts
+            </span>
+            <span
+              className={`font-heading text-[15px] font-extrabold tabular-nums ${
+                budgetVsAccounts === 0 ? 'text-text' : 'text-accent-700'
+              }`}
+            >
+              {formatCurrency(budgetVsAccounts)}
+            </span>
+          </div>
+        )}
       </div>
 
       {incomeGroup && <BudgetGroupCard group={incomeGroup} onSelectLineItem={onSelectLineItem} />}
