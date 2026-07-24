@@ -41,6 +41,19 @@ export const syncConnection = createAsyncThunk(
   }
 )
 
+export const resyncConnection = createAsyncThunk(
+  'accounts/resyncConnection',
+  async ({ connectionId, days }: { connectionId: string; days: number }, { dispatch, rejectWithValue }) => {
+    const result = await api.post<SyncResult[]>(`/api/sync/connection/${connectionId}/resync`, { days })
+    if (result.error) {
+      return rejectWithValue(result.error.message)
+    }
+    // Refresh last-sync/balance for the resynced accounts.
+    await dispatch(fetchAccounts())
+    return result.data!
+  }
+)
+
 const accountsSlice = createSlice({
   name: 'accounts',
   initialState,
@@ -66,6 +79,15 @@ const accountsSlice = createSlice({
         state.syncingConnectionId = null
       })
       .addCase(syncConnection.rejected, (state) => {
+        state.syncingConnectionId = null
+      })
+      .addCase(resyncConnection.pending, (state, action) => {
+        state.syncingConnectionId = action.meta.arg.connectionId
+      })
+      .addCase(resyncConnection.fulfilled, (state) => {
+        state.syncingConnectionId = null
+      })
+      .addCase(resyncConnection.rejected, (state) => {
         state.syncingConnectionId = null
       })
   },

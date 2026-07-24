@@ -72,8 +72,15 @@ public interface IBankSyncProvider
     /// The earliest point to fetch from, covering all accounts in the group. Providers that track
     /// their own position (e.g. Plaid's sync cursor) may ignore it.
     /// </param>
+    /// <param name="fullResync">
+    /// When true, this is a user-initiated full resync over an explicit lookback window: providers
+    /// that track their own position must ignore it and re-fetch from scratch (e.g. Plaid starts from
+    /// a null cursor). Providers that already fetch purely by <paramref name="since"/> (e.g. SimpleFIN)
+    /// are unaffected. ProviderTransactionId dedup absorbs the re-fetch.
+    /// </param>
     Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
         IReadOnlyList<Account> accounts,
         DateTime? since,
+        bool fullResync = false,
         CancellationToken cancellationToken = default);
 }

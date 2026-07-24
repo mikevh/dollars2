@@ -18,7 +18,7 @@ public class BankSyncServiceResolveTests
         public string GetConnectionKey(Account account) => account.ConnectionDetailsJson ?? "";
 
         public Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
-            IReadOnlyList<Account> accounts, DateTime? since, CancellationToken cancellationToken = default) =>
+            IReadOnlyList<Account> accounts, DateTime? since, bool fullResync = false, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 

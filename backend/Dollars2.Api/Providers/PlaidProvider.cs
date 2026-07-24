@@ -60,6 +60,7 @@ public class PlaidProvider : IBankSyncProvider
     public async Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
         IReadOnlyList<Account> accounts,
         DateTime? since,
+        bool fullResync = false,
         CancellationToken cancellationToken = default)
     {
         // Plaid API credentials come from configuration (the .env file). Without them no upstream call
@@ -111,9 +112,20 @@ public class PlaidProvider : IBankSyncProvider
         // scratch so no account's history is missed (ProviderTransactionId dedup absorbs the
         // re-fetch). After a successful run all synced accounts are written the same advanced cursor
         // and converge.
-        var cursor = ResolveGroupCursor(
-            parsed.Select(p => (p.Details?.AccountId, p.Details?.Cursor)).ToList());
-        if (cursor is null && accounts.Count > 1)
+        //
+        // A user-initiated full resync (`fullResync`) forces the cursor to null so /transactions/sync
+        // re-streams the whole Item from scratch. Plaid has no date-window parameter, so `since` cannot
+        // narrow it — resetting the cursor is the only way to honor the resync request; dedup absorbs
+        // the re-fetch and the advanced cursor is persisted as usual on success.
+        var cursor = SelectGroupCursor(
+            fullResync, parsed.Select(p => (p.Details?.AccountId, p.Details?.Cursor)).ToList());
+        if (fullResync)
+        {
+            _logger.LogInformation(
+                "Full resync requested for Plaid accounts {AccountIds}; ignoring stored cursor and re-streaming the Item.",
+                string.Join(", ", accounts.Select(a => a.Id)));
+        }
+        else if (cursor is null && accounts.Count > 1)
         {
             _logger.LogInformation(
                 "Plaid cursors for accounts {AccountIds} are not converged; performing a full resync to reconcile.",
@@ -227,6 +239,14 @@ public class PlaidProvider : IBankSyncProvider
     /// healthy siblings on every sync. A syncable account with an empty or divergent cursor (a new
     /// account, or one recovering from a failed persist) still forces the full resync it needs.
     /// </summary>
+    /// <summary>
+    /// Chooses the cursor to start /transactions/sync from. A user-initiated full resync forces a null
+    /// cursor so the whole Item re-streams from scratch (Plaid has no date-window parameter); otherwise
+    /// the stored cursor is reused only when the group has converged (<see cref="ResolveGroupCursor"/>).
+    /// </summary>
+    internal static string? SelectGroupCursor(bool fullResync, IReadOnlyList<(string? AccountId, string? Cursor)> group) =>
+        fullResync ? null : ResolveGroupCursor(group);
+
     internal static string? ResolveGroupCursor(IReadOnlyList<(string? AccountId, string? Cursor)> group)
     {
         var syncableCursors = group

@@ -45,8 +45,11 @@ public class SimplefinProvider : IBankSyncProvider
     public async Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
         IReadOnlyList<Account> accounts,
         DateTime? since,
+        bool fullResync = false,
         CancellationToken cancellationToken = default)
     {
+        // SimpleFIN fetches purely by the `since` window (?start-date), so a full resync needs no
+        // special handling here — the widened `since` the caller supplies already does the work.
         var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var parsed = accounts
             .Select(a => (Account: a, Details: JsonSerializer.Deserialize<SimplefinConnectionDetails>(

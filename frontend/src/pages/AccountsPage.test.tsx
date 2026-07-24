@@ -12,7 +12,7 @@ const postMock = vi.fn()
 vi.mock('../api/client', () => ({
   api: {
     get: (endpoint: string) => getMock(endpoint),
-    post: (endpoint: string) => postMock(endpoint),
+    post: (endpoint: string, body?: unknown) => postMock(endpoint, body),
   },
 }))
 vi.mock('react-hot-toast', () => ({
@@ -150,9 +150,79 @@ describe('AccountsPage', () => {
     getMock.mockClear()
     fireEvent.click(syncButton)
 
-    await waitFor(() => expect(postMock).toHaveBeenCalledWith('/api/sync/connection/abc123'))
+    await waitFor(() => expect(postMock).toHaveBeenCalledWith('/api/sync/connection/abc123', undefined))
     // Accounts are refetched after a successful sync.
     await waitFor(() => expect(getMock).toHaveBeenCalledWith('/api/accounts'))
+  })
+
+  const singleSimplefinGroup = {
+    data: [
+      {
+        connectionId: 'abc123',
+        sourceType: 'SimpleFIN',
+        accounts: [{ id: 1, name: 'Keybank Checking', lastSyncedAt: null, lastStatus: null, balance: null }],
+      },
+    ] satisfies AccountGroup[],
+    error: null,
+  }
+
+  it('opens the re-sync dialog with a default of 180 days', async () => {
+    getMock.mockResolvedValue(singleSimplefinGroup)
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Re-sync' }))
+
+    const input = screen.getByRole('spinbutton') as HTMLInputElement
+    expect(input.value).toBe('180')
+  })
+
+  it('disables the confirm button for out-of-range or blank day counts', async () => {
+    getMock.mockResolvedValue(singleSimplefinGroup)
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Re-sync' }))
+    const input = screen.getByRole('spinbutton')
+    // The dialog's confirm button shares the 'Re-sync' name; it's the one inside the dialog.
+    const confirm = screen.getAllByRole('button', { name: 'Re-sync' }).at(-1)!
+
+    expect(confirm).toBeEnabled() // default 180 is valid
+
+    fireEvent.change(input, { target: { value: '0' } })
+    expect(confirm).toBeDisabled()
+
+    fireEvent.change(input, { target: { value: '731' } })
+    expect(confirm).toBeDisabled()
+
+    fireEvent.change(input, { target: { value: '' } })
+    expect(confirm).toBeDisabled()
+
+    fireEvent.change(input, { target: { value: '365' } })
+    expect(confirm).toBeEnabled()
+  })
+
+  it('resyncs the connection with the chosen day count and toasts the new count', async () => {
+    const toast = (await import('react-hot-toast')).default
+    getMock.mockResolvedValue(singleSimplefinGroup)
+    postMock.mockResolvedValue({
+      data: [{ accountId: 1, accountName: 'Keybank Checking', status: 'Success', transactionCount: 3, errorMessage: null }],
+      error: null,
+    })
+
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Re-sync' }))
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '90' } })
+    getMock.mockClear()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Re-sync' }).at(-1)!)
+
+    await waitFor(() =>
+      expect(postMock).toHaveBeenCalledWith('/api/sync/connection/abc123/resync', { days: 90 }),
+    )
+    // Accounts are refetched after a successful resync.
+    await waitFor(() => expect(getMock).toHaveBeenCalledWith('/api/accounts'))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Synced 3 new transactions'))
+    // Dialog closes on success.
+    await waitFor(() => expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument())
   })
 
   it('shows an error toast when a group sync fails', async () => {
