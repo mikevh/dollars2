@@ -55,22 +55,16 @@ public class TransactionAssignmentRepository
             _db.CurrentTransaction);
     }
 
-    public async Task<decimal> GetSpentByLineItemIdAsync(int lineItemId)
+    // Net sum of every assignment for the line item, all signs included. Debits are negative and
+    // credits positive, so a spend-heavy item nets negative and a credit-heavy one nets positive.
+    // No sign filter: a positive assignment on an expense item (a refund, or money someone sent you
+    // earmarked for that item) is real spend activity and must count.
+    public async Task<decimal> GetNetAssignedByLineItemIdAsync(int lineItemId)
     {
         return await _db.Connection.QuerySingleAsync<decimal>(
             @"SELECT COALESCE(SUM(ta.Amount), 0) FROM TransactionAssignments ta
               INNER JOIN Transactions t ON t.Id = ta.TransactionId
-              WHERE ta.LineItemId = @lineItemId AND t.IsDeleted = 0 AND ta.Amount < 0",
-            new { lineItemId },
-            _db.CurrentTransaction);
-    }
-
-    public async Task<decimal> GetReceivedByLineItemIdAsync(int lineItemId)
-    {
-        return await _db.Connection.QuerySingleAsync<decimal>(
-            @"SELECT COALESCE(SUM(ta.Amount), 0) FROM TransactionAssignments ta
-              INNER JOIN Transactions t ON t.Id = ta.TransactionId
-              WHERE ta.LineItemId = @lineItemId AND t.IsDeleted = 0 AND ta.Amount > 0",
+              WHERE ta.LineItemId = @lineItemId AND t.IsDeleted = 0",
             new { lineItemId },
             _db.CurrentTransaction);
     }

@@ -30,11 +30,19 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
 
   const leftToBudget = totalIncomePlanned - totalExpensesPlanned
 
+  // Income line items contribute planned only; expenses contribute planned + rollover - spent.
+  // The income branch is load-bearing: spentAmount is the negated net of a line item's assignments,
+  // so on an income item it equals -receivedAmount, and a sign-blind loop would add already-received
+  // income on top of planned. See issue #73 for whether this total should net out received income.
   const budgetTotal = budget.groups.reduce(
     (sum, group) =>
       sum +
       group.lineItems.reduce(
-        (s, item) => s + item.plannedAmount + item.rolloverAmount - item.spentAmount,
+        (s, item) =>
+          s +
+          (group.isIncome
+            ? item.plannedAmount
+            : item.plannedAmount + item.rolloverAmount - item.spentAmount),
         0
       ),
     0
