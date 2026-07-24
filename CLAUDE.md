@@ -39,6 +39,9 @@ Detailed product specs live in `docs/`. Read these before building new features:
 - Any API calls with multiple DB mutating calls must be wrapped in a DbSession transaction
 - JWT secret and SQL connection string stored in dotnet user-secrets, NOT appsettings.json (placeholders: `<dotnet user secret>`)
 - Backend envelope response pattern: `DollarsApiResponse<T>` with `{ data, error }` — both fields always present
+- Instants are `DateTime`, stored/returned as UTC and always serialized with a `Z` marker (global
+  `UtcDateTimeConverter`); calendar dates are `DateOnly` and serialize bare (`2026-07-22`). Never model a
+  calendar date as a `DateTime` — that's what keeps the global converter from shifting dates a day back
 - Business rule violations return error results, not exceptions
 - Frontend: fetch API into Redux thunks (no Axios, no React Query), toast for errors
 - Inline editing pattern: click to edit, Enter/blur saves, Escape cancels

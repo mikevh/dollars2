@@ -4,7 +4,7 @@ namespace Dollars2.Api.Providers;
 
 public record SyncedTransaction(
     string ProviderTransactionId,
-    DateTime Date,
+    DateOnly Date,
     string Description,
     string Payee,
     string Memo,

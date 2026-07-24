@@ -5,7 +5,7 @@ namespace Dollars2.Api.Models;
 public class UpdateTransactionRequest
 {
     [Required]
-    public DateTime Date { get; set; }
+    public DateOnly Date { get; set; }
 
     [Required]
     [MinLength(1)]

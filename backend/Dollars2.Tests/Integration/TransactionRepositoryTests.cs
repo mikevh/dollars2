@@ -28,7 +28,7 @@ public sealed class TransactionRepositoryTests
             var userId = await SeedUserAsync(db, "roundtrip@example.com");
             var repository = new TransactionRepository(db);
 
-            var date = new DateTime(2026, 7, 15);
+            var date = new DateOnly(2026, 7, 15);
             var id = await repository.CreateAsync(
                 userId,
                 date,
@@ -71,7 +71,7 @@ public sealed class TransactionRepositoryTests
             var repository = new TransactionRepository(db);
 
             var id = await repository.CreateAsync(
-                userId, new DateTime(2026, 7, 15), "Groceries", "", "", -60m, null, isManual: true);
+                userId, new DateOnly(2026, 7, 15), "Groceries", "", "", -60m, null, isManual: true);
 
             await repository.SoftDeleteAsync(id);
 

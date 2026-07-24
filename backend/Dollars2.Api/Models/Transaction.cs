@@ -6,7 +6,7 @@ public class Transaction
     public int? AccountId { get; set; }
     public int UserId { get; set; }
     public string? ProviderTransactionId { get; set; }
-    public DateTime Date { get; set; }
+    public DateOnly Date { get; set; }
     public string Description { get; set; } = "";
     public string Payee { get; set; } = "";
     public string Memo { get; set; } = "";

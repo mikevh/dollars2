@@ -132,8 +132,8 @@ public class SimplefinProvider : IBankSyncProvider
                 }
 
                 var date = t.Posted == 0
-                    ? DateTime.UtcNow.Date
-                    : DateTimeOffset.FromUnixTimeSeconds(t.Posted).UtcDateTime.Date;
+                    ? DateOnly.FromDateTime(DateTime.UtcNow)
+                    : DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(t.Posted).UtcDateTime);
 
                 transactions.Add(new SyncedTransaction(t.Id, date, t.Description, t.Payee, t.Memo, amount, t.Pending));
             }

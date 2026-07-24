@@ -1,5 +1,6 @@
 using System.Text;
 using Dollars2.Api.Data;
+using Dollars2.Api.Json;
 using Dollars2.Api.Logging;
 using Dollars2.Api.Providers;
 using Dollars2.Api.Repositories;
@@ -19,7 +20,8 @@ var minimumLevel = builder.Configuration.GetValue("Serilog:MinimumLevel", LogEve
 builder.Host.UseSerilog((context, loggerConfig) =>
     loggerConfig.ConfigureDollars2Logging(logFilePath, elasticsearchUri, minimumLevel));
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options => Dollars2JsonOptions.Configure(options.JsonSerializerOptions));
 builder.Services.AddOpenApi();
 var cs = builder.Configuration.GetConnectionString("DefaultConnection");
 
