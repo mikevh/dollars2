@@ -66,6 +66,14 @@ cd frontend && npx tsc --noEmit
 cd backend/Dollars2.Api && dotnet build
 ```
 
+### UI verification
+
+The `/verify` skill delegates browser verification to the `ui-verify` subagent
+(`.claude/agents/ui-verify.md`, pinned to `model: sonnet`) so screenshot image
+tokens stay off the main session. The subagent starts the dev server, screenshots
+light/dark via `npm run ui:shot`, reads the PNGs itself, and returns a text
+PASS/FAIL verdict.
+
 ## Sprint Approach
 
 - Break work into the smallest possible increments, one concern per sprint
