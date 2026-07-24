@@ -66,13 +66,18 @@ cd frontend && npx tsc --noEmit
 cd backend/Dollars2.Api && dotnet build
 ```
 
-### UI verification
+### Subagents (keep heavy output off the main session)
 
-The `/verify` skill delegates browser verification to the `ui-verify` subagent
-(`.claude/agents/ui-verify.md`, pinned to `model: sonnet`) so screenshot image
-tokens stay off the main session. The subagent starts the dev server, screenshots
-light/dark via `npm run ui:shot`, reads the PNGs itself, and returns a text
-PASS/FAIL verdict.
+Both are pinned to `model: sonnet` and report back as condensed text.
+
+- **`ui-verify`** (`.claude/agents/ui-verify.md`) — browser verification. Starts the
+  dev server, screenshots light/dark via `npm run ui:shot`, drives interaction
+  flows, reads the PNGs itself, returns a render/console-error verdict. Spawn it
+  instead of screenshotting from the main session.
+- **`test-runner`** (`.claude/agents/test-runner.md`) — runs `dotnet build`,
+  `dotnet test`, `npm test`, and `npx tsc --noEmit` in the current worktree and
+  returns pass/fail per check with trimmed failure detail (test name, assertion,
+  `file:line`), keeping MSBuild/vitest/Testcontainers output out of context.
 
 ## Sprint Approach
 
