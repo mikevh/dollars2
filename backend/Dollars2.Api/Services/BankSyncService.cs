@@ -198,7 +198,7 @@ public class BankSyncService
             {
                 var lastSync = await _syncLogRepo.GetLastSuccessfulAsync(account.Id);
                 _logger.LogInformation("Last successful sync for account {AccountId} ({AccountName}) was at {LastSyncTime}", account.Id, account.Name, lastSync?.SyncedAt);
-                var accountSince = (lastSync?.SyncedAt ?? DateTime.UtcNow.AddDays(-30)).AddHours(-12);
+                var accountSince = (lastSync?.SyncedAt ?? DateTime.UtcNow.AddDays(-180));
                 if (since is null || accountSince < since)
                 {
                     since = accountSince;
