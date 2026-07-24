@@ -1,7 +1,7 @@
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faSun, faMoon, faDesktop, faSync, faSignOutAlt, faBuildingColumns, faList } from '@fortawesome/free-solid-svg-icons'
+import { faSun, faMoon, faDesktop, faSync, faSignOutAlt, faBuildingColumns, faList, faChartLine } from '@fortawesome/free-solid-svg-icons'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { setTheme, type ThemeMode } from '../features/theme/themeSlice'
 import { logout } from '../features/auth/authSlice'
@@ -24,6 +24,8 @@ export default function Footer() {
   const buildId = import.meta.env.VITE_BUILD_ID || 'dev'
   const buildDate = import.meta.env.VITE_BUILD_DATE
   const buildLabel = buildDate ? `${buildId} · ${buildDate}` : buildId
+
+  const kibanaUrl = import.meta.env.VITE_KIBANA_URL
 
   const cycleTheme = () => {
     const currentIndex = themeOrder.indexOf(mode)
@@ -50,6 +52,18 @@ export default function Footer() {
         <span className="opacity-50" title="Running build">
           {buildLabel}
         </span>
+        {kibanaUrl ? (
+          <a
+            href={kibanaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost text-[12px]"
+            title="Logs"
+          >
+            <FontAwesomeIcon icon={faChartLine} className="h-[15px] w-[15px]" />
+            <span>Logs</span>
+          </a>
+        ) : null}
       </div>
 
       <div className="flex items-center gap-1.5 opacity-50">

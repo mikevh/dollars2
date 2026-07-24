@@ -42,6 +42,27 @@ describe('Footer build id', () => {
   })
 })
 
+describe('Footer Kibana link', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('renders a Logs link to the configured Kibana URL, opening in a new tab', () => {
+    vi.stubEnv('VITE_KIBANA_URL', 'http://claw.tail303da.ts.net:5601/app/home')
+    renderFooter()
+    const link = screen.getByRole('link', { name: 'Logs' })
+    expect(link).toHaveAttribute('href', 'http://claw.tail303da.ts.net:5601/app/home')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+  })
+
+  it('renders no Logs link when the Kibana URL is not configured', () => {
+    vi.stubEnv('VITE_KIBANA_URL', '')
+    renderFooter()
+    expect(screen.queryByRole('link', { name: 'Logs' })).not.toBeInTheDocument()
+  })
+})
+
 describe('Footer navigation', () => {
   it('links to the Accounts page from the budget page', () => {
     renderFooter('/')
