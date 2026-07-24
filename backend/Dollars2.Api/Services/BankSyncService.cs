@@ -111,6 +111,35 @@ public class BankSyncService
     }
 
     /// <summary>
+    /// User-initiated full resync of a single connection group: re-fetches over an explicit lookback
+    /// window of <paramref name="days"/> (default surfaced by the UI is 180) instead of the automatic
+    /// "since last successful sync" window. Duplicate imports are still prevented by ProviderTransactionId
+    /// dedup, so only genuinely-new transactions are created and counted. Providers that fetch by date
+    /// window (SimpleFIN) honor <paramref name="days"/>; cursor-based providers (Plaid) ignore the window
+    /// but reset their cursor to re-stream from scratch. Returns null when no syncable connection matches
+    /// (unknown id, or the "manual" group). Callers must hold the per-user <see cref="SyncLockService"/>.
+    /// </summary>
+    public async Task<IReadOnlyList<SyncResult>?> ResyncConnectionForUserAsync(int userId, string connectionId, int days, CancellationToken cancellationToken = default)
+    {
+        var accounts = (await _accountRepo.GetByUserIdAsync(userId)).ToList();
+        var connectionAccounts = ResolveConnectionAccounts(accounts, connectionId, _providers);
+        if (connectionAccounts.Count == 0)
+        {
+            return null;
+        }
+
+        var provider = GetProvider(connectionAccounts[0].SourceType);
+        if (provider is null)
+        {
+            // Provider disabled or unregistered — mirror the full sync's skipped handling.
+            return connectionAccounts.Select(SkippedResult).ToList();
+        }
+
+        var since = DateTime.UtcNow.AddDays(-days);
+        return await SyncConnectionAsync(userId, provider, connectionAccounts, cancellationToken, overrideSince: since, fullResync: true);
+    }
+
+    /// <summary>
     /// Resolves the opaque connectionId back to the syncable accounts in that connection group. Mirrors
     /// <see cref="AccountService.BuildGroups"/> grouping so ids round-trip. Pure (no I/O) so it can be
     /// unit-tested. Returns an empty list when no syncable group matches (unknown id, or "manual").
@@ -185,28 +214,34 @@ public class BankSyncService
     }
 
     private async Task<IReadOnlyList<SyncResult>> SyncConnectionAsync(
-        int userId, IBankSyncProvider provider, IReadOnlyList<Account> accounts, CancellationToken cancellationToken)
+        int userId, IBankSyncProvider provider, IReadOnlyList<Account> accounts, CancellationToken cancellationToken,
+        DateTime? overrideSince = null, bool fullResync = false)
     {
         IReadOnlyDictionary<int, ProviderSyncResult> fetched;
         try
         {
-            // The provider's single upstream call covers the whole group, so fetch from the earliest
-            // point any account in it needs. Overlap by 12 hours to avoid missing transactions posted
-            // near the boundary; deduplication via ProviderTransactionId prevents double-imports.
-            DateTime? since = null;
-            foreach (var account in accounts)
+            // A user-initiated full resync supplies its own lookback window; use it verbatim and skip the
+            // per-account "since last sync" computation so the whole window is re-fetched.
+            DateTime? since = overrideSince;
+            if (since is null)
             {
-                var lastSync = await _syncLogRepo.GetLastSuccessfulAsync(account.Id);
-                _logger.LogInformation("Last successful sync for account {AccountId} ({AccountName}) was at {LastSyncTime}", account.Id, account.Name, lastSync?.SyncedAt);
-                var accountSince = (lastSync?.SyncedAt ?? DateTime.UtcNow.AddDays(-180));
-                if (since is null || accountSince < since)
+                // The provider's single upstream call covers the whole group, so fetch from the earliest
+                // point any account in it needs. Overlap by 12 hours to avoid missing transactions posted
+                // near the boundary; deduplication via ProviderTransactionId prevents double-imports.
+                foreach (var account in accounts)
                 {
-                    since = accountSince;
+                    var lastSync = await _syncLogRepo.GetLastSuccessfulAsync(account.Id);
+                    _logger.LogInformation("Last successful sync for account {AccountId} ({AccountName}) was at {LastSyncTime}", account.Id, account.Name, lastSync?.SyncedAt);
+                    var accountSince = (lastSync?.SyncedAt ?? DateTime.UtcNow.AddDays(-180));
+                    if (since is null || accountSince < since)
+                    {
+                        since = accountSince;
+                    }
                 }
             }
 
-            _logger.LogInformation("Syncing {AccountCount} account(s) for user {UserId} via {SourceType}", accounts.Count, userId, provider.SourceType);
-            fetched = await provider.FetchTransactionsForConnectionAsync(accounts, since, cancellationToken);
+            _logger.LogInformation("Syncing {AccountCount} account(s) for user {UserId} via {SourceType} (fullResync: {FullResync})", accounts.Count, userId, provider.SourceType, fullResync);
+            fetched = await provider.FetchTransactionsForConnectionAsync(accounts, since, fullResync, cancellationToken);
         }
         catch (Exception ex)
         {

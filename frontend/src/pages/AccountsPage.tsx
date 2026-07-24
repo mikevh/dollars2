@@ -1,10 +1,25 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
-import { fetchAccounts, syncConnection } from '../features/accounts/accountsSlice'
+import { fetchAccounts, syncConnection, resyncConnection } from '../features/accounts/accountsSlice'
 import { formatCurrency, formatRelativeTime } from '../utils/format'
-import type { AccountGroup, AccountInfo } from '../types/account'
+import type { AccountGroup, AccountInfo, SyncResult } from '../types/account'
+
+const DEFAULT_RESYNC_DAYS = 180
+const MIN_RESYNC_DAYS = 1
+const MAX_RESYNC_DAYS = 730
+
+/** Shared success/failure toast for both the manual sync and the full resync. */
+function toastSyncResults(results: SyncResult[]) {
+  const failures = results.filter((r) => r.status === 'Failure')
+  if (failures.length > 0) {
+    toast.error(`Sync failed for ${failures.map((f) => f.accountName).join(', ')}`)
+    return
+  }
+  const total = results.reduce((sum, r) => sum + r.transactionCount, 0)
+  toast.success(total > 0 ? `Synced ${total} new transaction${total === 1 ? '' : 's'}` : 'Synced — no new transactions')
+}
 
 function sourceTypeLabel(sourceType: string): string {
   if (sourceType === 'Manual') {
@@ -44,14 +59,7 @@ function SyncButton({ group }: { group: AccountGroup }) {
       toast.error(result.payload as string)
       return
     }
-    const results = result.payload
-    const failures = results.filter((r) => r.status === 'Failure')
-    if (failures.length > 0) {
-      toast.error(`Sync failed for ${failures.map((f) => f.accountName).join(', ')}`)
-      return
-    }
-    const total = results.reduce((sum, r) => sum + r.transactionCount, 0)
-    toast.success(total > 0 ? `Synced ${total} new transaction${total === 1 ? '' : 's'}` : 'Synced — no new transactions')
+    toastSyncResults(result.payload)
   }
 
   return (
@@ -63,6 +71,103 @@ function SyncButton({ group }: { group: AccountGroup }) {
     >
       {syncing ? 'Syncing…' : 'Sync'}
     </button>
+  )
+}
+
+function ResyncButton({ group }: { group: AccountGroup }) {
+  const [open, setOpen] = useState(false)
+  const syncingConnectionId = useAppSelector((state) => state.accounts.syncingConnectionId)
+  // Any sync in progress serializes per user, so disable resync while one runs.
+  const anySyncing = syncingConnectionId !== null
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        disabled={anySyncing}
+        className="text-[12px] font-semibold uppercase tracking-wide text-accent disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Re-sync
+      </button>
+      {open && <ResyncDialog group={group} onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+
+function ResyncDialog({ group, onClose }: { group: AccountGroup; onClose: () => void }) {
+  const dispatch = useAppDispatch()
+  const [days, setDays] = useState(String(DEFAULT_RESYNC_DAYS))
+  const syncingConnectionId = useAppSelector((state) => state.accounts.syncingConnectionId)
+  const resyncing = syncingConnectionId === group.connectionId
+
+  const parsed = Number(days)
+  const valid = days.trim() !== '' && Number.isInteger(parsed) && parsed >= MIN_RESYNC_DAYS && parsed <= MAX_RESYNC_DAYS
+
+  const handleResync = async () => {
+    if (!valid) {
+      return
+    }
+    const result = await dispatch(resyncConnection({ connectionId: group.connectionId, days: parsed }))
+    if (resyncConnection.rejected.match(result)) {
+      toast.error(result.payload as string)
+      return
+    }
+    toastSyncResults(result.payload)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="fixed inset-0 bg-black/50" />
+      <div
+        className="relative w-full max-w-sm border border-divider bg-surface p-6 shadow-elev-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-heading text-lg font-extrabold uppercase tracking-wide text-text">
+            Re-sync {sourceTypeLabel(group.sourceType)}
+          </h2>
+          <button onClick={onClose} className="text-muted hover:text-accent-700">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
+          </button>
+        </div>
+
+        <label className="flex flex-col gap-1.5 text-sm text-text">
+          Number of days to sync back
+          <input
+            type="number"
+            min={MIN_RESYNC_DAYS}
+            max={MAX_RESYNC_DAYS}
+            value={days}
+            autoFocus
+            onChange={(e) => setDays(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && valid) {
+                handleResync()
+              }
+            }}
+            className="w-full border border-divider bg-bg px-2 py-1 text-text focus:border-accent focus:outline-none"
+          />
+        </label>
+        <p className="mt-1 text-[12px] text-muted">Between {MIN_RESYNC_DAYS} and {MAX_RESYNC_DAYS} days.</p>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="btn btn-secondary">
+            Cancel
+          </button>
+          <button
+            onClick={handleResync}
+            disabled={!valid || resyncing}
+            className="btn btn-primary"
+          >
+            {resyncing ? 'Re-syncing…' : 'Re-sync'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -98,7 +203,12 @@ export default function AccountsPage() {
                   <span className="text-muted text-[12px] font-semibold uppercase tracking-wide">
                     {sourceTypeLabel(group.sourceType)}
                   </span>
-                  {group.sourceType !== 'Manual' && <SyncButton group={group} />}
+                  {group.sourceType !== 'Manual' && (
+                    <div className="flex items-center gap-3">
+                      <SyncButton group={group} />
+                      <ResyncButton group={group} />
+                    </div>
+                  )}
                 </div>
                 <ul>
                   {group.accounts.map((account) => (

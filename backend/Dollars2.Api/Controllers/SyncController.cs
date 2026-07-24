@@ -65,6 +65,29 @@ public class SyncController : DollarsControllerBase
         }
     }
 
+    [HttpPost("connection/{connectionId}/resync")]
+    public async Task<IActionResult> ResyncConnection(string connectionId, [FromBody] ResyncRequest request)
+    {
+        var userId = GetUserId();
+        if (!_syncLock.TryAcquire(userId))
+        {
+            return Conflict(DollarsApiResponse<IEnumerable<SyncResult>>.Fail("A sync is already in progress.", "SYNC_IN_PROGRESS"));
+        }
+        try
+        {
+            var results = await _syncService.ResyncConnectionForUserAsync(userId, connectionId, request.Days, HttpContext.RequestAborted);
+            if (results is null)
+            {
+                return NotFound(DollarsApiResponse<IEnumerable<SyncResult>>.Fail("Connection not found.", "CONNECTION_NOT_FOUND"));
+            }
+            return Ok(DollarsApiResponse<IEnumerable<SyncResult>>.Success(results));
+        }
+        finally
+        {
+            _syncLock.Release(userId);
+        }
+    }
+
     [HttpGet("status")]
     public async Task<IActionResult> Status()
     {

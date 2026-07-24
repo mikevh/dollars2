@@ -103,6 +103,32 @@ public class PlaidProviderTests
         Assert.Null(PlaidProvider.ResolveGroupCursor(group));
     }
 
+    // Full resync (issue #84): a user-initiated resync forces a null cursor so /transactions/sync
+    // re-streams the whole Item, ignoring whatever cursor is stored.
+    [Fact]
+    public void SelectGroupCursor_forces_null_cursor_on_full_resync_even_when_converged()
+    {
+        var group = new List<(string?, string?)>
+        {
+            ("acct-1", "cursor-x"),
+            ("acct-2", "cursor-x"),
+        };
+
+        Assert.Null(PlaidProvider.SelectGroupCursor(fullResync: true, group));
+    }
+
+    [Fact]
+    public void SelectGroupCursor_reuses_converged_cursor_on_a_normal_sync()
+    {
+        var group = new List<(string?, string?)>
+        {
+            ("acct-1", "cursor-x"),
+            ("acct-2", "cursor-x"),
+        };
+
+        Assert.Equal("cursor-x", PlaidProvider.SelectGroupCursor(fullResync: false, group));
+    }
+
     // Regression test for the "removed transactions dropped" bug: at the pinned API version, removed
     // items carry no account_id, so filtering them by account_id skipped every soft-delete for an
     // account that had a specific account_id. Removed ids must be collected regardless of account_id
