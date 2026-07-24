@@ -49,6 +49,12 @@ Detailed product specs live in `docs/`. Read these before building new features:
 - Fixed height rows (`h-10`) with `border border-transparent px-2 py-0.5` on spans to match input dimensions
 - Migration scripts use `ScriptName` column (not `Name`) in the Migrations table
 - Migrations 006+ have `IF NOT EXISTS` idempotency guards
+- Migration scripts contain no `GO` batches — each file is executed as a single batch
+- Name every constraint explicitly — `PK_<Table>`, `FK_<Table>_<RefTable>` (`FK_<Table>_<Column>` when
+  a table has 2+ FKs to the same table), `UQ_<Table>_<Cols>`, `DF_<Table>_<Col>`, `CK_<Table>_<Rule>`,
+  `IX_`/`UX_<Table>_<Cols>`. Never the inline `PRIMARY KEY`/`REFERENCES`/`UNIQUE`/bare `DEFAULT`
+  shorthand: it silently produces a per-database generated name no later migration can reference.
+  `ConstraintNamingTests` fails the build if a system-named constraint reaches the schema
 
 ## Development
 
