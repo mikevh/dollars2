@@ -30,22 +30,15 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg p-4 text-text">
-      <div className="flex w-[360px] flex-col gap-4 border border-divider bg-surface px-6 py-8 shadow-elev-md">
+      <div className="flex w-90 flex-col gap-4 border border-divider bg-surface px-6 py-8 shadow-elev-md">
         <div>
           <h1 className="mb-1 text-[28px] leading-tight">Dollars2</h1>
-          <p className="text-muted text-[13px]">
-            Zero-based budgeting, self-hosted.
-          </p>
+          <p className="text-muted text-[13px]">Zero-based budgeting, self-hosted.</p>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="field">
             <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              autoFocus
-              placeholder="you@example.com"
-              className="input"
+            <input id="email" type="email" autoFocus placeholder="you@example.com" className="input"
               {...register('email', {
                 required: 'Email is required',
                 pattern: {
@@ -55,18 +48,10 @@ export default function LoginPage() {
               })}
             />
             {errors.email && (
-              <p className="mt-1 text-[12px] text-accent-700">
-                {errors.email.message}
-              </p>
+              <p className="mt-1 text-[12px] text-accent-700">{errors.email.message}</p>
             )}
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary btn-block"
-          >
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
+          <button type="submit" disabled={loading} className="btn btn-primary btn-block" >{loading ? 'Signing in…' : 'Sign in'}</button>
         </form>
       </div>
     </div>

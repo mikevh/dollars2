@@ -16,48 +16,12 @@ function App() {
     <BrowserRouter>
       <Toaster position="top-right" />
       <Routes>
-        <Route
-          path="/"
-          element={
-            isAuthenticated ? (
-              <BudgetPage />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/accounts"
-          element={
-            isAuthenticated ? (
-              <AccountsPage />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/accounts/:accountId"
-          element={
-            isAuthenticated ? (
-              <AccountTransactionsPage />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            isAuthenticated ? (
-              <Navigate to="/" replace />
-            ) : (
-              <LoginPage />
-            )
-          }
-        />
+        <Route path="/" element={ isAuthenticated ? <BudgetPage /> : <Navigate to="/login" replace /> }/>
+        <Route path="/accounts" element={ isAuthenticated ? <AccountsPage /> : <Navigate to="/login" replace /> } />
+        <Route path="/accounts/:accountId" element={ isAuthenticated ? <AccountTransactionsPage /> : <Navigate to="/login" replace /> } />
+        <Route path="/login" element={ isAuthenticated ? <Navigate to="/" replace /> : <LoginPage /> } />
       </Routes>
-      {isAuthenticated && <Footer />}
+      { isAuthenticated && <Footer /> }
     </BrowserRouter>
   )
 }
