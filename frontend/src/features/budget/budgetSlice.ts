@@ -140,11 +140,10 @@ const budgetSlice = createSlice({
       for (const group of state.budget.groups) {
         const lineItem = group.lineItems.find((li) => li.id === action.payload.lineItemId)
         if (lineItem) {
-          if (action.payload.amount < 0) {
-            lineItem.spentAmount += Math.abs(action.payload.amount)
-          } else {
-            lineItem.receivedAmount += action.payload.amount
-          }
+          // Both columns move on every assignment, whatever the sign — spent is the negated net,
+          // received is the net. Splitting by sign is what dropped credits on expense items.
+          lineItem.spentAmount -= action.payload.amount
+          lineItem.receivedAmount += action.payload.amount
           break
         }
       }

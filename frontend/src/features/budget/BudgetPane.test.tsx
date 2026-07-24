@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { store } from '../../app/store'
 import type { BudgetResponse } from '../../types/budget'
 import BudgetPane from './BudgetPane'
+import budgetReducer, { applyTransactionAssignment } from './budgetSlice'
 
 function makeBudget(): BudgetResponse {
   return {
@@ -23,7 +24,9 @@ function makeBudget(): BudgetResponse {
             id: 100,
             name: 'Paycheck',
             plannedAmount: 4000,
-            spentAmount: 0,
+            // spentAmount is the negated net of a line item's assignments, so on an income item it
+            // mirrors receivedAmount. "Budget vs. accounts" must not pick this up (issue #71).
+            spentAmount: -4000,
             receivedAmount: 4000,
             rolloverAmount: 0,
             sortOrder: 0,
@@ -150,5 +153,49 @@ describe('BudgetPane (Modernist restyle)', () => {
     budget.month = 8 // current month is 2026-07 → August is future
     renderPane(budget)
     expect(screen.queryByText('Budget vs. accounts')).not.toBeInTheDocument()
+  })
+
+  // Issue #71: a positive (income) transaction assigned to an expense line item is real spend
+  // activity — it arrives as a negative spentAmount and must raise Remaining by its full amount.
+  it('renders a credit-heavy expense item with negative Spent and raised Remaining', () => {
+    const budget = makeBudget()
+    const gifts = budget.groups[1].lineItems[0]
+    gifts.name = 'Gifts'
+    gifts.plannedAmount = 300
+    gifts.spentAmount = -690.89 // one +$690.89 assignment
+    renderPane(budget)
+    // 300 + 0 - (-690.89) = 990.89
+    expect(screen.getByText('$990.89')).toBeInTheDocument()
+    expect(screen.getByText('-$690.89')).toBeInTheDocument()
+  })
+
+  it('raises an expense item Remaining optimistically when a positive amount is assigned', () => {
+    const budget = makeBudget()
+    budget.groups[1].lineItems[0].plannedAmount = 300
+    budget.groups[1].lineItems[0].spentAmount = 0
+
+    const next = budgetReducer(
+      { budget, loading: false, error: null, currentYear: 2026, currentMonth: 7 },
+      applyTransactionAssignment({ lineItemId: 200, amount: 690.89 }),
+    )
+
+    const item = next.budget!.groups[1].lineItems[0]
+    expect(item.spentAmount).toBe(-690.89)
+    expect(item.receivedAmount).toBe(690.89)
+
+    renderPane(next.budget!)
+    expect(screen.getByText('$990.89')).toBeInTheDocument()
+  })
+
+  it('raises an expense item Spent optimistically when a negative amount is assigned', () => {
+    const budget = makeBudget()
+    budget.groups[1].lineItems[0].spentAmount = 0
+
+    const next = budgetReducer(
+      { budget, loading: false, error: null, currentYear: 2026, currentMonth: 7 },
+      applyTransactionAssignment({ lineItemId: 200, amount: -25 }),
+    )
+
+    expect(next.budget!.groups[1].lineItems[0].spentAmount).toBe(25)
   })
 })

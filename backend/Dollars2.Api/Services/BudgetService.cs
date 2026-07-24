@@ -420,8 +420,9 @@ public class BudgetService
 
     private async Task<LineItemResponse> MapLineItemAsync(LineItem item, bool isIncome)
     {
-        var spent = await _assignmentRepo.GetSpentByLineItemIdAsync(item.Id);
-        var received = await _assignmentRepo.GetReceivedByLineItemIdAsync(item.Id);
+        // One net figure drives both columns: spending is the negation (debits read positive), and
+        // received is the net itself. No Math.Abs — that is what erased credits on expense items.
+        var net = await _assignmentRepo.GetNetAssignedByLineItemIdAsync(item.Id);
 
         decimal rollover = 0;
         if (!isIncome)
@@ -434,8 +435,8 @@ public class BudgetService
             Id = item.Id,
             Name = item.Name,
             PlannedAmount = item.PlannedAmount,
-            SpentAmount = Math.Abs(spent),
-            ReceivedAmount = received,
+            SpentAmount = -net,
+            ReceivedAmount = net,
             RolloverAmount = rollover,
             SortOrder = item.SortOrder,
             Notes = item.Notes
