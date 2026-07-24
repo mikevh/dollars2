@@ -5,6 +5,7 @@ import type { LineItemResponse } from '../../types/budget'
 import { formatCurrency } from '../../utils/format'
 import { useAppDispatch } from '../../app/hooks'
 import { updateLineItem, deleteLineItem } from './budgetSlice'
+import FlowAmount from './FlowAmount'
 
 interface LineItemRowProps {
   lineItem: LineItemResponse
@@ -152,9 +153,12 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
             {formatCurrency(lineItem.plannedAmount)}
           </span>
         )}
-        <span className="w-24 border border-transparent px-2 py-0.5 text-right text-muted">
-          {formatCurrency(isIncome ? lineItem.receivedAmount : lineItem.spentAmount)}
-        </span>
+        <FlowAmount
+          value={isIncome ? lineItem.receivedAmount : lineItem.spentAmount}
+          isIncome={isIncome}
+          neutralClass="text-muted"
+          className="w-24 border border-transparent px-2 py-0.5 text-right"
+        />
         <span className={`w-24 border border-transparent px-2 py-0.5 text-right ${remaining < 0 ? 'text-accent-700' : 'text-text'}`}>
           {formatCurrency(remaining)}
         </span>

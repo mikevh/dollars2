@@ -23,6 +23,11 @@
   --color-accent: #ec3013;
   --color-divider: color-mix(in srgb, #201e1d 40%, transparent);
 
+  /* Credit green — money flowing *into* an expense category (a good surprise).
+     The sole green in an otherwise red-only palette; paired with text-accent-700
+     for adverse negatives. Dark override lives in the .dark block below. */
+  --color-positive: #15803d;
+
   /* Tonal ramps — OKLCH-generated on one shared lightness scale. */
   --color-neutral-100: #f8f4f4;
   --color-neutral-200: #eae7e7;
@@ -59,6 +64,9 @@
   --color-surface: #2d2b2b;
   --color-text: #f3f2f2;
   --color-divider: color-mix(in srgb, #f3f2f2 22%, transparent);
+
+  /* Brighter green so credits stay legible on the near-black dark ground. */
+  --color-positive: #4ade80;
 
   --color-neutral-100: #2d2b2b;
   --color-neutral-200: #444141;
