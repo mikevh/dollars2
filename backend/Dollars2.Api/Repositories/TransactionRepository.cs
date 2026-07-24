@@ -36,7 +36,7 @@ public class TransactionRepository
             _db.CurrentTransaction);
     }
 
-    public async Task<IEnumerable<Transaction>> GetTrackedAsync(int userId, DateTime fromDate)
+    public async Task<IEnumerable<Transaction>> GetTrackedAsync(int userId, DateOnly fromDate)
     {
         return await _db.Connection.QueryAsync<Transaction>(
             @"SELECT t.Id, t.AccountId, t.UserId, t.ProviderTransactionId, t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.Notes, t.IsDeleted, t.IsPending, t.IsManual, t.CreatedAt, t.UpdatedAt
@@ -136,7 +136,7 @@ public class TransactionRepository
 
     public async Task<TransactionCountsResponse> GetCountsAsync(int userId)
     {
-        var trackedFromDate = DateTime.UtcNow.AddMonths(-2);
+        var trackedFromDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(-2);
         using var multi = await _db.Connection.QueryMultipleAsync(
             @"SELECT COUNT(*) FROM Transactions t
               LEFT JOIN TransactionAssignments ta ON ta.TransactionId = t.Id
@@ -167,7 +167,7 @@ public class TransactionRepository
         };
     }
 
-    public async Task<int> CreateAsync(int userId, DateTime date, string description, string payee, string memo, decimal amount, string? notes, bool isManual)
+    public async Task<int> CreateAsync(int userId, DateOnly date, string description, string payee, string memo, decimal amount, string? notes, bool isManual)
     {
         return await _db.Connection.QuerySingleAsync<int>(
             @"INSERT INTO Transactions (UserId, Date, Description, Payee, Memo, Amount, Notes, IsManual, CreatedAt, UpdatedAt)
@@ -177,7 +177,7 @@ public class TransactionRepository
             _db.CurrentTransaction);
     }
 
-    public async Task UpdateAsync(int id, DateTime date, string description, decimal amount, string? notes)
+    public async Task UpdateAsync(int id, DateOnly date, string description, decimal amount, string? notes)
     {
         await _db.Connection.ExecuteAsync(
             "UPDATE Transactions SET Date = @date, Description = @description, Amount = @amount, Notes = @notes, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id",
@@ -229,8 +229,8 @@ public class TransactionRepository
         int userId, 
         int accountId, 
         string providerTransactionId, 
-        DateTime date, 
-        string description, 
+        DateOnly date,
+        string description,
         string payee,
         string memo,
         decimal amount, 
@@ -245,7 +245,7 @@ public class TransactionRepository
             _db.CurrentTransaction);
     }
 
-    public async Task UpdateFromSyncAsync(int id, DateTime date, string description, string payee, string memo, decimal amount, bool isPending)
+    public async Task UpdateFromSyncAsync(int id, DateOnly date, string description, string payee, string memo, decimal amount, bool isPending)
     {
         await _db.Connection.ExecuteAsync(
             "UPDATE Transactions SET Date = @date, Description = @description, Payee = @payee, Memo = @memo, Amount = @amount, IsPending = @isPending, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id",

@@ -264,7 +264,7 @@ public class BankSyncService
                                    || existing.Description != t.Description
                                    || existing.Payee != t.Payee
                                    || existing.Memo != t.Memo
-                                   || existing.Date.Date != t.Date;
+                                   || existing.Date != t.Date;
                         if (changed)
                         {
                             await _transactionRepo.UpdateFromSyncAsync(existing.Id, t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.IsPending);

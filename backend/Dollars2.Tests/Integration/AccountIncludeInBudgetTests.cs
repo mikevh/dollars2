@@ -63,7 +63,7 @@ public sealed class AccountIncludeInBudgetTests
             var includedNew = await SeedSyncedTransactionAsync(db, userId, included, "KROGER");
             var excludedNew = await SeedSyncedTransactionAsync(db, userId, excluded, "VANGUARD BUY");
             var manualNew = await repository.CreateAsync(
-                userId, new DateTime(2026, 7, 15), "Cash", "", "", -20m, null, isManual: true);
+                userId, new DateOnly(2026, 7, 15), "Cash", "", "", -20m, null, isManual: true);
 
             // Tracked (assigned) rows on each account.
             var includedTracked = await SeedSyncedTransactionAsync(db, userId, included, "RENT");
@@ -82,7 +82,7 @@ public sealed class AccountIncludeInBudgetTests
             var excludedPending = await SeedSyncedTransactionAsync(db, userId, excluded, "PENDING BROKERAGE", isPending: true);
 
             var newIds = (await repository.GetNewAsync(userId)).Select(t => t.Id).ToHashSet();
-            var trackedIds = (await repository.GetTrackedAsync(userId, new DateTime(2026, 1, 1))).Select(t => t.Id).ToHashSet();
+            var trackedIds = (await repository.GetTrackedAsync(userId, new DateOnly(2026, 1, 1))).Select(t => t.Id).ToHashSet();
             var deletedIds = (await repository.GetDeletedAsync(userId)).Select(t => t.Id).ToHashSet();
             var pendingIds = (await repository.GetPendingAsync(userId)).Select(t => t.Id).ToHashSet();
 

@@ -20,6 +20,19 @@
   - Success: `{ "data": { ... }, "error": null }`
   - Failure: `{ "data": null, "error": { "message": "...", "code": "..." } }`
 - CORS: allow configured frontend URL from appsettings.json
+- Dates and times are split by type, and the type determines the wire format:
+  - **Instants** (`DateTime` — `CreatedAt`, `UpdatedAt`, `SyncedAt`, `ExpiresAt`, …) are stored and
+    returned as UTC, and always serialize with a `Z` marker (`2026-07-20T08:00:00Z`) via the global
+    `UtcDateTimeConverter`. An unmarked date-time string is parsed by the browser as *local* time, so
+    omitting the marker silently shifts every instant by the viewer's UTC offset.
+  - **Calendar dates** (`DateOnly` — `Transactions.Date`, a SQL `date` column) serialize bare
+    (`2026-07-22`). They have no instant to convert; marking one as UTC would shift it to the previous
+    day for every user west of UTC.
+  - Because calendar dates are `DateOnly`, every remaining `DateTime` in the API is by definition an
+    instant, which is what makes the global converter safe. Keep it that way: a new calendar date is
+    `DateOnly`, never a `DateTime` with a zeroed time.
+  - Dapper reads a SQL `date` into `DateOnly` via `DateOnlyTypeHandler`, registered by a module
+    initializer in `Data/DateOnlyTypeHandler.cs` (writes bind natively; reads do not).
 
 ## Authentication
 

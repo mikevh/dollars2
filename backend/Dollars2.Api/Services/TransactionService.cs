@@ -38,7 +38,7 @@ public class TransactionService
         return DollarsApiResponse<List<TransactionResponse>>.Success(responses);
     }
 
-    public async Task<DollarsApiResponse<List<TransactionResponse>>> GetTrackedAsync(int userId, DateTime fromDate)
+    public async Task<DollarsApiResponse<List<TransactionResponse>>> GetTrackedAsync(int userId, DateOnly fromDate)
     {
         var transactions = await _transactionRepo.GetTrackedAsync(userId, fromDate);
         var responses = new List<TransactionResponse>();
@@ -112,7 +112,7 @@ public class TransactionService
         });
     }
 
-    public async Task<DollarsApiResponse<TransactionResponse>> CreateAsync(int userId, DateTime date, string description, decimal amount, string? notes, string? payee, string? memo)
+    public async Task<DollarsApiResponse<TransactionResponse>> CreateAsync(int userId, DateOnly date, string description, decimal amount, string? notes, string? payee, string? memo)
     {
         if (amount == 0)
         {
@@ -124,7 +124,7 @@ public class TransactionService
         return DollarsApiResponse<TransactionResponse>.Success(await BuildResponseAsync(transaction));
     }
 
-    public async Task<DollarsApiResponse<TransactionResponse>> UpdateAsync(int id, int userId, DateTime date, string description, decimal amount, string? notes)
+    public async Task<DollarsApiResponse<TransactionResponse>> UpdateAsync(int id, int userId, DateOnly date, string description, decimal amount, string? notes)
     {
         var transaction = await _transactionRepo.GetByIdAsync(id);
         if (transaction is null || transaction.UserId != userId)

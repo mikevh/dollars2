@@ -280,7 +280,7 @@ public class PlaidProvider : IBankSyncProvider
         // Plaid amounts are positive for outflow (money leaving the account); our
         // convention is negative for expenses, positive for income — so negate.
         var amount = -(t.Amount ?? 0);
-        var date = t.Date?.ToDateTime(TimeOnly.MinValue) ?? DateTime.UtcNow.Date;
+        var date = t.Date ?? DateOnly.FromDateTime(DateTime.UtcNow);
 #pragma warning disable CS0612 // Transaction.Name is obsolete but remains the best fallback label
         var payee = t.MerchantName ?? t.Name ?? "";
         var description = t.OriginalDescription ?? t.Name ?? "";
