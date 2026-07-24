@@ -73,7 +73,7 @@ describe('ActivityPane (Modernist restyle)', () => {
     expect(remaining.className).not.toContain('text-accent-700')
   })
 
-  it('renders a negative rollover row with a minus sign in accent-red (no green/red palette)', async () => {
+  it('renders a negative rollover row with a minus sign in accent-red (rollover stays red-only, never green)', async () => {
     renderPane(makeLineItem({ rolloverAmount: -30 }))
     // budgetMonth 7 (July) → rollover carried from June
     const label = await screen.findByText('Rollover from June')
@@ -90,6 +90,30 @@ describe('ActivityPane (Modernist restyle)', () => {
     const amount = within(row).getByText('+$30.00')
     expect(amount.className).toContain('text-text')
     expect(amount.className).not.toContain('text-accent-700')
+  })
+})
+
+describe('ActivityPane Spent/Received flow coloring (issue #80)', () => {
+  it('shows a credit-heavy expense (Spent < 0) as +$ in green', () => {
+    // income 690.89 + expense 16.35 assigned → spentAmount -674.54
+    renderPane(makeLineItem({ spentAmount: -674.54 }))
+    const spent = screen.getByText('+$674.54')
+    expect(spent.className).toContain('text-positive')
+    expect(spent.className).not.toContain('text-accent-700')
+  })
+
+  it('shows a normal expense Spent as a neutral, unsigned figure', () => {
+    renderPane(makeLineItem({ spentAmount: 50 }))
+    const spent = screen.getByText('$50.00')
+    expect(spent.className).toContain('text-text')
+    expect(spent.className).not.toContain('text-positive')
+  })
+
+  it('shows an adverse income (Received < 0) as -$ in red, not green', () => {
+    renderPane(makeLineItem({ receivedAmount: -25 }), { isIncome: true })
+    const received = screen.getByText('-$25.00')
+    expect(received.className).toContain('text-accent-700')
+    expect(received.className).not.toContain('text-positive')
   })
 })
 

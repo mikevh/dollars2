@@ -157,7 +157,8 @@ describe('BudgetPane (Modernist restyle)', () => {
 
   // Issue #71: a positive (income) transaction assigned to an expense line item is real spend
   // activity — it arrives as a negative spentAmount and must raise Remaining by its full amount.
-  it('renders a credit-heavy expense item with negative Spent and raised Remaining', () => {
+  // Issue #80: that inflow renders in the Spent column as a green, +signed credit (not a bare negative).
+  it('renders a credit-heavy expense item with a green +Spent credit and raised Remaining', () => {
     const budget = makeBudget()
     const gifts = budget.groups[1].lineItems[0]
     gifts.name = 'Gifts'
@@ -166,7 +167,9 @@ describe('BudgetPane (Modernist restyle)', () => {
     renderPane(budget)
     // 300 + 0 - (-690.89) = 990.89
     expect(screen.getByText('$990.89')).toBeInTheDocument()
-    expect(screen.getByText('-$690.89')).toBeInTheDocument()
+    const spent = screen.getByText('+$690.89')
+    expect(spent.className).toContain('text-positive')
+    expect(spent.className).not.toContain('text-accent-700')
   })
 
   it('raises an expense item Remaining optimistically when a positive amount is assigned', () => {
