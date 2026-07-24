@@ -111,6 +111,14 @@
     outline-offset: 2px;
   }
 
+  /* Tailwind v4's preflight dropped v3's `button { cursor: pointer }`. This
+     codebase was written against v3, so restore it; `.btn:disabled` and the
+     `disabled:cursor-not-allowed` utility still win via the :not() scope. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
   ::selection {
     background: color-mix(in srgb, var(--color-accent) 30%, transparent);
   }
