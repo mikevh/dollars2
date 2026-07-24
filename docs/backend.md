@@ -58,6 +58,10 @@
 - For a DB migrated before the scripts were normalized (rows only for 006–010), run
   `scripts/backfill_migrations.sql` **once** before `migrate.ps1`
 - Migrations tracking table (`Migrations`) records each applied script by `ScriptName`
+- Scripts contain no `GO` batches — both `migrate.ps1` and the test `MigrationRunner` execute each
+  file as a single batch, so anything needing multiple steps uses dynamic SQL inside the guard
+- Every constraint is named explicitly (`CONSTRAINT <name> ...`), never the inline shorthand — see
+  the naming table in `docs/database.md`; `ConstraintNamingTests` enforces it
 - Connection string in appsettings.json
 
 ## Logging

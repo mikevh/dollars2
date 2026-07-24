@@ -5,7 +5,7 @@ namespace Dollars2.Tests.Integration;
 /// <summary>
 /// Proves the migrations are idempotent (issue #65): every script guards on its own
 /// <c>Migrations</c> row, so applying the whole set a second time against an already-migrated
-/// database runs clean, records exactly one row per script (with a row for every file 000–016),
+/// database runs clean, records exactly one row per script (with a row for every file 000–017),
 /// and leaves the schema intact. The shared fixture has already applied the migrations once, so
 /// re-applying here is the second pass.
 /// </summary>
@@ -34,6 +34,7 @@ public sealed class MigrationIdempotencyTests
         "014_add_transaction_payee_memo",
         "015_create_account_balances",
         "016_add_account_include_in_budget",
+        "017_name_existing_constraints",
     };
 
     private static readonly string[] ExpectedTables =
@@ -55,7 +56,7 @@ public sealed class MigrationIdempotencyTests
 
         using var db = _fixture.CreateSession();
 
-        // Exactly one Migrations row per script, and a row for every file 000–016.
+        // Exactly one Migrations row per script, and a row for every file 000–017.
         var rows = (await db.Connection.QueryAsync<MigrationCount>(
             "SELECT ScriptName, COUNT(*) AS Count FROM Migrations GROUP BY ScriptName"))
             .ToDictionary(r => r.ScriptName, r => r.Count);

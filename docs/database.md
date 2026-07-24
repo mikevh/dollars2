@@ -7,6 +7,23 @@
 - All tables have `CreatedAt datetime2` and `UpdatedAt datetime2`
 - Sort order: `int` starting at 0
 - Raw SQL migration scripts, numbered, run manually, tracked via migrations table
+- Every constraint is named explicitly with the `CONSTRAINT <name> ...` form — never the inline
+  `PRIMARY KEY` / `REFERENCES` / `UNIQUE` / bare `DEFAULT` column shorthand, which makes MSSQL
+  generate a per-database name (`DF__BudgetGro__IsInc__3E52440B`) that no later migration can
+  reference. `ConstraintNamingTests` fails the build if a system-named constraint appears.
+
+| Object | Pattern | Example |
+|--------|---------|---------|
+| Primary key | `PK_<Table>` | `PK_LineItems` |
+| Foreign key | `FK_<Table>_<ReferencedTable>` | `FK_LineItems_BudgetGroups` |
+| Foreign key (2+ to the same table) | `FK_<Table>_<Column>` | `FK_LineItems_PreviousLineItem` |
+| Unique constraint | `UQ_<Table>_<Columns>` | `UQ_Budgets_UserId_Year_Month` |
+| Default | `DF_<Table>_<Column>` | `DF_BudgetGroups_IsIncome` |
+| Check | `CK_<Table>_<Rule>` | `CK_Budgets_MonthRange` |
+| Index / unique index | `IX_`/`UX_<Table>_<Columns>` | `IX_SyncLog_AccountId_SyncedAt` |
+
+Migration `017_name_existing_constraints` renamed every constraint that predated this convention, so
+migrated and freshly-created databases carry identical names.
 
 ## Tables
 
