@@ -116,7 +116,15 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
     )
   )
 
+  // Flipping expense <-> income keeps the assignment magnitudes but flips their signs, so we must
+  // re-send the assignments to re-sign the stored rows. Comparing magnitudes alone would miss this.
+  const assignmentSignFlipped = !isCreate && pendingAssignments.length > 0 &&
+    Math.sign(signedAmount) !== Math.sign(transaction!.amount)
+
   const hasAssignmentChange = (() => {
+    if (assignmentSignFlipped) {
+      return true
+    }
     if (pendingAssignments.length !== originalAssignments.length) {
       return true
     }

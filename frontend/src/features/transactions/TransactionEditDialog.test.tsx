@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { describe, expect, it, vi } from 'vitest'
 import { store } from '../../app/store'
+import { api } from '../../api/client'
 import type { TransactionResponse } from '../../types/transaction'
 import TransactionEditDialog from './TransactionEditDialog'
 
@@ -79,6 +80,32 @@ describe('TransactionEditDialog (Modernist restyle)', () => {
     const { onClose } = renderDialog(null)
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-signs the assignment when flipping an assigned expense to income', async () => {
+    vi.mocked(api.put).mockClear()
+    const transaction = makeTransaction({
+      amount: -3000,
+      description: 'Tithe',
+      assignments: [{ id: 9, lineItemId: 3, lineItemName: 'Church', amount: -3000 }],
+    })
+    const { onMutate } = renderDialog(transaction)
+
+    // Flip Expense -> Income; magnitude is unchanged, only the sign flips.
+    fireEvent.click(screen.getByRole('radio', { name: 'Income' }))
+
+    const save = screen.getByRole('button', { name: 'Save' })
+    expect(save).toBeEnabled()
+    fireEvent.click(save)
+
+    await vi.waitFor(() => expect(onMutate).toHaveBeenCalledTimes(1))
+
+    const assignmentCall = vi.mocked(api.put).mock.calls.find(
+      ([url]) => typeof url === 'string' && url.endsWith('/assignments'),
+    )
+    expect(assignmentCall).toBeDefined()
+    const body = assignmentCall![1] as { assignments: { lineItemId: number; amount: number }[] }
+    expect(body.assignments).toEqual([{ lineItemId: 3, amount: 3000 }])
   })
 
   it('offers a destructive Delete action for an unassigned manual transaction', async () => {
