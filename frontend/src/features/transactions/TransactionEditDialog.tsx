@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useAppSelector } from '../../app/hooks'
 import { api } from '../../api/client'
@@ -55,29 +55,16 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
 
   const selectedIds = new Set(pendingAssignments.map((a) => a.lineItemId))
 
-  useEffect(() => {
-    setPendingAssignments((prev) => {
-      if (prev.length === 1) {
-        return [{ ...prev[0], amount: absTotal.toString() }]
-      }
-      return prev
-    })
-  }, [absTotal])
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      } else if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
-        e.preventDefault()
-        if (canSave && !saving) {
-          handleSave()
-        }
-      }
+  // A lone assignment always carries the full transaction amount. Re-seeding it
+  // during render (rather than in an effect) is React's recommended way to reset
+  // state on an input change and avoids a cascading re-render.
+  const [seededTotal, setSeededTotal] = useState(absTotal)
+  if (seededTotal !== absTotal) {
+    setSeededTotal(absTotal)
+    if (pendingAssignments.length === 1) {
+      setPendingAssignments([{ ...pendingAssignments[0], amount: absTotal.toString() }])
     }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  })
+  }
 
   const addAssignment = (lineItemId: number, lineItemName: string) => {
     setPendingAssignments((prev) => {
@@ -205,6 +192,29 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
     onMutate()
     onClose()
   }
+
+  // The document listener is attached once on mount and reads the current handler
+  // through a ref, instead of closing over save state and re-subscribing on every
+  // render the way an effect with no dependency array would.
+  const latestKeyDown = useRef<(e: KeyboardEvent) => void>(() => {})
+  useEffect(() => {
+    latestKeyDown.current = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+      } else if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault()
+        if (canSave && !saving) {
+          handleSave()
+        }
+      }
+    }
+  })
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => latestKeyDown.current(e)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const handleDelete = async () => {
     if (!transaction) {

@@ -29,8 +29,18 @@ export default function BudgetPage() {
   const isPastMonth = currentYear < now.getFullYear() ||
     (currentYear === now.getFullYear() && currentMonth < now.getMonth() + 1)
 
-  useEffect(() => {
+  // Drop the activity selection when the month changes — the line item belongs to
+  // the month being navigated away from. Adjusting state during render (rather than
+  // in an effect) is React's recommended way to reset state on an input change and
+  // avoids a cascading re-render.
+  const monthKey = `${currentYear}-${currentMonth}`
+  const [selectedMonthKey, setSelectedMonthKey] = useState(monthKey)
+  if (selectedMonthKey !== monthKey) {
+    setSelectedMonthKey(monthKey)
     setSelectedLineItemId(null)
+  }
+
+  useEffect(() => {
     dispatch(fetchBudget({ year: currentYear, month: currentMonth }))
   }, [dispatch, currentYear, currentMonth])
 

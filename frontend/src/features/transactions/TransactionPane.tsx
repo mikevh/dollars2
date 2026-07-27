@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
 import {
@@ -34,6 +34,15 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
   const [editingTransaction, setEditingTransaction] = useState<TransactionResponse | null | 'create'>(null)
   const [search, setSearch] = useState('')
 
+  // Clear the search box when the tab changes. Adjusting state during render
+  // (rather than in an effect) is React's recommended way to reset state on an
+  // input change and avoids a cascading re-render.
+  const [searchedTab, setSearchedTab] = useState(activeTab)
+  if (searchedTab !== activeTab) {
+    setSearchedTab(activeTab)
+    setSearch('')
+  }
+
   const query = search.trim().toLowerCase()
   const filteredTransactions = query
     ? transactions.filter((t) => {
@@ -42,7 +51,7 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
       })
     : transactions
 
-  const fetchCurrentTab = () => {
+  const fetchCurrentTab = useCallback(() => {
     dispatch(fetchCounts())
     if (activeTab === 'new') {
       dispatch(fetchNewTransactions())
@@ -55,15 +64,13 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
     } else if (activeTab === 'pending') {
       dispatch(fetchPendingTransactions())
     }
-  }
+  }, [dispatch, activeTab])
 
   useEffect(() => {
     fetchCurrentTab()
-  }, [dispatch, activeTab, currentYear, currentMonth])
-
-  useEffect(() => {
-    setSearch('')
-  }, [activeTab])
+    // currentYear/currentMonth aren't read by fetchCurrentTab, but navigating to a
+    // different budget month has to refresh the counts and the tracked list.
+  }, [fetchCurrentTab, currentYear, currentMonth])
 
   const handleSoftDelete = async (id: number) => {
     const result = await dispatch(softDeleteTransaction({ id }))

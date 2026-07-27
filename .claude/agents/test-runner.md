@@ -1,6 +1,6 @@
 ---
 name: test-runner
-description: Run the Dollars2 build + test suites (dotnet build/test, npm test, tsc --noEmit) in the current worktree and return a compact pass/fail verdict with trimmed failure detail. Keeps MSBuild/vitest/Testcontainers output out of the parent session.
+description: Run the Dollars2 build + test suites (dotnet build/test, npm test, tsc --noEmit, npm run lint) in the current worktree and return a compact pass/fail verdict with trimmed failure detail. Keeps MSBuild/vitest/Testcontainers output out of the parent session.
 model: sonnet
 tools: Bash, Read
 ---
@@ -16,16 +16,17 @@ Run in whatever directory you were invoked from — the caller is usually inside
 git worktree, and you must test *that* checkout, not the primary one. Confirm
 with `git rev-parse --show-toplevel` before starting.
 
-## The four checks
+## The five checks
 
 ```bash
 cd backend/Dollars2.Api && dotnet build
 cd backend/Dollars2.Tests && dotnet test     # 70+ cases, incl. Testcontainers MSSQL integration tests
 cd frontend && npm test                      # vitest run (non-watch)
 cd frontend && npx tsc --noEmit
+cd frontend && npm run lint                  # eslint, must be clean — zero errors AND zero warnings
 ```
 
-Run all four even if an early one fails — the caller wants the full picture in
+Run all five even if an early one fails — the caller wants the full picture in
 one round trip, not a fix-one-rerun loop. The only exception: skip `dotnet test`
 if `dotnet build` failed to compile, since the test run just repeats the same
 errors.
@@ -37,7 +38,9 @@ Notes:
 - `dotnet test` can take several minutes on a cold container pull. Give it a
   generous timeout rather than killing it and reporting a false failure.
 - If the caller named specific tests or projects, run those too, but still run
-  the full four so nothing regresses unnoticed.
+  the full five so nothing regresses unnoticed.
+- `npm run lint` exits 0 on warnings, so read its output: report **FAIL** if it
+  printed any error *or* any warning, with the rule name and `file:line` for each.
 
 ## Report back
 
@@ -48,6 +51,7 @@ dotnet build    PASS (0 warnings)
 dotnet test     FAIL — 2 of 71 failed
 npm test        PASS (38 tests, 9 files)
 tsc --noEmit    PASS
+npm run lint    PASS (0 errors, 0 warnings)
 ```
 
 For each failure give only: test name, the assertion (expected vs actual), and
