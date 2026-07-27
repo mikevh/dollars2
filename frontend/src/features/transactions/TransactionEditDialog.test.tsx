@@ -76,6 +76,24 @@ describe('TransactionEditDialog (Modernist restyle)', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
+  it('creates a new transaction by posting directly, then mutates and closes', async () => {
+    vi.mocked(api.post).mockClear()
+    const { onMutate, onClose } = renderDialog(null)
+
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Lunch' } })
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '20' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await vi.waitFor(() => expect(onMutate).toHaveBeenCalledTimes(1))
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    const createCall = vi.mocked(api.post).mock.calls.find(([url]) => url === '/api/transactions')
+    expect(createCall).toBeDefined()
+    const body = createCall![1] as { description: string; amount: number }
+    expect(body.description).toBe('Lunch')
+    expect(body.amount).toBe(-20)
+  })
+
   it('closes when Cancel is clicked', () => {
     const { onClose } = renderDialog(null)
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
