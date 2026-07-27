@@ -109,4 +109,50 @@ public sealed class ConstraintNamingTests
             db.Rollback();
         }
     }
+
+    /// <summary>
+    /// Covers the sweep's multi-column <c>UQ_</c> branch, which the live schema does not exercise —
+    /// the only unique constraint it renames is single-column. A throwaway table with an inline
+    /// two-column <c>UNIQUE</c> is created inside a rolled-back transaction, so the fixture is
+    /// unchanged. The columns are declared out of ordinal order to prove the name follows
+    /// <c>key_ordinal</c> rather than <c>column_id</c>.
+    /// </summary>
+    [Fact]
+    public async Task Sweep_names_a_multi_column_unique_constraint_in_key_order()
+    {
+        var scriptPath = Path.Combine(AppContext.BaseDirectory, "Migrations", $"{SweepScriptName}.sql");
+        var sweepSql = await File.ReadAllTextAsync(scriptPath, TestContext.Current.CancellationToken);
+
+        using var db = _fixture.CreateSession();
+        db.BeginTransaction();
+        try
+        {
+            await db.Connection.ExecuteAsync(
+                """
+                CREATE TABLE ConstraintNamingProbe (
+                    Alpha INT NOT NULL,
+                    Beta INT NOT NULL,
+                    UNIQUE (Beta, Alpha)
+                )
+                """,
+                transaction: db.CurrentTransaction);
+
+            await db.Connection.ExecuteAsync(
+                "DELETE FROM Migrations WHERE ScriptName = @ScriptName",
+                new { ScriptName = SweepScriptName },
+                db.CurrentTransaction);
+
+            await db.Connection.ExecuteAsync(sweepSql, transaction: db.CurrentTransaction);
+
+            var probeConstraints = (await db.Connection.QueryAsync<string>(
+                "SELECT name FROM sys.key_constraints WHERE parent_object_id = OBJECT_ID('ConstraintNamingProbe')",
+                transaction: db.CurrentTransaction)).ToArray();
+
+            Assert.Equal(new[] { "UQ_ConstraintNamingProbe_Beta_Alpha" }, probeConstraints);
+        }
+        finally
+        {
+            db.Rollback();
+        }
+    }
 }
