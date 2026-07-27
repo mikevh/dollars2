@@ -132,6 +132,9 @@ export default function AccountTransactionsPage() {
     setPagination({ pageIndex: 0, pageSize: size })
   }
 
+  // TanStack Table returns functions the React Compiler cannot memoize safely, so it
+  // skips compiling this component. That is inherent to the library, not fixable here.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: transactions,
     columns,

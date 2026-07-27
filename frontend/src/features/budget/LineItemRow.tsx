@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { useDroppable } from '@dnd-kit/core'
 import type { LineItemResponse } from '../../types/budget'
@@ -22,17 +22,24 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
     id: `lineitem-${lineItem.id}`,
     data: { lineItemId: lineItem.id },
   })
-  const [editingName, setEditingName] = useState(false)
+  // A freshly added item mounts with startEditing set, so seed the name editor open
+  // and empty rather than opening it from an effect after the first paint.
+  const [editingName, setEditingName] = useState(startEditing ?? false)
   const [editingAmount, setEditingAmount] = useState(false)
-  const [nameValue, setNameValue] = useState(lineItem.name)
+  const [nameValue, setNameValue] = useState(startEditing ? '' : lineItem.name)
   const [amountValue, setAmountValue] = useState(lineItem.plannedAmount.toString())
 
-  useEffect(() => {
+  // Re-open the editor if the row is later flagged for editing. Adjusting state
+  // during render (rather than in an effect) is React's recommended way to react
+  // to a prop change and avoids a cascading re-render.
+  const [seededStartEditing, setSeededStartEditing] = useState(startEditing)
+  if (seededStartEditing !== startEditing) {
+    setSeededStartEditing(startEditing)
     if (startEditing) {
       setEditingName(true)
       setNameValue('')
     }
-  }, [startEditing])
+  }
 
   const remaining = isIncome
     ? lineItem.plannedAmount - lineItem.receivedAmount

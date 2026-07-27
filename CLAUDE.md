@@ -68,6 +68,9 @@ cd backend/Dollars2.Api && dotnet run
 # Type check
 cd frontend && npx tsc --noEmit
 
+# Lint (must stay clean — zero errors, zero warnings)
+cd frontend && npm run lint
+
 # Backend build
 cd backend/Dollars2.Api && dotnet build
 ```
@@ -81,8 +84,8 @@ Both are pinned to `model: sonnet` and report back as condensed text.
   flows, reads the PNGs itself, returns a render/console-error verdict. Spawn it
   instead of screenshotting from the main session.
 - **`test-runner`** (`.claude/agents/test-runner.md`) — runs `dotnet build`,
-  `dotnet test`, `npm test`, and `npx tsc --noEmit` in the current worktree and
-  returns pass/fail per check with trimmed failure detail (test name, assertion,
+  `dotnet test`, `npm test`, `npx tsc --noEmit`, and `npm run lint` in the current
+  worktree and returns pass/fail per check with trimmed failure detail (test name, assertion,
   `file:line`), keeping MSBuild/vitest/Testcontainers output out of context.
 
 ## Sprint Approach
