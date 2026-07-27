@@ -1,6 +1,10 @@
 import { useEffect } from 'react'
 import { useAppSelector } from '../../app/hooks'
 
+// Authority for the theme class once React is mounted: runtime switching and
+// following the OS in 'system' mode. The first paint is handled earlier by the
+// inline script in index.html, which duplicates the isDark decision below —
+// change one, change both, or dark-mode users get a light flash on load.
 export function useTheme() {
   const mode = useAppSelector((state) => state.theme.mode)
 

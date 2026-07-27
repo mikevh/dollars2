@@ -4,6 +4,31 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Sets the theme class before the first paint so dark-mode users never see a
+      light flash while React mounts. Must stay a plain blocking script: no
+      type="module", no defer/async.
+
+      The isDark decision mirrors src/features/theme/useTheme.ts exactly, down to
+      the `??` fallback used by themeSlice.ts. Keep all three in sync — any
+      divergence reintroduces a flash. useTheme remains the authority once React
+      is mounted; this only pre-seeds the class so its first effect is a no-op.
+    -->
+    <script>
+      try {
+        const mode = localStorage.getItem('theme') ?? 'system'
+        const isDark =
+          mode === 'dark' ||
+          (mode === 'system' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches)
+        if (isDark) {
+          document.documentElement.classList.add('dark')
+        }
+      } catch {
+        // localStorage or matchMedia unavailable (restricted privacy modes) —
+        // fall through to the light default rather than blocking app boot.
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
