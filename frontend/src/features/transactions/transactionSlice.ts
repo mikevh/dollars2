@@ -71,17 +71,6 @@ export const fetchPendingTransactions = createAsyncThunk(
   }
 )
 
-export const createTransaction = createAsyncThunk(
-  'transactions/create',
-  async ({ date, description, amount, notes }: { date: string; description: string; amount: number; notes?: string }, { rejectWithValue }) => {
-    const result = await api.post<TransactionResponse>('/api/transactions', { date, description, amount, notes })
-    if (result.error) {
-      return rejectWithValue(result.error.message)
-    }
-    return result.data!
-  }
-)
-
 export const softDeleteTransaction = createAsyncThunk(
   'transactions/softDelete',
   async ({ id }: { id: number }, { rejectWithValue }) => {
@@ -174,9 +163,6 @@ const transactionSlice = createSlice({
       .addCase(fetchPendingTransactions.pending, pending)
       .addCase(fetchPendingTransactions.fulfilled, fulfilled)
       .addCase(fetchPendingTransactions.rejected, rejected)
-      .addCase(createTransaction.fulfilled, (state, action) => {
-        state.transactions.unshift(action.payload)
-      })
       .addCase(softDeleteTransaction.fulfilled, (state, action) => {
         state.transactions = state.transactions.filter((t) => t.id !== action.payload)
       })
