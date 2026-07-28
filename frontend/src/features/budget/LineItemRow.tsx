@@ -29,6 +29,23 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
   const [nameValue, setNameValue] = useState(startEditing ? '' : lineItem.name)
   const [amountValue, setAmountValue] = useState(lineItem.plannedAmount.toString())
 
+  // Re-seed the drafts whenever the saved values change. A reducer that replaces
+  // the line item in place — another tab's edit landing through a refresh, or a
+  // transaction assignment — updates these props without remounting the row, so
+  // without this a later-opened editor would show a stale value and could save it
+  // back over the newer one. Skip while an editor is open so an in-progress edit
+  // is not yanked out from under the user; the draft re-seeds once it closes.
+  const [seededName, setSeededName] = useState(lineItem.name)
+  if (!editingName && seededName !== lineItem.name) {
+    setSeededName(lineItem.name)
+    setNameValue(lineItem.name)
+  }
+  const [seededAmount, setSeededAmount] = useState(lineItem.plannedAmount)
+  if (!editingAmount && seededAmount !== lineItem.plannedAmount) {
+    setSeededAmount(lineItem.plannedAmount)
+    setAmountValue(lineItem.plannedAmount.toString())
+  }
+
   // Re-open the editor if the row is later flagged for editing. Adjusting state
   // during render (rather than in an effect) is React's recommended way to react
   // to a prop change and avoids a cascading re-render.
@@ -47,12 +64,14 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
 
   const saveUpdate = async (name: string, plannedAmount: number) => {
     if (name === lineItem.name && plannedAmount === lineItem.plannedAmount) {
-      return
+      return true
     }
     const result = await dispatch(updateLineItem({ lineItemId: lineItem.id, groupId, name, plannedAmount }))
     if (updateLineItem.rejected.match(result)) {
       toast.error(result.payload as string)
+      return false
     }
+    return true
   }
 
   const handleSaveName = async () => {
@@ -63,7 +82,11 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
       onEditComplete?.()
       return
     }
-    await saveUpdate(trimmed, lineItem.plannedAmount)
+    // A rejected save leaves the prop unchanged, so the re-seed above won't fire —
+    // drop the failed draft here or the next blur would silently re-submit it.
+    if (!await saveUpdate(trimmed, lineItem.plannedAmount)) {
+      setNameValue(lineItem.name)
+    }
     setEditingName(false)
     if (startEditing) {
       setEditingAmount(true)
@@ -75,7 +98,9 @@ export default function LineItemRow({ lineItem, groupId, isIncome, startEditing,
     const parsed = parseFloat(amountValue) || 0
     const rounded = Math.round(parsed * 100) / 100
     setAmountValue(rounded.toString())
-    await saveUpdate(lineItem.name, rounded)
+    if (!await saveUpdate(lineItem.name, rounded)) {
+      setAmountValue(lineItem.plannedAmount.toString())
+    }
     setEditingAmount(false)
   }
 
