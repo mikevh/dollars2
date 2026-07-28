@@ -51,6 +51,11 @@
 
 - Input validation: data annotations on request DTOs
 - Business rule validation: return error results from service methods (not exceptions)
+- **Money precision:** every client-supplied amount (transaction amount, split assignment amount,
+  line item planned amount) is rejected with `INVALID_AMOUNT_PRECISION` when it is finer than a
+  cent, rather than being rounded into the `decimal(18,2)` column — the stored value is always the
+  one the user entered. `Money.IsWholeCents` is the single gate; the money inputs in the UI refuse
+  the keystroke so the error is a backstop, not the normal path
 
 ## Database
 

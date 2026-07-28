@@ -131,6 +131,13 @@
 
 ## Transaction Edit Dialog (Modal)
 
+### Money Inputs
+- Amount and split-amount fields are `type="text"` + `inputMode="decimal"`, guarded by
+  `isMoneyDraft` (`utils/money.ts`): digits with at most two decimal places, no sign
+- A keystroke that would make the value finer than a cent is refused, so nothing is ever
+  silently rounded between what the user confirms and what is stored (the API rejects
+  sub-cent amounts outright — see `docs/backend.md`)
+
 ### Synced Transactions
 - Read-only: date, description, amount, account
 - Editable: notes, line item assignment(s)

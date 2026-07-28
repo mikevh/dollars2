@@ -5,6 +5,7 @@ import { api } from '../../api/client'
 import Dialog, { DialogHeader } from '../../components/Dialog'
 import type { TransactionResponse } from '../../types/transaction'
 import { formatCurrency } from '../../utils/format'
+import { isMoneyDraft } from '../../utils/money'
 
 interface PendingAssignment {
   lineItemId: number
@@ -314,10 +315,15 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
             <label>Amount</label>
             {isEditable ? (
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
+                aria-label="Amount"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                step="0.01"
+                onChange={(e) => {
+                  if (isMoneyDraft(e.target.value)) {
+                    setAmount(e.target.value)
+                  }
+                }}
                 className="input"
               />
             ) : (
@@ -360,10 +366,15 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
                   <span className="min-w-0 flex-1 truncate text-sm text-text">{a.lineItemName}</span>
                   {isSplit && (
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
+                      aria-label={`${a.lineItemName} amount`}
                       value={a.amount}
-                      onChange={(e) => updateAssignmentAmount(a.lineItemId, e.target.value)}
-                      step="0.01"
+                      onChange={(e) => {
+                        if (isMoneyDraft(e.target.value)) {
+                          updateAssignmentAmount(a.lineItemId, e.target.value)
+                        }
+                      }}
                       className="input w-24 text-right"
                     />
                   )}
