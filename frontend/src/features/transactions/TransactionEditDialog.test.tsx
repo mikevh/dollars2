@@ -72,7 +72,7 @@ describe('TransactionEditDialog (Modernist restyle)', () => {
   it('enables Save once a valid new transaction is entered', () => {
     renderDialog(null)
     fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Lunch' } })
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '20' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '20' } })
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
@@ -81,7 +81,7 @@ describe('TransactionEditDialog (Modernist restyle)', () => {
     const { onMutate, onClose } = renderDialog(null)
 
     fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Lunch' } })
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '20' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '20' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await vi.waitFor(() => expect(onMutate).toHaveBeenCalledTimes(1))
@@ -106,7 +106,7 @@ describe('TransactionEditDialog (Modernist restyle)', () => {
 
     // A saveable form: Enter anywhere else would save.
     fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Lunch' } })
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '20' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '20' } })
 
     const cancel = screen.getByRole('button', { name: 'Cancel' })
     cancel.focus()
@@ -141,6 +141,80 @@ describe('TransactionEditDialog (Modernist restyle)', () => {
     expect(assignmentCall).toBeDefined()
     const body = assignmentCall![1] as { assignments: { lineItemId: number; amount: number }[] }
     expect(body.assignments).toEqual([{ lineItemId: 3, amount: 3000 }])
+  })
+
+  it('refuses a third decimal place instead of accepting it and rounding on save', () => {
+    renderDialog(null)
+    const amount = screen.getByLabelText('Amount')
+
+    fireEvent.change(amount, { target: { value: '10.99' } })
+    fireEvent.change(amount, { target: { value: '10.999' } })
+
+    expect(amount).toHaveValue('10.99')
+  })
+
+  it('keeps Save disabled for a sub-cent amount, which the field never accepts', () => {
+    renderDialog(null)
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Lunch' } })
+
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '0.004' } })
+
+    expect(screen.getByLabelText('Amount')).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
+  it('sends the entered cents unchanged', async () => {
+    vi.mocked(api.post).mockClear()
+    const { onMutate } = renderDialog(null)
+
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Lunch' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '10.99' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await vi.waitFor(() => expect(onMutate).toHaveBeenCalledTimes(1))
+    const createCall = vi.mocked(api.post).mock.calls.find(([url]) => url === '/api/transactions')
+    expect((createCall![1] as { amount: number }).amount).toBe(-10.99)
+  })
+
+  it('refuses a third decimal place in a split amount', () => {
+    renderDialog(makeTransaction({
+      amount: -100,
+      assignments: [
+        { id: 1, lineItemId: 3, lineItemName: 'Groceries', amount: -60 },
+        { id: 2, lineItemId: 4, lineItemName: 'Dining', amount: -40 },
+      ],
+    }))
+    const split = screen.getByLabelText('Groceries amount')
+
+    fireEvent.change(split, { target: { value: '59.99' } })
+    fireEvent.change(split, { target: { value: '59.995' } })
+
+    expect(split).toHaveValue('59.99')
+  })
+
+  it('sends split amounts that sum exactly to the transaction amount', async () => {
+    vi.mocked(api.put).mockClear()
+    const { onMutate } = renderDialog(makeTransaction({
+      amount: -100,
+      assignments: [
+        { id: 1, lineItemId: 3, lineItemName: 'Groceries', amount: -60 },
+        { id: 2, lineItemId: 4, lineItemName: 'Dining', amount: -40 },
+      ],
+    }))
+
+    fireEvent.change(screen.getByLabelText('Groceries amount'), { target: { value: '59.99' } })
+    fireEvent.change(screen.getByLabelText('Dining amount'), { target: { value: '40.01' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await vi.waitFor(() => expect(onMutate).toHaveBeenCalledTimes(1))
+    const assignmentCall = vi.mocked(api.put).mock.calls.find(
+      ([url]) => typeof url === 'string' && url.endsWith('/assignments'),
+    )
+    const body = assignmentCall![1] as { assignments: { lineItemId: number; amount: number }[] }
+    expect(body.assignments).toEqual([
+      { lineItemId: 3, amount: -59.99 },
+      { lineItemId: 4, amount: -40.01 },
+    ])
   })
 
   it('offers a destructive Delete action for an unassigned manual transaction', async () => {
