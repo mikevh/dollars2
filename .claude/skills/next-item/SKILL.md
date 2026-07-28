@@ -11,7 +11,8 @@ toward too small; split anything that smells like two concerns).
 
 Invoking this skill IS the user's instruction to go all the way through commit, push, and PR — a
 scoped override of the standing "never commit/push without instruction" gate
-(`[[feedback-commit-push]]`), valid only inside this workflow.
+(`[[feedback-commit-push]]`), valid only inside this workflow. The one stop along the way is the
+code-review handoff in step 7.
 
 Delegate the token-heavy phases to the cheaper subagents noted below (`Explore`, `test-runner`,
 `ui-verify`) and keep this session on understanding, implementing, and judging.
@@ -89,10 +90,15 @@ Follow `CLAUDE.md`'s conventions and match the surrounding style.
   (`--url`), not a general sweep.
 - **Skip it** for work with no visible change — migrations, SQL, sync internals, backend-only
   refactors, tests, docs. Say in the PR that you skipped it and why.
-- Run the `/code-review` command on the diff and address findings. Capture any deliberately deferred
-  finding as a GitHub issue (per `CLAUDE.md`'s backlog convention).
+- **Then stop and hand off for code review.** `/code-review` is user-invokable only — you cannot
+  trigger it, and reviewing the diff yourself from memory is not a substitute. Leave the changes
+  uncommitted in the worktree, say the diff is ready, and ask the user to run `/code-review`. This is
+  the one deliberate pause between step 3 and the PR; wait for it.
+- When the findings come back, address them, then continue to step 8. Capture any deliberately
+  deferred finding as a GitHub issue (per `CLAUDE.md`'s backlog convention).
+- If the user says to skip the review, skip it — and say so in the PR body.
 
-### 8. Commit, push, PR, clean up (full auto)
+### 8. Commit, push, PR, clean up (full auto, once the review clears)
 - Commit in the repo's style (imperative, concise) with the harness's `Co-Authored-By` and
   `Claude-Session` trailers.
 - Push and open a PR against `master` (`gh`), linking the issue (`Closes #N`); PR body ends with the
