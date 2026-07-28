@@ -66,9 +66,18 @@ const columns: ColumnDef<TransactionResponse>[] = [
   { id: 'budgetItem', header: 'Budget item', enableSorting: false },
 ]
 
+// React Router reuses one instance across /accounts/1 -> /accounts/2, so without a key the
+// previous account's rows, name, search, sort and page all carry into the next account and the
+// first request for it goes out with the old query. Keying on the id remounts instead: the new
+// account gets fresh state and the cleanup below clears the slice on the way out. The global
+// page-size preference survives, since loadPageSize re-reads localStorage on every mount.
 export default function AccountTransactionsPage() {
-  const dispatch = useAppDispatch()
   const { accountId } = useParams<{ accountId: string }>()
+  return <AccountTransactions key={accountId} accountId={accountId} />
+}
+
+function AccountTransactions({ accountId }: { accountId: string | undefined }) {
+  const dispatch = useAppDispatch()
   const { data, loading, error } = useAppSelector((state) => state.accountTransactions)
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }])
@@ -79,8 +88,13 @@ export default function AccountTransactionsPage() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
-  // Debounce the search box; a new term always returns to the first page.
+  // Debounce the search box; a new term always returns to the first page. The guard keeps a
+  // mount from scheduling a timer that would snap an already-paged view back to page 1 for a
+  // term that never changed — reachable now that switching accounts remounts this component.
   useEffect(() => {
+    if (search === debouncedSearch) {
+      return
+    }
     const handle = setTimeout(() => {
       setDebouncedSearch(search)
       setPagination((prev) => (prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 }))
@@ -88,7 +102,7 @@ export default function AccountTransactionsPage() {
     return () => {
       clearTimeout(handle)
     }
-  }, [search])
+  }, [search, debouncedSearch])
 
   const sort = sorting[0]?.id ?? 'date'
   const dir = sorting[0]?.desc === false ? 'asc' : 'desc'
