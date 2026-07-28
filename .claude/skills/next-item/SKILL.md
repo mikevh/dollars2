@@ -52,8 +52,9 @@ claim is stale — report it and ask before reclaiming. Don't silently steal it.
 ### 2. Understand the item (interview if underspecified)
 - Read the issue in full: `gh issue view <N> --comments`.
 - For the surrounding context — which files the change touches, the relevant `docs/*.md` spec
-  language, and the existing patterns to match — **spawn the `Explore` agent** and work from its
-  brief. Then read only the files you'll actually edit. Don't graze the codebase from this session.
+  language, and the existing patterns to match — **spawn the `Explore` agent with `model: sonnet`**
+  (it inherits Opus otherwise, and this is search-and-summarize work) and work from its brief. Then
+  read only the files you'll actually edit. Don't graze the codebase from this session.
 - **If you don't fully understand the behavior, scope, and acceptance criteria, interview the user
   before writing any code** — targeted questions, verify your understanding back, don't start until
   the ambiguity is resolved.
@@ -71,30 +72,23 @@ claim is stale — report it and ask before reclaiming. Don't silently steal it.
 - Do ALL work in a dedicated worktree off `master`, never the primary checkout (EnterWorktree, or
   `git worktree add`).
 - Branch: `issue-<N>-<short-kebab-slug>` — the issue number makes `git worktree list` a local
-  registry of what's in flight, so a parallel agent can see the claim without hitting the API.
+  registry of what's in flight for parallel agents.
 
 ### 5. Implement
-- Follow `CLAUDE.md`: curly braces on all conditionals; multi-mutation API calls in a `DbSession`
-  transaction; `DollarsApiResponse<T>` envelope; business-rule violations return error results, not
-  exceptions; `DateOnly` for calendar dates and `DateTime` for instants; secrets in user-secrets; new
-  migrations use `ScriptName` and `IF NOT EXISTS` guards.
-- Match surrounding style (inline-editing patterns, fixed-height rows, etc.).
+Follow `CLAUDE.md`'s conventions and match the surrounding style.
 
 ### 6. Write and run tests
 - Cover the step-3 acceptance check and the core logic paths.
-- **Spawn the `test-runner` agent** (`.claude/agents/test-runner.md`, sonnet) to run `dotnet build`,
-  `dotnet test`, `npm test`, and `npx tsc --noEmit` and return a compact verdict — build and test
-  output doesn't belong in this session. Fix what it reports, then have it re-run.
+- **Spawn `test-runner`** for every build/test run — that output doesn't belong in this session. Fix
+  what it reports, then continue the *same* agent (`SendMessage`) for the re-run rather than spawning
+  a fresh one.
 
 ### 7. Verify and review
-- **Spawn the `ui-verify` agent** (`.claude/agents/ui-verify.md`, sonnet) *only when the change
-  alters what renders* — frontend components, styles/tokens, or an API response shape the UI
-  displays. Point it at the specific changed screen (`--url`), not a general sweep; it drives light
-  + dark, confirms the step-3 acceptance check, reads the screenshots itself, and returns a text
-  verdict.
+- **Spawn `ui-verify` only when the change alters what renders** — frontend components,
+  styles/tokens, or an API response shape the UI displays. Point it at the specific changed screen
+  (`--url`), not a general sweep.
 - **Skip it** for work with no visible change — migrations, SQL, sync internals, backend-only
-  refactors, tests, docs. `npm test` and `tsc` already ran in step 6; booting the dev server and
-  Chromium to look at an unchanged screen proves nothing. Say in the PR that you skipped it and why.
+  refactors, tests, docs. Say in the PR that you skipped it and why.
 - Run the `/code-review` command on the diff and address findings. Capture any deliberately deferred
   finding as a GitHub issue (per `CLAUDE.md`'s backlog convention).
 
@@ -113,10 +107,5 @@ claim is stale — report it and ask before reclaiming. Don't silently steal it.
   pushed commit can look "unmerged" against a stale local `master`). Don't remove if the push failed
   or changes are uncommitted — leave it and say so.
 - Note that the PR branch lives only on the remote; review changes need a fresh checkout.
-
-## Notes
-- Stop and ask when: no item named, a named issue lacks `groomed` (hard block → `/groom <N>`), the
-  issue is already claimed or holds a stale claim, the issue is underspecified (interview), scope
-  needs splitting, or verification can't be defined — not for routine progress.
 - Other agents are working other issues concurrently. Touch only the claimed issue and your own
   worktree; never `git worktree remove` or push a branch that isn't yours.
