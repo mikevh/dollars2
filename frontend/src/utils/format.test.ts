@@ -13,6 +13,14 @@ describe('formatRelativeTime', () => {
     expect(formatRelativeTime(ago(5 * 60), now)).toBe('5m ago')
   })
 
+  it('rounds the 45-59s window up to "1m ago" rather than "0m ago"', () => {
+    expect(formatRelativeTime(ago(44), now)).toBe('just now')
+    expect(formatRelativeTime(ago(45), now)).toBe('1m ago')
+    expect(formatRelativeTime(ago(50), now)).toBe('1m ago')
+    expect(formatRelativeTime(ago(59), now)).toBe('1m ago')
+    expect(formatRelativeTime(ago(60), now)).toBe('1m ago')
+  })
+
   it('returns hours for sub-day ages', () => {
     expect(formatRelativeTime(ago(2 * 3600), now)).toBe('2h ago')
   })

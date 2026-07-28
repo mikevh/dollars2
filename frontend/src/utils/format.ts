@@ -13,7 +13,9 @@ export function formatRelativeTime(iso: string, now: number = Date.now()): strin
   if (seconds < 45) {
     return 'just now'
   }
-  const minutes = Math.floor(seconds / 60)
+  // The 45s 'just now' cutoff is meant to round up, so clamp to 1 — a bare floor would
+  // report "0m ago" for 45..59 seconds.
+  const minutes = Math.max(1, Math.floor(seconds / 60))
   if (minutes < 60) {
     return `${minutes}m ago`
   }
