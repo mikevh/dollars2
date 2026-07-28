@@ -36,4 +36,17 @@ public class RefreshTokenRepository
             new { id },
             _db.CurrentTransaction);
     }
+
+    /// <summary>
+    /// Removes the user's already-expired refresh tokens. Called from the auth flows so the table
+    /// stays bounded without a scheduled job; tokens that are never used again would otherwise
+    /// linger forever.
+    /// </summary>
+    public async Task<int> DeleteExpiredForUserAsync(int userId)
+    {
+        return await _db.Connection.ExecuteAsync(
+            "DELETE FROM RefreshTokens WHERE UserId = @userId AND ExpiresAt <= SYSUTCDATETIME()",
+            new { userId },
+            _db.CurrentTransaction);
+    }
 }

@@ -41,6 +41,11 @@
 - Refresh tokens
 - JWT secret in appsettings.json
 - Users created directly in the database
+- **Retention:** a login or refresh mints a new refresh-token row, and a token that is never used
+  again (cleared browser, second device, failed refresh) would otherwise linger forever. Both auth
+  paths delete the acting user's already-expired rows as part of the same transaction, so the table
+  stays bounded without a scheduled job. No configuration — "expired" is defined by the row's own
+  `ExpiresAt`.
 
 ## Validation
 
@@ -93,6 +98,13 @@
 - On each successful account sync, the provider-reported current balance is appended to
   `AccountBalances` (in the same per-account transaction as the transaction upserts and sync-log
   entry), building a balance time-series. A null/unparseable balance records no row.
+- **`SyncLog` retention:** the hourly loop prunes `SyncLog` after each sync run, deleting rows older
+  than `Retention:SyncLogDays` (default 90). There is no SQL Agent in the self-hosted container, so
+  the app drives its own retention. Two rows per account are kept regardless of age: the newest row
+  (backing the per-account sync status the frontend shows) and the newest **successful** row, which
+  is the incremental-sync watermark — pruning it away would silently reset that account to a full
+  180-day refetch. The prune runs in its own scope and its own try/catch, so a prune failure never
+  stops syncing and a sync failure never skips the prune.
 
 ## Provider Abstraction
 
