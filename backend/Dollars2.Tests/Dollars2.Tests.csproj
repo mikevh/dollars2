@@ -39,10 +39,4 @@
     <None Include="..\Dollars2.Api\Migrations\*.sql" Link="Migrations\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- Copy the API's shipped appsettings.json (into a subfolder, so it can't be mistaken for the
-       test host's own config) so JwtSettingsTests can assert the real file passes validation. -->
-  <ItemGroup>
-    <None Include="..\Dollars2.Api\appsettings.json" Link="ApiConfig\appsettings.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
 </Project>

@@ -1,5 +1,4 @@
 using System.Text;
-using Dollars2.Api.Configuration;
 using Dollars2.Api.Data;
 using Dollars2.Api.Json;
 using Dollars2.Api.Logging;
@@ -68,8 +67,17 @@ builder.Services.AddCors(options =>
     });
 });
 
-var jwtSettings = JwtSettings.FromConfiguration(builder.Configuration);
-builder.Services.AddSingleton(jwtSettings);
+var jwtSecret = builder.Configuration["Jwt:Secret"]
+    ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "Dollars2";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "Dollars2";
+
+// AuthService reads this with GetValue<int>, so a missing or unparseable key silently yields 0 and
+// every token it mints is already expired. Fail startup instead.
+if (builder.Configuration.GetValue<int>("Jwt:ExpirationDays") <= 0)
+{
+    throw new InvalidOperationException("Jwt:ExpirationDays is not configured.");
+}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -80,9 +88,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSettings.Issuer,
-            ValidAudience = jwtSettings.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret))
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
         };
     });
 
