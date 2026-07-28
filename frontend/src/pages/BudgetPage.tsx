@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import toast from 'react-hot-toast'
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
@@ -10,6 +10,7 @@ import BudgetPane from '../features/budget/BudgetPane'
 import ActivityPane from '../features/budget/ActivityPane'
 import TransactionPane from '../features/transactions/TransactionPane'
 import TransactionRow from '../features/transactions/TransactionRow'
+import Dialog from '../components/Dialog'
 import type { TransactionResponse } from '../types/transaction'
 
 export default function BudgetPage() {
@@ -20,6 +21,7 @@ export default function BudgetPage() {
   const [draggingTransaction, setDraggingTransaction] = useState<TransactionResponse | null>(null)
   const [selectedLineItemId, setSelectedLineItemId] = useState<number | null>(null)
   const [crossMonthPending, setCrossMonthPending] = useState<{ transaction: TransactionResponse; lineItemId: number } | null>(null)
+  const crossMonthTitleId = useId()
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -164,33 +166,34 @@ export default function BudgetPage() {
         const txMonthName = txDate.toLocaleString('default', { month: 'long' })
         const budgetMonthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long' })
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/60" onClick={() => setCrossMonthPending(null)} />
-            <div className="relative w-full max-w-[420px] border border-divider bg-surface p-6 text-text shadow-elev-lg">
-              <h2 className="mb-2 text-[18px]">Cross-month assignment</h2>
-              <p className="text-muted mb-5 text-[14px]">
-                This transaction is from <strong className="text-text">{txMonthName}</strong> but you're viewing <strong className="text-text">{budgetMonthName}</strong>. Assign it anyway?
-              </p>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setCrossMonthPending(null)}
-                  className="btn btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    const { transaction, lineItemId } = crossMonthPending
-                    setCrossMonthPending(null)
-                    await doAssign(transaction, lineItemId)
-                  }}
-                  className="btn btn-primary"
-                >
-                  Assign anyway
-                </button>
-              </div>
+          <Dialog
+            onClose={() => setCrossMonthPending(null)}
+            labelledBy={crossMonthTitleId}
+            className="max-w-[420px]"
+          >
+            <h2 id={crossMonthTitleId} className="mb-2 text-[18px]">Cross-month assignment</h2>
+            <p className="text-muted mb-5 text-[14px]">
+              This transaction is from <strong className="text-text">{txMonthName}</strong> but you're viewing <strong className="text-text">{budgetMonthName}</strong>. Assign it anyway?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setCrossMonthPending(null)}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const { transaction, lineItemId } = crossMonthPending
+                  setCrossMonthPending(null)
+                  await doAssign(transaction, lineItemId)
+                }}
+                className="btn btn-primary"
+              >
+                Assign anyway
+              </button>
             </div>
-          </div>
+          </Dialog>
         )
       })()}
 

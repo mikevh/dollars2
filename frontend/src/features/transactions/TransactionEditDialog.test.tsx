@@ -100,6 +100,23 @@ describe('TransactionEditDialog (Modernist restyle)', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('does not hijack Enter pressed on a focused button', async () => {
+    vi.mocked(api.post).mockClear()
+    const { onMutate } = renderDialog(null)
+
+    // A saveable form: Enter anywhere else would save.
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Lunch' } })
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '20' } })
+
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    cancel.focus()
+    fireEvent.keyDown(cancel, { key: 'Enter' })
+
+    // Enter belongs to the button; the dialog must not save behind its back.
+    expect(vi.mocked(api.post)).not.toHaveBeenCalled()
+    expect(onMutate).not.toHaveBeenCalled()
+  })
+
   it('re-signs the assignment when flipping an assigned expense to income', async () => {
     vi.mocked(api.put).mockClear()
     const transaction = makeTransaction({
