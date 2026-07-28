@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { MemoryRouter } from 'react-router-dom'
@@ -21,7 +21,7 @@ vi.mock('react-hot-toast', () => ({
 
 function renderPage() {
   const store = configureStore({ reducer: { accounts: accountsReducer } })
-  render(
+  return render(
     <Provider store={store}>
       <MemoryRouter>
         <AccountsPage />
@@ -32,6 +32,9 @@ function renderPage() {
 
 describe('AccountsPage', () => {
   beforeEach(() => {
+    // A test that installs fake timers must not leak them into the rest of the file: the
+    // real-timer polling in findBy*/waitFor would hang everywhere downstream.
+    vi.useRealTimers()
     getMock.mockReset()
     postMock.mockReset()
   })
@@ -106,6 +109,56 @@ describe('AccountsPage', () => {
 
     const row = (await screen.findByText('Broken')).closest('li')!
     expect(within(row).getByText(/sync failed/)).toBeInTheDocument()
+  })
+
+  it('ages the relative sync time on its own and stops ticking on unmount', async () => {
+    vi.useFakeTimers({ now: new Date('2026-07-22T10:00:00Z') })
+    try {
+      getMock.mockResolvedValue({
+        data: [
+          {
+            connectionId: 'abc123',
+            sourceType: 'SimpleFIN',
+            accounts: [
+              { id: 1, name: 'Keybank Checking', lastSyncedAt: '2026-07-22T10:00:00Z', lastStatus: 'Success', balance: null },
+            ],
+          },
+        ] satisfies AccountGroup[],
+        error: null,
+      })
+
+      const { unmount } = renderPage()
+
+      // findBy*/waitFor poll on real timers, which the fake clock freezes — flush the mocked
+      // fetch by hand instead.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      const row = screen.getByText('Keybank Checking').closest('li')!
+      expect(within(row).getByText('synced just now')).toBeInTheDocument()
+
+      // No user interaction — only the clock moves.
+      await act(async () => {
+        vi.advanceTimersByTime(90_000)
+      })
+      expect(within(row).getByText('synced 1m ago')).toBeInTheDocument()
+
+      await act(async () => {
+        vi.advanceTimersByTime(60_000)
+      })
+      expect(within(row).getByText('synced 2m ago')).toBeInTheDocument()
+
+      // The absolute timestamp stays in the title throughout.
+      expect(within(row).getByText('synced 2m ago')).toHaveAttribute(
+        'title',
+        new Date('2026-07-22T10:00:00Z').toLocaleString(),
+      )
+
+      unmount()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('shows an empty state when there are no accounts', async () => {
