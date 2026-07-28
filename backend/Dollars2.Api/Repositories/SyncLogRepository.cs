@@ -60,4 +60,38 @@ public class SyncLogRepository
             new { accountIds },
             _db.CurrentTransaction);
     }
+
+    /// <summary>
+    /// Deletes sync history older than the retention window, keeping two rows per account no matter
+    /// how old they are: the newest row (what <see cref="GetLatestPerAccountAsync"/> reports) and the
+    /// newest successful row (what <see cref="GetLastSuccessfulAsync"/> uses as the incremental sync
+    /// watermark — dropping it would silently reset the account to a full 180-day refetch).
+    /// The cutoff is computed by the database so it can't drift from the SYSUTCDATETIME() stamps
+    /// written by <see cref="CreateAsync"/>. Returns the number of rows removed.
+    /// </summary>
+    public async Task<int> PruneAsync(int retentionDays)
+    {
+        return await _db.Connection.ExecuteAsync(
+            @"WITH Keepers AS (
+                SELECT Id
+                FROM (
+                    SELECT Id, ROW_NUMBER() OVER (PARTITION BY AccountId ORDER BY SyncedAt DESC, Id DESC) AS rn
+                    FROM SyncLog
+                ) latest
+                WHERE rn = 1
+                UNION
+                SELECT Id
+                FROM (
+                    SELECT Id, ROW_NUMBER() OVER (PARTITION BY AccountId ORDER BY SyncedAt DESC, Id DESC) AS rn
+                    FROM SyncLog
+                    WHERE Status = 'Success'
+                ) latestSuccess
+                WHERE rn = 1
+              )
+              DELETE FROM SyncLog
+              WHERE SyncedAt < DATEADD(day, -@retentionDays, SYSUTCDATETIME())
+                AND Id NOT IN (SELECT Id FROM Keepers)",
+            new { retentionDays },
+            _db.CurrentTransaction);
+    }
 }

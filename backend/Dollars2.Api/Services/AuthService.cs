@@ -33,7 +33,19 @@ public class AuthService
             return DollarsApiResponse<AuthResponse>.Fail("User not found.", "USER_NOT_FOUND");
         }
 
-        return await GenerateTokensAsync(user);
+        _dbSession.BeginTransaction();
+        try
+        {
+            await _refreshTokenRepo.DeleteExpiredForUserAsync(user.Id);
+            var result = await GenerateTokensAsync(user);
+            _dbSession.Commit();
+            return result;
+        }
+        catch
+        {
+            _dbSession.Rollback();
+            throw;
+        }
     }
 
     public async Task<DollarsApiResponse<AuthResponse>> RefreshAsync(string refreshToken)
@@ -56,6 +68,7 @@ public class AuthService
         try
         {
             await _refreshTokenRepo.DeleteAsync(token.Id);
+            await _refreshTokenRepo.DeleteExpiredForUserAsync(user.Id);
             var result = await GenerateTokensAsync(user);
             _dbSession.Commit();
             return result;
