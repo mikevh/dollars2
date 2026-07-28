@@ -10,6 +10,22 @@ const DEFAULT_RESYNC_DAYS = 180
 const MIN_RESYNC_DAYS = 1
 const MAX_RESYNC_DAYS = 730
 
+// Matches formatRelativeTime's finest granularity ('just now' vs whole minutes), so the
+// 'just now' -> '1m ago' transition doesn't visibly lag.
+const RELATIVE_TIME_TICK_MS = 30_000
+
+/** Current epoch millis, re-rendering on an interval so rendered relative times age on their own. */
+function useNow(intervalMs: number): number {
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs)
+    return () => clearInterval(id)
+  }, [intervalMs])
+
+  return now
+}
+
 /** Shared success/failure toast for both the manual sync and the full resync. */
 function toastSyncResults(results: SyncResult[]) {
   const failures = results.filter((r) => r.status === 'Failure')
@@ -28,7 +44,7 @@ function sourceTypeLabel(sourceType: string): string {
   return sourceType
 }
 
-function LastSynced({ account }: { account: AccountInfo }) {
+function LastSynced({ account, now }: { account: AccountInfo; now: number }) {
   if (!account.lastSyncedAt) {
     return <span className="text-muted">—</span>
   }
@@ -41,7 +57,7 @@ function LastSynced({ account }: { account: AccountInfo }) {
       title={failed ? `Last sync failed · ${absolute}` : absolute}
     >
       {failed ? 'sync failed ' : 'synced '}
-      {formatRelativeTime(account.lastSyncedAt)}
+      {formatRelativeTime(account.lastSyncedAt, now)}
     </span>
   )
 }
@@ -174,6 +190,7 @@ function ResyncDialog({ group, onClose }: { group: AccountGroup; onClose: () => 
 export default function AccountsPage() {
   const dispatch = useAppDispatch()
   const { groups, loading, error } = useAppSelector((state) => state.accounts)
+  const now = useNow(RELATIVE_TIME_TICK_MS)
 
   useEffect(() => {
     dispatch(fetchAccounts())
@@ -225,7 +242,7 @@ export default function AccountsPage() {
                               {formatCurrency(account.balance)}
                             </span>
                           )}
-                          <LastSynced account={account} />
+                          <LastSynced account={account} now={now} />
                         </div>
                       </Link>
                     </li>
