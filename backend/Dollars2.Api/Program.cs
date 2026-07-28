@@ -1,4 +1,5 @@
 using System.Text;
+using Dollars2.Api.Configuration;
 using Dollars2.Api.Data;
 using Dollars2.Api.Json;
 using Dollars2.Api.Logging;
@@ -67,10 +68,8 @@ builder.Services.AddCors(options =>
     });
 });
 
-var jwtSecret = builder.Configuration["Jwt:Secret"]
-    ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
-var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "Dollars2";
-var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "Dollars2";
+var jwtSettings = JwtSettings.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(jwtSettings);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -81,9 +80,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+            ValidIssuer = jwtSettings.Issuer,
+            ValidAudience = jwtSettings.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret))
         };
     });
 
