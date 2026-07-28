@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useAppSelector } from '../../app/hooks'
 import { api } from '../../api/client'
+import Dialog, { DialogHeader } from '../../components/Dialog'
 import type { TransactionResponse } from '../../types/transaction'
 import { formatCurrency } from '../../utils/format'
 
@@ -32,6 +33,10 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
   const isCreate = !transaction
   const isEditable = isCreate || transaction.isManual
   const budget = useAppSelector((state) => state.budget.budget)
+  const titleId = useId()
+  // Null when the transaction isn't editable and no input renders — Dialog then
+  // falls back to focusing the panel.
+  const descriptionRef = useRef<HTMLInputElement>(null)
 
   const [description, setDescription] = useState(transaction?.description ?? '')
   const [isExpense, setIsExpense] = useState(transaction ? transaction.amount < 0 : true)
@@ -193,15 +198,21 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
     onClose()
   }
 
-  // The document listener is attached once on mount and reads the current handler
-  // through a ref, instead of closing over save state and re-subscribing on every
-  // render the way an effect with no dependency array would.
+  // Escape is handled by Dialog; this listener covers only Enter-to-save. It is
+  // attached once on mount and reads the current handler through a ref, instead of
+  // closing over save state and re-subscribing on every render the way an effect
+  // with no dependency array would.
   const latestKeyDown = useRef<(e: KeyboardEvent) => void>(() => {})
   useEffect(() => {
     latestKeyDown.current = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      } else if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
+      // Buttons are excluded as well as textareas: now that the dialog traps focus,
+      // Cancel/Close/Delete are reachable by keyboard, and swallowing Enter there
+      // would save instead of activating the focused button.
+      if (
+        e.key === 'Enter' &&
+        !(e.target instanceof HTMLTextAreaElement) &&
+        !(e.target instanceof HTMLButtonElement)
+      ) {
         e.preventDefault()
         if (canSave && !saving) {
           handleSave()
@@ -234,226 +245,212 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="fixed inset-0 bg-black/50" />
-      <div
-        className="relative w-full max-w-md border border-divider bg-surface p-6 shadow-elev-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-heading text-lg font-extrabold uppercase tracking-wide text-text">
-            {isCreate ? 'New Transaction' : 'Edit Transaction'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-muted hover:text-accent-700"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
-          </button>
+    <Dialog onClose={onClose} labelledBy={titleId} initialFocusRef={descriptionRef} className="max-w-md">
+      <DialogHeader
+        id={titleId}
+        title={isCreate ? 'New Transaction' : 'Edit Transaction'}
+        onClose={onClose}
+      />
+
+      <div className="flex flex-col gap-3">
+        {isEditable ? (
+          <div className="flex gap-4">
+            <label className="flex items-center gap-1.5 text-sm text-text">
+              <input
+                type="radio"
+                checked={isExpense}
+                onChange={() => setIsExpense(true)}
+                className="accent-accent"
+              />
+              Expense
+            </label>
+            <label className="flex items-center gap-1.5 text-sm text-text">
+              <input
+                type="radio"
+                checked={!isExpense}
+                onChange={() => setIsExpense(false)}
+                className="accent-accent"
+              />
+              Income
+            </label>
+          </div>
+        ) : (
+          <div className="text-sm text-muted">
+            {transaction.amount < 0 ? 'Expense' : 'Income'}
+          </div>
+        )}
+
+        <div className="field">
+          <label>Description</label>
+          {isEditable ? (
+            <input
+              ref={descriptionRef}
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="input"
+            />
+          ) : (
+            <div className="text-sm text-text">{description}</div>
+          )}
         </div>
 
-        <div className="flex flex-col gap-3">
-          {isEditable ? (
-            <div className="flex gap-4">
-              <label className="flex items-center gap-1.5 text-sm text-text">
-                <input
-                  type="radio"
-                  checked={isExpense}
-                  onChange={() => setIsExpense(true)}
-                  className="accent-accent"
-                />
-                Expense
-              </label>
-              <label className="flex items-center gap-1.5 text-sm text-text">
-                <input
-                  type="radio"
-                  checked={!isExpense}
-                  onChange={() => setIsExpense(false)}
-                  className="accent-accent"
-                />
-                Income
-              </label>
-            </div>
-          ) : (
-            <div className="text-sm text-muted">
-              {transaction.amount < 0 ? 'Expense' : 'Income'}
-            </div>
-          )}
-
+        {transaction?.payee && (
           <div className="field">
-            <label>Description</label>
+            <label>Payee</label>
+            <div className="text-sm text-text">{transaction.payee}</div>
+          </div>
+        )}
+
+        {transaction?.memo && (
+          <div className="field">
+            <label>Memo</label>
+            <div className="text-sm text-text">{transaction.memo}</div>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <div className="field flex-1">
+            <label>Amount</label>
             {isEditable ? (
               <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                autoFocus
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                step="0.01"
                 className="input"
               />
             ) : (
-              <div className="text-sm text-text">{description}</div>
+              <div className="text-sm text-text">{formatCurrency(parseFloat(amount))}</div>
             )}
           </div>
-
-          {transaction?.payee && (
-            <div className="field">
-              <label>Payee</label>
-              <div className="text-sm text-text">{transaction.payee}</div>
-            </div>
-          )}
-
-          {transaction?.memo && (
-            <div className="field">
-              <label>Memo</label>
-              <div className="text-sm text-text">{transaction.memo}</div>
-            </div>
-          )}
-
-          <div className="flex gap-3">
-            <div className="field flex-1">
-              <label>Amount</label>
-              {isEditable ? (
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  step="0.01"
-                  className="input"
-                />
-              ) : (
-                <div className="text-sm text-text">{formatCurrency(parseFloat(amount))}</div>
-              )}
-            </div>
-            <div className="field flex-1">
-              <label>Date</label>
-              {isEditable ? (
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="input"
-                />
-              ) : (
-                <div className="text-sm text-text">
-                  {new Date(date + 'T00:00:00').toLocaleDateString()}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="field">
-            <label>Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="input"
-            />
-          </div>
-
-          <div className="field">
-            <label>Line Item</label>
-            {pendingAssignments.length > 0 && (
-              <div className="mb-2 border border-divider">
-                {pendingAssignments.map((a) => (
-                  <div key={a.lineItemId} className="flex items-center justify-between gap-2 border-b border-divider px-3 py-1.5 last:border-b-0">
-                    <span className="min-w-0 flex-1 truncate text-sm text-text">{a.lineItemName}</span>
-                    {isSplit && (
-                      <input
-                        type="number"
-                        value={a.amount}
-                        onChange={(e) => updateAssignmentAmount(a.lineItemId, e.target.value)}
-                        step="0.01"
-                        className="input w-24 text-right"
-                      />
-                    )}
-                    <button
-                      onClick={() => removeAssignment(a.lineItemId)}
-                      className="text-muted hover:text-accent-700"
-                      title="Remove"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
+          <div className="field flex-1">
+            <label>Date</label>
+            {isEditable ? (
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="input"
+              />
+            ) : (
+              <div className="text-sm text-text">
+                {new Date(date + 'T00:00:00').toLocaleDateString()}
               </div>
             )}
-            {isSplit && !sumMatches && (
-              <p className="mb-2 text-xs text-accent-700">
-                Split amounts must add up to {formatCurrency(absTotal)}
-              </p>
-            )}
-            {hasDropdownOptions && (
-              <select
-                value=""
-                onChange={(e) => {
-                  const id = parseInt(e.target.value)
-                  if (!id || !budget) {
-                    return
-                  }
-                  for (const group of budget.groups) {
-                    const li = group.lineItems.find((l) => l.id === id)
-                    if (li) {
-                      addAssignment(li.id, li.name)
-                      return
-                    }
-                  }
-                }}
-                className="input"
-              >
-                <option value="">Select a line item...</option>
-                {budget!.groups.map((group) => {
-                  const available = group.lineItems.filter((li) => !selectedIds.has(li.id))
-                  if (available.length === 0) {
-                    return null
-                  }
-                  return (
-                    <optgroup key={group.id} label={group.name}>
-                      {available.map((li) => (
-                        <option key={li.id} value={li.id}>{li.name}</option>
-                      ))}
-                    </optgroup>
-                  )
-                })}
-              </select>
-            )}
           </div>
         </div>
 
-        <div className="mt-5 flex items-center justify-between">
-          <div className="flex gap-2">
-            {!isCreate && originalAssignments.length === 0 && pendingAssignments.length === 0 && (
-              <button
-                onClick={handleDelete}
-                className="btn btn-secondary text-accent-700"
-              >
-                Delete
-              </button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="btn btn-secondary"
+        <div className="field">
+          <label>Notes</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            className="input"
+          />
+        </div>
+
+        <div className="field">
+          <label>Line Item</label>
+          {pendingAssignments.length > 0 && (
+            <div className="mb-2 border border-divider">
+              {pendingAssignments.map((a) => (
+                <div key={a.lineItemId} className="flex items-center justify-between gap-2 border-b border-divider px-3 py-1.5 last:border-b-0">
+                  <span className="min-w-0 flex-1 truncate text-sm text-text">{a.lineItemName}</span>
+                  {isSplit && (
+                    <input
+                      type="number"
+                      value={a.amount}
+                      onChange={(e) => updateAssignmentAmount(a.lineItemId, e.target.value)}
+                      step="0.01"
+                      className="input w-24 text-right"
+                    />
+                  )}
+                  <button
+                    onClick={() => removeAssignment(a.lineItemId)}
+                    className="text-muted hover:text-accent-700"
+                    title="Remove"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                      <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {isSplit && !sumMatches && (
+            <p className="mb-2 text-xs text-accent-700">
+              Split amounts must add up to {formatCurrency(absTotal)}
+            </p>
+          )}
+          {hasDropdownOptions && (
+            <select
+              value=""
+              onChange={(e) => {
+                const id = parseInt(e.target.value)
+                if (!id || !budget) {
+                  return
+                }
+                for (const group of budget.groups) {
+                  const li = group.lineItems.find((l) => l.id === id)
+                  if (li) {
+                    addAssignment(li.id, li.name)
+                    return
+                  }
+                }
+              }}
+              className="input"
             >
-              Cancel
-            </button>
-            {(isCreate || isEditable || hasAssignmentChange || notes.trim() !== (transaction?.notes ?? '')) && (
-              <button
-                onClick={handleSave}
-                disabled={!canSave || saving}
-                className="btn btn-primary"
-              >
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-            )}
-          </div>
+              <option value="">Select a line item...</option>
+              {budget!.groups.map((group) => {
+                const available = group.lineItems.filter((li) => !selectedIds.has(li.id))
+                if (available.length === 0) {
+                  return null
+                }
+                return (
+                  <optgroup key={group.id} label={group.name}>
+                    {available.map((li) => (
+                      <option key={li.id} value={li.id}>{li.name}</option>
+                    ))}
+                  </optgroup>
+                )
+              })}
+            </select>
+          )}
         </div>
       </div>
-    </div>
+
+      <div className="mt-5 flex items-center justify-between">
+        <div className="flex gap-2">
+          {!isCreate && originalAssignments.length === 0 && pendingAssignments.length === 0 && (
+            <button
+              onClick={handleDelete}
+              className="btn btn-secondary text-accent-700"
+            >
+              Delete
+            </button>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="btn btn-secondary"
+          >
+            Cancel
+          </button>
+          {(isCreate || isEditable || hasAssignmentChange || notes.trim() !== (transaction?.notes ?? '')) && (
+            <button
+              onClick={handleSave}
+              disabled={!canSave || saving}
+              className="btn btn-primary"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          )}
+        </div>
+      </div>
+    </Dialog>
   )
 }

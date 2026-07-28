@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
+import Dialog, { DialogHeader } from '../components/Dialog'
 import { fetchAccounts, syncConnection, resyncConnection } from '../features/accounts/accountsSlice'
 import { formatCurrency, formatRelativeTime } from '../utils/format'
 import type { AccountGroup, AccountInfo, SyncResult } from '../types/account'
@@ -113,6 +114,8 @@ function ResyncButton({ group }: { group: AccountGroup }) {
 
 function ResyncDialog({ group, onClose }: { group: AccountGroup; onClose: () => void }) {
   const dispatch = useAppDispatch()
+  const titleId = useId()
+  const daysInputRef = useRef<HTMLInputElement>(null)
   const [days, setDays] = useState(String(DEFAULT_RESYNC_DAYS))
   const syncingConnectionId = useAppSelector((state) => state.accounts.syncingConnectionId)
   const resyncing = syncingConnectionId === group.connectionId
@@ -134,56 +137,45 @@ function ResyncDialog({ group, onClose }: { group: AccountGroup; onClose: () => 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="fixed inset-0 bg-black/50" />
-      <div
-        className="relative w-full max-w-sm border border-divider bg-surface p-6 shadow-elev-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-heading text-lg font-extrabold uppercase tracking-wide text-text">
-            Re-sync {sourceTypeLabel(group.sourceType)}
-          </h2>
-          <button onClick={onClose} className="text-muted hover:text-accent-700">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
-          </button>
-        </div>
+    <Dialog onClose={onClose} labelledBy={titleId} initialFocusRef={daysInputRef} className="max-w-sm">
+      <DialogHeader
+        id={titleId}
+        title={<>Re-sync {sourceTypeLabel(group.sourceType)}</>}
+        onClose={onClose}
+      />
 
-        <label className="flex flex-col gap-1.5 text-sm text-text">
-          Number of days to sync back
-          <input
-            type="number"
-            min={MIN_RESYNC_DAYS}
-            max={MAX_RESYNC_DAYS}
-            value={days}
-            autoFocus
-            onChange={(e) => setDays(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && valid) {
-                handleResync()
-              }
-            }}
-            className="w-full border border-divider bg-bg px-2 py-1 text-text focus:border-accent focus:outline-none"
-          />
-        </label>
-        <p className="mt-1 text-[12px] text-muted">Between {MIN_RESYNC_DAYS} and {MAX_RESYNC_DAYS} days.</p>
+      <label className="flex flex-col gap-1.5 text-sm text-text">
+        Number of days to sync back
+        <input
+          ref={daysInputRef}
+          type="number"
+          min={MIN_RESYNC_DAYS}
+          max={MAX_RESYNC_DAYS}
+          value={days}
+          onChange={(e) => setDays(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && valid) {
+              handleResync()
+            }
+          }}
+          className="w-full border border-divider bg-bg px-2 py-1 text-text focus:border-accent focus:outline-none"
+        />
+      </label>
+      <p className="mt-1 text-[12px] text-muted">Between {MIN_RESYNC_DAYS} and {MAX_RESYNC_DAYS} days.</p>
 
-        <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="btn btn-secondary">
-            Cancel
-          </button>
-          <button
-            onClick={handleResync}
-            disabled={!valid || resyncing}
-            className="btn btn-primary"
-          >
-            {resyncing ? 'Re-syncing…' : 'Re-sync'}
-          </button>
-        </div>
+      <div className="mt-5 flex justify-end gap-2">
+        <button onClick={onClose} className="btn btn-secondary">
+          Cancel
+        </button>
+        <button
+          onClick={handleResync}
+          disabled={!valid || resyncing}
+          className="btn btn-primary"
+        >
+          {resyncing ? 'Re-syncing…' : 'Re-sync'}
+        </button>
       </div>
-    </div>
+    </Dialog>
   )
 }
 

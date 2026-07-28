@@ -229,6 +229,21 @@ describe('AccountsPage', () => {
     expect(input.value).toBe('180')
   })
 
+  it('dismisses the re-sync dialog on Escape and returns focus to the trigger', async () => {
+    getMock.mockResolvedValue(singleSimplefinGroup)
+    renderPage()
+
+    const trigger = await screen.findByRole('button', { name: 'Re-sync' })
+    trigger.focus()
+    fireEvent.click(trigger)
+    expect(screen.getByRole('spinbutton')).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
+
   it('disables the confirm button for out-of-range or blank day counts', async () => {
     getMock.mockResolvedValue(singleSimplefinGroup)
     renderPage()
