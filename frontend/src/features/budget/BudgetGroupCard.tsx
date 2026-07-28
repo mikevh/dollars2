@@ -16,6 +16,17 @@ export default function BudgetGroupCard({ group, onSelectLineItem }: BudgetGroup
   const [nameValue, setNameValue] = useState(group.name)
   const [editingNewItemId, setEditingNewItemId] = useState<number | null>(null)
 
+  // Re-seed the draft whenever the saved name changes. A reducer that replaces the
+  // group in place updates this prop without remounting the card, so without this
+  // a later-opened editor would show a stale name and could save it back over the
+  // newer one. Skip while the editor is open so an in-progress edit is not yanked
+  // out from under the user; the draft re-seeds once it closes.
+  const [seededName, setSeededName] = useState(group.name)
+  if (!editingName && seededName !== group.name) {
+    setSeededName(group.name)
+    setNameValue(group.name)
+  }
+
   const columnLabels = group.isIncome
     ? { col1: 'Planned', col2: 'Received', col3: 'Remaining' }
     : { col1: 'Planned', col2: 'Spent', col3: 'Remaining' }
