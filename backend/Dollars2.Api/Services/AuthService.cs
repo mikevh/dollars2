@@ -2,7 +2,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using Dollars2.Api.Configuration;
 using Dollars2.Api.Data;
 using Dollars2.Api.Models;
 using Dollars2.Api.Repositories;
@@ -15,14 +14,14 @@ public class AuthService
     private readonly DbSession _dbSession;
     private readonly UserRepository _userRepo;
     private readonly RefreshTokenRepository _refreshTokenRepo;
-    private readonly JwtSettings _jwtSettings;
+    private readonly IConfiguration _config;
 
-    public AuthService(DbSession dbSession, UserRepository userRepo, RefreshTokenRepository refreshTokenRepo, JwtSettings jwtSettings)
+    public AuthService(DbSession dbSession, UserRepository userRepo, RefreshTokenRepository refreshTokenRepo, IConfiguration config)
     {
         _dbSession = dbSession;
         _userRepo = userRepo;
         _refreshTokenRepo = refreshTokenRepo;
-        _jwtSettings = jwtSettings;
+        _config = config;
     }
 
     public async Task<DollarsApiResponse<AuthResponse>> LoginAsync(string email)
@@ -83,14 +82,12 @@ public class AuthService
 
     private async Task<DollarsApiResponse<AuthResponse>> GenerateTokensAsync(User user)
     {
-        var now = DateTime.UtcNow;
-        // One expiry instant drives both the token's `exp` claim and the ExpiresAt we hand the
-        // client, so the two can never disagree about when the session dies.
-        var expiresAt = now.AddDays(_jwtSettings.ExpirationDays);
-        var jwt = GenerateJwt(user, expiresAt);
+        var jwt = GenerateJwt(user);
         var refreshToken = GenerateRefreshToken();
+        var expiresAt = DateTime.UtcNow.AddDays(_config.GetValue<int>("Jwt:ExpirationDays"));
+        var refreshExpirationDays = _config.GetValue<int?>("Jwt:RefreshExpirationDays") ?? 30;
 
-        await _refreshTokenRepo.CreateAsync(user.Id, refreshToken, now.AddDays(_jwtSettings.RefreshExpirationDays));
+        await _refreshTokenRepo.CreateAsync(user.Id, refreshToken, DateTime.UtcNow.AddDays(refreshExpirationDays));
 
         return DollarsApiResponse<AuthResponse>.Success(new AuthResponse
         {
@@ -100,9 +97,14 @@ public class AuthService
         });
     }
 
-    private string GenerateJwt(User user, DateTime expiresAt)
+    private string GenerateJwt(User user)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
+        var secret = _config["Jwt:Secret"]!;
+        var issuer = _config["Jwt:Issuer"] ?? "Dollars2";
+        var audience = _config["Jwt:Audience"] ?? "Dollars2";
+        var expirationDays = _config.GetValue<int>("Jwt:ExpirationDays");
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
@@ -113,10 +115,10 @@ public class AuthService
         };
 
         var token = new JwtSecurityToken(
-            issuer: _jwtSettings.Issuer,
-            audience: _jwtSettings.Audience,
+            issuer: issuer,
+            audience: audience,
             claims: claims,
-            expires: expiresAt,
+            expires: DateTime.UtcNow.AddDays(expirationDays),
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
