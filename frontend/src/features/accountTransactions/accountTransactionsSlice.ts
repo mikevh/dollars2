@@ -21,11 +21,15 @@ export interface AccountTransactionsQuery {
   sort: string
   dir: string
   q: string
+  includeDeleted: boolean
 }
 
 export const fetchAccountTransactions = createAsyncThunk(
   'accountTransactions/fetch',
-  async ({ accountId, page, size, sort, dir, q }: AccountTransactionsQuery, { rejectWithValue }) => {
+  async (
+    { accountId, page, size, sort, dir, q, includeDeleted }: AccountTransactionsQuery,
+    { rejectWithValue }
+  ) => {
     const params = new URLSearchParams({
       page: String(page),
       size: String(size),
@@ -34,6 +38,10 @@ export const fetchAccountTransactions = createAsyncThunk(
     })
     if (q) {
       params.set('q', q)
+    }
+    // Only sent when opted in — the backend defaults to excluding deleted rows.
+    if (includeDeleted) {
+      params.set('includeDeleted', 'true')
     }
     const result = await api.get<AccountTransactions>(
       `/api/transactions/by-account/${accountId}?${params.toString()}`

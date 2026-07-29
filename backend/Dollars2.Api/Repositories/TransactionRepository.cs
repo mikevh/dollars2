@@ -74,7 +74,7 @@ public class TransactionRepository
     }
 
     public async Task<(IReadOnlyList<Transaction> Rows, int TotalCount)> GetByAccountIdAsync(
-        int accountId, int page, int size, string sort, string dir, string? q)
+        int accountId, int page, int size, string sort, string dir, string? q, bool includeDeleted = false)
     {
         // Whitelist sort column and direction — never interpolate raw input into ORDER BY.
         var sortColumn = sort switch
@@ -87,6 +87,10 @@ public class TransactionRepository
 
         // Build the filter once and reuse it for both the count and the page so they can't diverge.
         var where = "t.AccountId = @accountId";
+        if (!includeDeleted)
+        {
+            where += " AND t.IsDeleted = 0";
+        }
         string? like = null;
         decimal? amount = null;
         if (!string.IsNullOrWhiteSpace(q))

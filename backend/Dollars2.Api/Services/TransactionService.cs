@@ -88,7 +88,7 @@ public class TransactionService
     }
 
     public async Task<DollarsApiResponse<AccountTransactionsResponse>> GetByAccountAsync(
-        int accountId, int userId, int page, int size, string sort, string dir, string? q)
+        int accountId, int userId, int page, int size, string sort, string dir, string? q, bool includeDeleted = false)
     {
         var account = await _accountRepo.GetByIdAsync(accountId);
         if (account is null || account.UserId != userId)
@@ -96,7 +96,7 @@ public class TransactionService
             return DollarsApiResponse<AccountTransactionsResponse>.Fail("Account not found.", "ACCOUNT_NOT_FOUND");
         }
 
-        var (rows, totalCount) = await _transactionRepo.GetByAccountIdAsync(accountId, page, size, sort, dir, q);
+        var (rows, totalCount) = await _transactionRepo.GetByAccountIdAsync(accountId, page, size, sort, dir, q, includeDeleted);
         var responses = new List<TransactionResponse>();
         foreach (var t in rows)
         {

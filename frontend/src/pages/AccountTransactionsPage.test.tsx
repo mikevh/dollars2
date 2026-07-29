@@ -91,6 +91,10 @@ function sizeOf(url: string): string | null {
   return new URLSearchParams(url.split('?')[1] ?? '').get('size')
 }
 
+function includeDeletedOf(url: string): string | null {
+  return new URLSearchParams(url.split('?')[1] ?? '').get('includeDeleted')
+}
+
 describe('AccountTransactionsPage', () => {
   beforeEach(() => {
     getMock.mockReset()
@@ -241,6 +245,79 @@ describe('AccountTransactionsPage', () => {
     getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
     renderPage()
     await waitFor(() => expect(sizeOf(lastUrl())).toBe('100'))
+  })
+
+  it('hides deleted transactions by default', async () => {
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    await waitFor(() => expect(lastUrl()).toContain('page=1'))
+
+    expect(includeDeletedOf(lastUrl())).toBeNull()
+    expect((screen.getByLabelText('Show deleted') as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('re-requests with deleted rows, resets to page 1, and persists the choice', async () => {
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    await waitFor(() => expect(lastUrl()).toContain('page=1'))
+
+    // Move off page 1 so the reset is observable.
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(lastUrl()).toContain('page=2'))
+
+    fireEvent.click(screen.getByLabelText('Show deleted'))
+    await waitFor(() => {
+      expect(includeDeletedOf(lastUrl())).toBe('true')
+      expect(lastUrl()).toContain('page=1')
+    })
+    expect(localStorage.getItem('accountTxShowDeleted')).toBe('true')
+  })
+
+  it('restores the persisted show-deleted choice on load', async () => {
+    localStorage.setItem('accountTxShowDeleted', 'true')
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    await waitFor(() => expect(includeDeletedOf(lastUrl())).toBe('true'))
+    expect((screen.getByLabelText('Show deleted') as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('unchecking stops requesting deleted rows and persists the choice', async () => {
+    localStorage.setItem('accountTxShowDeleted', 'true')
+    getMock.mockResolvedValue({ data: page([tx({})], 250), error: null })
+    renderPage()
+    await waitFor(() => expect(includeDeletedOf(lastUrl())).toBe('true'))
+
+    fireEvent.click(screen.getByLabelText('Show deleted'))
+    await waitFor(() => expect(includeDeletedOf(lastUrl())).toBeNull())
+    expect(localStorage.getItem('accountTxShowDeleted')).toBe('false')
+  })
+
+  it('keeps the show-deleted toggle reachable when the page comes back empty', async () => {
+    // An account whose rows are all deleted renders the empty state; the toggle is the
+    // only way back to them, so it must survive an empty page.
+    getMock.mockResolvedValue({ data: page([]), error: null })
+    renderPage()
+
+    expect(await screen.findByText('No transactions for this account.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Show deleted')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next' })).toBeNull()
+  })
+
+  it('says deleted rows are hidden on an empty page, so the message is not misleading', async () => {
+    // An account whose rows are all soft-deleted looks identical to an empty one.
+    getMock.mockResolvedValue({ data: page([]), error: null })
+    renderPage()
+
+    expect(await screen.findByText('Deleted transactions are hidden.')).toBeInTheDocument()
+  })
+
+  it('drops the hidden-deleted hint once deleted rows are being shown', async () => {
+    localStorage.setItem('accountTxShowDeleted', 'true')
+    getMock.mockResolvedValue({ data: page([]), error: null })
+    renderPage()
+
+    expect(await screen.findByText('No transactions for this account.')).toBeInTheDocument()
+    expect(screen.queryByText('Deleted transactions are hidden.')).toBeNull()
   })
 
   it('shows an empty state when the account has no transactions', async () => {

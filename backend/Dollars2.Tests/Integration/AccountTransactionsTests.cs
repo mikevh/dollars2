@@ -38,7 +38,7 @@ public sealed class AccountTransactionsTests
             await repository.SoftDeleteAsync(deleted);
             await SeedTransactionAsync(db, userId, accountB, "OTHER ACCOUNT");
 
-            var (rows, total) = await repository.GetByAccountIdAsync(accountA, 1, 100, "date", "desc", null);
+            var (rows, total) = await repository.GetByAccountIdAsync(accountA, 1, 100, "date", "desc", null, includeDeleted: true);
 
             Assert.Equal(2, rows.Count);
             Assert.Equal(2, total);
@@ -266,12 +266,101 @@ public sealed class AccountTransactionsTests
             var deleted = await SeedTransactionAsync(db, userId, accountId, "Removed");
             await repository.SoftDeleteAsync(deleted);
 
-            var (rows, total) = await repository.GetByAccountIdAsync(accountId, 1, 100, "date", "desc", null);
+            var (rows, total) = await repository.GetByAccountIdAsync(accountId, 1, 100, "date", "desc", null, includeDeleted: true);
 
             Assert.Equal(3, total);
             Assert.Contains(rows, t => t.Id == pending && t.IsPending);
             Assert.Contains(rows, t => t.Id == manual && t.IsManual);
             Assert.Contains(rows, t => t.Id == deleted && t.IsDeleted);
+        }
+        finally
+        {
+            db.Rollback();
+        }
+    }
+
+    [Fact]
+    public async Task GetByAccountIdAsync_excludes_deleted_rows_by_default()
+    {
+        using var db = _fixture.CreateSession();
+        db.BeginTransaction();
+        try
+        {
+            var userId = await SeedUserAsync(db, "hidedeleted@example.com");
+            var accountId = await SeedAccountAsync(db, userId, "Checking");
+            var repository = new TransactionRepository(db);
+
+            var kept = await SeedTransactionAsync(db, userId, accountId, "KROGER");
+            var deleted = await SeedTransactionAsync(db, userId, accountId, "OLD CHARGE");
+            await repository.SoftDeleteAsync(deleted);
+
+            var (rows, total) = await repository.GetByAccountIdAsync(accountId, 1, 100, "date", "desc", null);
+
+            // The count and the page share one WHERE clause, so the total must drop too —
+            // otherwise paging would advertise pages that come back empty.
+            Assert.Equal(1, total);
+            Assert.Equal(kept, Assert.Single(rows).Id);
+        }
+        finally
+        {
+            db.Rollback();
+        }
+    }
+
+    [Fact]
+    public async Task GetByAccountIdAsync_search_returns_a_deleted_match_only_when_included()
+    {
+        using var db = _fixture.CreateSession();
+        db.BeginTransaction();
+        try
+        {
+            var userId = await SeedUserAsync(db, "deletedsearch@example.com");
+            var accountId = await SeedAccountAsync(db, userId, "Checking");
+            var repository = new TransactionRepository(db);
+
+            var deleted = await SeedTransactionAsync(db, userId, accountId, "Morning COFFEE run");
+            await repository.SoftDeleteAsync(deleted);
+            await SeedTransactionAsync(db, userId, accountId, "Gas station", payee: "Shell");
+
+            var (hidden, hiddenTotal) = await repository.GetByAccountIdAsync(accountId, 1, 100, "date", "desc", "coffee");
+            var (shown, shownTotal) = await repository.GetByAccountIdAsync(accountId, 1, 100, "date", "desc", "coffee", includeDeleted: true);
+
+            Assert.Equal(0, hiddenTotal);
+            Assert.Empty(hidden);
+            Assert.Equal(1, shownTotal);
+            Assert.Equal(deleted, Assert.Single(shown).Id);
+        }
+        finally
+        {
+            db.Rollback();
+        }
+    }
+
+    [Fact]
+    public async Task GetByAccountAsync_passes_the_include_deleted_flag_through()
+    {
+        using var db = _fixture.CreateSession();
+        db.BeginTransaction();
+        try
+        {
+            var userId = await SeedUserAsync(db, "svc-deleted@example.com");
+            var accountId = await SeedAccountAsync(db, userId, "Checking");
+            var repository = new TransactionRepository(db);
+            await SeedTransactionAsync(db, userId, accountId, "KROGER");
+            var deleted = await SeedTransactionAsync(db, userId, accountId, "OLD CHARGE");
+            await repository.SoftDeleteAsync(deleted);
+            var service = BuildService(db);
+
+            var hidden = await service.GetByAccountAsync(accountId, userId, 1, 100, "date", "desc", null);
+            var shown = await service.GetByAccountAsync(accountId, userId, 1, 100, "date", "desc", null, includeDeleted: true);
+
+            Assert.Single(hidden.Data!.Transactions);
+            Assert.Equal(1, hidden.Data.TotalCount);
+            Assert.DoesNotContain(hidden.Data.Transactions, t => t.IsDeleted);
+
+            Assert.Equal(2, shown.Data!.Transactions.Count);
+            Assert.Equal(2, shown.Data.TotalCount);
+            Assert.Contains(shown.Data.Transactions, t => t.Id == deleted && t.IsDeleted);
         }
         finally
         {
