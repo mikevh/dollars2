@@ -9,6 +9,7 @@ public class CreateTransactionRequest
 
     [Required]
     [MinLength(1)]
+    [MaxLength(TransactionText.MaxLength)]
     public string Description { get; set; } = "";
 
     [Required]
@@ -16,7 +17,9 @@ public class CreateTransactionRequest
 
     public string? Notes { get; set; }
 
+    [MaxLength(TransactionText.MaxLength)]
     public string? Payee { get; set; }
 
+    [MaxLength(TransactionText.MaxLength)]
     public string? Memo { get; set; }
 }

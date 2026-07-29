@@ -295,7 +295,7 @@ public class PlaidProvider : IBankSyncProvider
         return match?.Balances?.Current;
     }
 
-    private static SyncedTransaction MapTransaction(PlaidTransaction t)
+    internal static SyncedTransaction MapTransaction(PlaidTransaction t)
     {
         // Plaid amounts are positive for outflow (money leaving the account); our
         // convention is negative for expenses, positive for income — so negate.

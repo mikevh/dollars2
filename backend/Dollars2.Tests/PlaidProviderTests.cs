@@ -1,6 +1,8 @@
+using Dollars2.Api.Models;
 using Dollars2.Api.Providers;
 using RemovedTransaction = Going.Plaid.Entity.RemovedTransaction;
 using PlaidAccount = Going.Plaid.Entity.Account;
+using PlaidTransaction = Going.Plaid.Entity.Transaction;
 using AccountBalance = Going.Plaid.Entity.AccountBalance;
 
 namespace Dollars2.Tests;
@@ -204,5 +206,43 @@ public class PlaidProviderTests
         var snapshot = new[] { SnapshotAccount("acct-1", null) };
 
         Assert.Null(PlaidProvider.ExtractCurrentBalance(snapshot, "acct-1"));
+    }
+
+    // Issue #93: Plaid puts no bound on original_description or merchant name, and the columns are
+    // nvarchar(500). Over-length text must be clamped on the way in — unclamped it raises SqlException
+    // 8152 on write, which fails the whole account's sync on every run while it is in the window.
+    [Fact]
+    public void MapTransaction_truncates_over_length_description_and_payee()
+    {
+        var longText = new string('x', 600);
+        var mapped = PlaidProvider.MapTransaction(new PlaidTransaction
+        {
+            TransactionId = "t1",
+            Date = new DateOnly(2026, 7, 15),
+            Amount = 12.50m,
+            OriginalDescription = longText,
+            MerchantName = longText,
+        });
+
+        Assert.Equal(TransactionText.MaxLength, mapped.Description.Length);
+        Assert.Equal(TransactionText.MaxLength, mapped.Payee.Length);
+    }
+
+    [Fact]
+    public void MapTransaction_leaves_text_within_the_column_width_unchanged()
+    {
+        var mapped = PlaidProvider.MapTransaction(new PlaidTransaction
+        {
+            TransactionId = "t1",
+            Date = new DateOnly(2026, 7, 15),
+            Amount = 12.50m,
+            OriginalDescription = "COFFEE SHOP #123",
+            MerchantName = "Blue Bottle",
+        });
+
+        Assert.Equal("COFFEE SHOP #123", mapped.Description);
+        Assert.Equal("Blue Bottle", mapped.Payee);
+        // Plaid amounts are positive for outflow; ours are negative for expenses.
+        Assert.Equal(-12.50m, mapped.Amount);
     }
 }

@@ -9,6 +9,7 @@ public class UpdateTransactionRequest
 
     [Required]
     [MinLength(1)]
+    [MaxLength(TransactionText.MaxLength)]
     public string Description { get; set; } = "";
 
     [Required]

@@ -79,6 +79,73 @@ public class SimplefinProviderTests
         Assert.NotNull(results[2].Error);
     }
 
+    // Issue #93: SimpleFIN puts no bound on description/payee/memo, and the columns are nvarchar(500).
+    // Over-length text must be clamped rather than fail the account — an unclamped value raises
+    // SqlException 8152 on write, which stalls that account's imports for as long as it is in the window.
+    [Fact]
+    public async Task Over_length_text_is_truncated_instead_of_failing_the_account()
+    {
+        var longText = new string('x', 600);
+        var response = $$"""
+        {"accounts":[{"id":"sf-1","transactions":[
+            {"id":"t1","posted":1700000000,"amount":"-12.50","description":"{{longText}}","payee":"{{longText}}","memo":"{{longText}}","pending":false}
+        ]}],"errlist":[]}
+        """;
+        var provider = CreateProvider(response);
+
+        var results = await provider.FetchTransactionsForConnectionAsync(
+            new[] { Account(1, accountId: "sf-1") }, since: null, cancel: TestContext.Current.CancellationToken);
+
+        Assert.Null(results[1].Error);
+        var mapped = Assert.Single(results[1].Upserts);
+        Assert.Equal(TransactionText.MaxLength, mapped.Description.Length);
+        Assert.Equal(TransactionText.MaxLength, mapped.Payee.Length);
+        Assert.Equal(TransactionText.MaxLength, mapped.Memo.Length);
+    }
+
+    // An explicit JSON null overwrites the DTO's "" default even though the property is declared
+    // non-nullable, so the clamp has to tolerate it. If it threw, the failure would surface from the
+    // fetch rather than the write, and BankSyncService fails *every* account on the connection when a
+    // fetch throws — a wider blast radius than the per-account failure this issue set out to remove.
+    [Fact]
+    public async Task Null_text_fields_map_to_empty_without_failing_the_fetch()
+    {
+        const string response = """
+        {"accounts":[{"id":"sf-1","transactions":[
+            {"id":"t1","posted":1700000000,"amount":"-12.50","description":null,"payee":null,"memo":null,"pending":false}
+        ]}],"errlist":[]}
+        """;
+        var provider = CreateProvider(response);
+
+        var results = await provider.FetchTransactionsForConnectionAsync(
+            new[] { Account(1, accountId: "sf-1") }, since: null, cancel: TestContext.Current.CancellationToken);
+
+        Assert.Null(results[1].Error);
+        var mapped = Assert.Single(results[1].Upserts);
+        Assert.Equal("", mapped.Description);
+        Assert.Equal("", mapped.Payee);
+        Assert.Equal("", mapped.Memo);
+    }
+
+    [Fact]
+    public async Task Text_within_the_column_width_is_mapped_unchanged()
+    {
+        const string response = """
+        {"accounts":[{"id":"sf-1","transactions":[
+            {"id":"t1","posted":1700000000,"amount":"-12.50","description":"Coffee","payee":"Cafe","memo":"latte","pending":false}
+        ]}],"errlist":[]}
+        """;
+        var provider = CreateProvider(response);
+
+        var results = await provider.FetchTransactionsForConnectionAsync(
+            new[] { Account(1, accountId: "sf-1") }, since: null, cancel: TestContext.Current.CancellationToken);
+
+        var mapped = Assert.Single(results[1].Upserts);
+        Assert.Equal("Coffee", mapped.Description);
+        Assert.Equal("Cafe", mapped.Payee);
+        Assert.Equal("latte", mapped.Memo);
+    }
+
     [Fact]
     public async Task Reported_balance_is_parsed_onto_the_result()
     {
