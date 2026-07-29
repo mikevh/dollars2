@@ -109,7 +109,10 @@ describe('LineItemRow draft re-sync', () => {
 
   // A rejected save leaves the prop unchanged, so the re-seed can't fire on its own.
   it('drops a rejected amount draft instead of re-submitting it on the next blur', async () => {
-    vi.mocked(api.put).mockResolvedValueOnce({ data: null, error: { message: 'nope' } })
+    vi.mocked(api.put).mockResolvedValueOnce({
+      data: null,
+      error: { message: 'nope', code: 'SERVER_ERROR' },
+    })
     renderRow()
 
     fireEvent.click(screen.getByText('$200.00'))
@@ -127,7 +130,10 @@ describe('LineItemRow draft re-sync', () => {
   })
 
   it('drops a rejected name draft instead of re-submitting it on the next blur', async () => {
-    vi.mocked(api.put).mockResolvedValueOnce({ data: null, error: { message: 'nope' } })
+    vi.mocked(api.put).mockResolvedValueOnce({
+      data: null,
+      error: { message: 'nope', code: 'SERVER_ERROR' },
+    })
     renderRow()
 
     fireEvent.click(screen.getByText('Rent'))
