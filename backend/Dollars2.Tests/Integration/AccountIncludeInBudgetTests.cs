@@ -106,8 +106,10 @@ public sealed class AccountIncludeInBudgetTests
             Assert.Equal(1, counts.Deleted);
             Assert.Equal(1, counts.Pending);
 
-            // The per-account view still returns the excluded account's rows.
-            var perAccount = (await repository.GetByAccountIdAsync(excluded, 1, 100, "date", "desc", null)).Rows.Select(t => t.Id).ToHashSet();
+            // The per-account view still returns the excluded account's rows. Deleted rows are
+            // opt-in there, so ask for them — the point is that IncludeInBudget doesn't filter
+            // this view, not that deleted rows show by default.
+            var perAccount = (await repository.GetByAccountIdAsync(excluded, 1, 100, "date", "desc", null, includeDeleted: true)).Rows.Select(t => t.Id).ToHashSet();
             Assert.Contains(excludedNew, perAccount);
             Assert.Contains(excludedTracked, perAccount);
             Assert.Contains(excludedDeleted, perAccount);

@@ -27,6 +27,7 @@ import type { TransactionResponse } from '../types/transaction'
 const PAGE_SIZE_OPTIONS = [10, 50, 100, 500]
 const DEFAULT_PAGE_SIZE = 100
 const PAGE_SIZE_STORAGE_KEY = 'accountTxPageSize'
+const SHOW_DELETED_STORAGE_KEY = 'accountTxShowDeleted'
 const SEARCH_DEBOUNCE_MS = 300
 
 // A single global page-size preference shared across all account pages. Falls
@@ -34,6 +35,11 @@ const SEARCH_DEBOUNCE_MS = 300
 function loadPageSize(): number {
   const stored = Number(localStorage.getItem(PAGE_SIZE_STORAGE_KEY))
   return PAGE_SIZE_OPTIONS.includes(stored) ? stored : DEFAULT_PAGE_SIZE
+}
+
+// Deleted transactions are hidden by default; anything but the stored 'true' reads as off.
+function loadShowDeleted(): boolean {
+  return localStorage.getItem(SHOW_DELETED_STORAGE_KEY) === 'true'
 }
 
 function formatDate(date: string): string {
@@ -87,6 +93,7 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
   })
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [showDeleted, setShowDeleted] = useState(loadShowDeleted)
 
   // Debounce the search box; a new term always returns to the first page. The guard keeps a
   // mount from scheduling a timer that would snap an already-paged view back to page 1 for a
@@ -118,10 +125,20 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
           sort,
           dir,
           q: debouncedSearch,
+          includeDeleted: showDeleted,
         })
       )
     }
-  }, [dispatch, accountId, pagination.pageIndex, pagination.pageSize, sort, dir, debouncedSearch])
+  }, [
+    dispatch,
+    accountId,
+    pagination.pageIndex,
+    pagination.pageSize,
+    sort,
+    dir,
+    debouncedSearch,
+    showDeleted,
+  ])
 
   useEffect(() => {
     return () => {
@@ -144,6 +161,14 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
     const size = Number(e.target.value)
     localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(size))
     setPagination({ pageIndex: 0, pageSize: size })
+  }
+
+  // Persist the choice globally and return to the first page — the row set changes underneath.
+  const handleShowDeletedChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const next = e.target.checked
+    localStorage.setItem(SHOW_DELETED_STORAGE_KEY, String(next))
+    setShowDeleted(next)
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }))
   }
 
   // TanStack Table returns functions the React Compiler cannot memoize safely, so it
@@ -199,9 +224,15 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
 
             {transactions.length === 0 ? (
               <div className="text-muted py-12 text-center">
-                {debouncedSearch
-                  ? 'No transactions match your search.'
-                  : 'No transactions for this account.'}
+                <div>
+                  {debouncedSearch
+                    ? 'No transactions match your search.'
+                    : 'No transactions for this account.'}
+                </div>
+                {/* Without this the message reads as a lie when every row is soft-deleted. */}
+                {!showDeleted && (
+                  <div className="mt-1 text-[13px]">Deleted transactions are hidden.</div>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto border border-divider bg-surface shadow-elev-sm">
@@ -298,25 +329,39 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
               </div>
             )}
 
-            {transactions.length > 0 && (
-              <div className="text-muted mt-3 flex items-center justify-between text-[13px]">
-                <div className="flex items-center gap-3">
+            {/* The preference group renders even on an empty page: with deleted hidden by
+                default, an account whose rows are all deleted would otherwise strand the user
+                in the empty state with no way to switch them back on. */}
+            <div className="text-muted mt-3 flex items-center justify-between text-[13px]">
+              <div className="flex items-center gap-3">
+                {totalCount > 0 && (
                   <span className="tabular-nums">
                     {rangeStart}–{rangeEnd} of {totalCount}
                   </span>
-                  <select
-                    value={pagination.pageSize}
-                    onChange={handlePageSizeChange}
-                    className="input w-auto text-[13px]"
-                    aria-label="Transactions per page"
-                  >
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <option key={size} value={size}>
-                        {size} / page
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                )}
+                <select
+                  value={pagination.pageSize}
+                  onChange={handlePageSizeChange}
+                  className="input w-auto text-[13px]"
+                  aria-label="Transactions per page"
+                >
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size} / page
+                    </option>
+                  ))}
+                </select>
+                <label className="flex cursor-pointer items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={showDeleted}
+                    onChange={handleShowDeletedChange}
+                    className="accent-accent h-[13px] w-[13px] cursor-pointer"
+                  />
+                  <span>Show deleted</span>
+                </label>
+              </div>
+              {transactions.length > 0 && (
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -338,8 +383,8 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
                     Next
                   </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </>
         )}
       </div>

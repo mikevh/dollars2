@@ -58,7 +58,8 @@ public class TransactionsController : DollarsControllerBase
         [FromQuery] int size = 100,
         [FromQuery] string sort = "date",
         [FromQuery] string dir = "desc",
-        [FromQuery] string? q = null)
+        [FromQuery] string? q = null,
+        [FromQuery] bool includeDeleted = false)
     {
         if (page < 1)
         {
@@ -80,7 +81,7 @@ public class TransactionsController : DollarsControllerBase
         };
         dir = dir?.ToLowerInvariant() == "asc" ? "asc" : "desc";
 
-        var result = await _transactionService.GetByAccountAsync(accountId, GetUserId(), page, size, sort, dir, q);
+        var result = await _transactionService.GetByAccountAsync(accountId, GetUserId(), page, size, sort, dir, q, includeDeleted);
         if (result.Error is not null)
         {
             return BadRequest(result);
