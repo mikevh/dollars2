@@ -66,7 +66,7 @@ public class SyncController : DollarsControllerBase
     }
 
     [HttpPost("connection/{connectionId}/resync")]
-    public async Task<IActionResult> ResyncConnection(string connectionId, [FromBody] ResyncRequest request)
+    public async Task<IActionResult> ResyncConnection(string connectionId)
     {
         var userId = GetUserId();
         if (!_syncLock.TryAcquire(userId))
@@ -75,7 +75,7 @@ public class SyncController : DollarsControllerBase
         }
         try
         {
-            var results = await _syncService.ResyncConnectionForUserAsync(userId, connectionId, request.Days, HttpContext.RequestAborted);
+            var results = await _syncService.ResyncConnectionForUserAsync(userId, connectionId, HttpContext.RequestAborted);
             if (results is null)
             {
                 return NotFound(DollarsApiResponse<IEnumerable<SyncResult>>.Fail("Connection not found.", "CONNECTION_NOT_FOUND"));

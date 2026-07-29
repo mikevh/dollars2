@@ -7,10 +7,6 @@ import { fetchAccounts, syncConnection, resyncConnection } from '../features/acc
 import { formatCurrency, formatRelativeTime } from '../utils/format'
 import type { AccountGroup, AccountInfo, SyncResult } from '../types/account'
 
-const DEFAULT_RESYNC_DAYS = 180
-const MIN_RESYNC_DAYS = 1
-const MAX_RESYNC_DAYS = 730
-
 // Matches formatRelativeTime's finest granularity ('just now' vs whole minutes), so the
 // 'just now' -> '1m ago' transition doesn't visibly lag.
 const RELATIVE_TIME_TICK_MS = 30_000
@@ -115,19 +111,14 @@ function ResyncButton({ group }: { group: AccountGroup }) {
 function ResyncDialog({ group, onClose }: { group: AccountGroup; onClose: () => void }) {
   const dispatch = useAppDispatch()
   const titleId = useId()
-  const daysInputRef = useRef<HTMLInputElement>(null)
-  const [days, setDays] = useState(String(DEFAULT_RESYNC_DAYS))
+  // Focus the confirm button rather than the panel: with the days input gone there's nothing to
+  // fill in, and this keeps Enter-to-confirm working via the button's native activation.
+  const confirmRef = useRef<HTMLButtonElement>(null)
   const syncingConnectionId = useAppSelector((state) => state.accounts.syncingConnectionId)
   const resyncing = syncingConnectionId === group.connectionId
 
-  const parsed = Number(days)
-  const valid = days.trim() !== '' && Number.isInteger(parsed) && parsed >= MIN_RESYNC_DAYS && parsed <= MAX_RESYNC_DAYS
-
   const handleResync = async () => {
-    if (!valid) {
-      return
-    }
-    const result = await dispatch(resyncConnection({ connectionId: group.connectionId, days: parsed }))
+    const result = await dispatch(resyncConnection(group.connectionId))
     if (resyncConnection.rejected.match(result)) {
       toast.error(result.payload as string)
       return
@@ -137,39 +128,26 @@ function ResyncDialog({ group, onClose }: { group: AccountGroup; onClose: () => 
   }
 
   return (
-    <Dialog onClose={onClose} labelledBy={titleId} initialFocusRef={daysInputRef} className="max-w-sm">
+    <Dialog onClose={onClose} labelledBy={titleId} initialFocusRef={confirmRef} className="max-w-sm">
       <DialogHeader
         id={titleId}
         title={<>Re-sync {sourceTypeLabel(group.sourceType)}</>}
         onClose={onClose}
       />
 
-      <label className="flex flex-col gap-1.5 text-sm text-text">
-        Number of days to sync back
-        <input
-          ref={daysInputRef}
-          type="number"
-          min={MIN_RESYNC_DAYS}
-          max={MAX_RESYNC_DAYS}
-          value={days}
-          onChange={(e) => setDays(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && valid) {
-              handleResync()
-            }
-          }}
-          className="w-full border border-divider bg-bg px-2 py-1 text-text focus:border-accent focus:outline-none"
-        />
-      </label>
-      <p className="mt-1 text-[12px] text-muted">Between {MIN_RESYNC_DAYS} and {MAX_RESYNC_DAYS} days.</p>
+      <p className="text-sm text-text">
+        Re-fetches this connection's full transaction history. Transactions you already have are
+        matched and skipped, so this only adds what's missing.
+      </p>
 
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="btn btn-secondary">
           Cancel
         </button>
         <button
+          ref={confirmRef}
           onClick={handleResync}
-          disabled={!valid || resyncing}
+          disabled={resyncing}
           className="btn btn-primary"
         >
           {resyncing ? 'Re-syncing…' : 'Re-sync'}

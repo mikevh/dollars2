@@ -42,18 +42,13 @@ public class SimplefinProvider : IBankSyncProvider
         return $"{details.Url}\n{details.Username}";
     }
 
-    public async Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
-        IReadOnlyList<Account> accounts,
-        DateTime? since,
-        bool fullResync = false,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(IReadOnlyList<Account> accounts, DateTime? since, bool fullResync = false, CancellationToken cancel = default)
     {
         // SimpleFIN fetches purely by the `since` window (?start-date), so a full resync needs no
         // special handling here — the widened `since` the caller supplies already does the work.
         var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var parsed = accounts
-            .Select(a => (Account: a, Details: JsonSerializer.Deserialize<SimplefinConnectionDetails>(
-                a.ConnectionDetailsJson ?? "{}", jsonOptions)))
+            .Select(a => (Account: a, Details: JsonSerializer.Deserialize<SimplefinConnectionDetails>(a.ConnectionDetailsJson ?? "{}", jsonOptions)))
             .ToList();
 
         // Credentials are shared across the connection group (that's the key), so any account's
@@ -67,36 +62,38 @@ public class SimplefinProvider : IBankSyncProvider
 
         if (connectionDetails is null)
         {
-            _logger.LogWarning("SimpleFIN connection for accounts {AccountIds} has missing or invalid details.",
-                string.Join(", ", accounts.Select(a => a.Id)));
+            _logger.LogWarning("SimpleFIN connection for accounts {AccountIds} has missing or invalid details.", string.Join(", ", accounts.Select(a => a.Id)));
             throw new InvalidOperationException("SimpleFIN connection has missing or invalid details.");
         }
 
         var url = connectionDetails.Url;
         var base64Credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{connectionDetails.Username}:{connectionDetails.Password}"));
 
-        if (since.HasValue)
+        if (!fullResync && since.HasValue)
         {
             var startDate = ((DateTimeOffset)DateTime.SpecifyKind(since.Value, DateTimeKind.Utc)).ToUnixTimeSeconds();
             url += $"?start-date={startDate}";
         }
+        else
+        {
+            _logger.LogInformation("Simplefin fullsync? {fullResync}, since {since}, url {url}", fullResync, since?.ToString("u") ?? "since was null", url);
+        }
 
-        _logger.LogTrace("Fetching transactions for accounts {AccountIds} from SimpleFIN",
-            string.Join(", ", accounts.Select(a => a.Id)));
+        _logger.LogTrace("Fetching transactions for accounts {AccountIds} from SimpleFIN", string.Join(", ", accounts.Select(a => a.Id)));
+
         var http = _httpClientFactory.CreateClient("simplefin");
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64Credentials);
 
-        using var response = await http.SendAsync(request, cancellationToken);
+        using var response = await http.SendAsync(request, cancel);
         if (!response.IsSuccessStatusCode)
         {
-            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            var errorBody = await response.Content.ReadAsStringAsync(cancel);
             throw new HttpRequestException($"SimpleFIN request failed with status {(int)response.StatusCode}: {errorBody}");
         }
 
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        var accountSet = JsonSerializer.Deserialize<SimplefinAccountSet>(json)
-            ?? throw new InvalidOperationException("Failed to deserialize SimpleFIN response.");
+        var json = await response.Content.ReadAsStringAsync(cancel);
+        var accountSet = JsonSerializer.Deserialize<SimplefinAccountSet>(json) ?? throw new InvalidOperationException("Failed to deserialize SimpleFIN response.");
 
         foreach (var error in accountSet.Errlist)
         {
@@ -109,9 +106,7 @@ public class SimplefinProvider : IBankSyncProvider
             if (details is null || string.IsNullOrEmpty(details.AccountId))
             {
                 _logger.LogWarning("SimpleFIN account {AccountId} has no configured SimpleFIN AccountId.", account.Id);
-                results[account.Id] = new ProviderSyncResult(
-                    Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null,
-                    "SimpleFIN connection details are missing an AccountId.");
+                results[account.Id] = new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null, "SimpleFIN connection details are missing an AccountId.");
                 continue;
             }
 
@@ -119,9 +114,7 @@ public class SimplefinProvider : IBankSyncProvider
             if (simplefinAccount is null)
             {
                 _logger.LogWarning("No matching account found in SimpleFIN response for account {AccountId} with SimpleFIN AccountId {SimplefinAccountId}.", account.Id, details.AccountId);
-                results[account.Id] = new ProviderSyncResult(
-                    Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null,
-                    $"SimpleFIN returned no account matching AccountId '{details.AccountId}'.");
+                results[account.Id] = new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null, $"SimpleFIN returned no account matching AccountId '{details.AccountId}'.");
                 continue;
             }
 

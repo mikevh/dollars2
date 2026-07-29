@@ -59,11 +59,11 @@ public class BankSyncService
                 }
                 continue;
             }
-
+            
             if (enforceMinInterval && await IsWithinMinIntervalAsync(userId, sourceType, provider.MinSyncInterval))
             {
-                _logger.LogInformation("Skipping scheduled {SourceType} sync for user {UserId} — last successful sync is within the {MinInterval} minimum interval",
-                    sourceType, userId, provider.MinSyncInterval);
+                _logger.LogInformation("Skipping scheduled {SourceType} sync for user {UserId} — last successful sync is within the {MinInterval} minimum interval", sourceType, userId, provider.MinSyncInterval);
+
                 foreach (var account in group)
                 {
                     results.Add(SkippedResult(account));
@@ -77,7 +77,8 @@ public class BankSyncService
             foreach (var connectionGroup in connectionGroups)
             {
                 var connectionAccounts = connectionGroup.ToList();
-                results.AddRange(await SyncConnectionAsync(userId, provider, connectionAccounts, cancellationToken));
+                var syncResults = await SyncConnectionAsync(userId, provider, connectionAccounts, cancellationToken);
+                results.AddRange(syncResults);
             }
         }
 
@@ -107,7 +108,9 @@ public class BankSyncService
         }
 
         // Manual sync bypasses MinSyncInterval by design.
-        return await SyncConnectionAsync(userId, provider, connectionAccounts, cancellationToken);
+        var rv = await SyncConnectionAsync(userId, provider, connectionAccounts, cancellationToken);
+
+        return rv;
     }
 
     /// <summary>
@@ -119,7 +122,7 @@ public class BankSyncService
     /// but reset their cursor to re-stream from scratch. Returns null when no syncable connection matches
     /// (unknown id, or the "manual" group). Callers must hold the per-user <see cref="SyncLockService"/>.
     /// </summary>
-    public async Task<IReadOnlyList<SyncResult>?> ResyncConnectionForUserAsync(int userId, string connectionId, int days, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SyncResult>?> ResyncConnectionForUserAsync(int userId, string connectionId, CancellationToken cancellationToken = default)
     {
         var accounts = (await _accountRepo.GetByUserIdAsync(userId)).ToList();
         var connectionAccounts = ResolveConnectionAccounts(accounts, connectionId, _providers);
@@ -134,9 +137,10 @@ public class BankSyncService
             // Provider disabled or unregistered — mirror the full sync's skipped handling.
             return connectionAccounts.Select(SkippedResult).ToList();
         }
+        
+        var rv = await SyncConnectionAsync(userId, provider, connectionAccounts, cancellationToken, fullResync: true);
 
-        var since = DateTime.UtcNow.AddDays(-days);
-        return await SyncConnectionAsync(userId, provider, connectionAccounts, cancellationToken, overrideSince: since, fullResync: true);
+        return rv;
     }
 
     /// <summary>
@@ -144,10 +148,7 @@ public class BankSyncService
     /// <see cref="AccountService.BuildGroups"/> grouping so ids round-trip. Pure (no I/O) so it can be
     /// unit-tested. Returns an empty list when no syncable group matches (unknown id, or "manual").
     /// </summary>
-    public static IReadOnlyList<Account> ResolveConnectionAccounts(
-        IReadOnlyList<Account> accounts,
-        string connectionId,
-        IReadOnlyDictionary<string, IBankSyncProvider> providers)
+    public static IReadOnlyList<Account> ResolveConnectionAccounts(IReadOnlyList<Account> accounts, string connectionId, IReadOnlyDictionary<string, IBankSyncProvider> providers)
     {
         var syncable = accounts.Where(a => a.SourceType != SyncConstants.SourceTypeManual);
         foreach (var bySource in syncable.GroupBy(a => a.SourceType))
@@ -186,6 +187,7 @@ public class BankSyncService
         {
             return false;
         }
+
         return DateTime.UtcNow - lastSuccess.SyncedAt < minInterval;
     }
 
@@ -213,35 +215,30 @@ public class BankSyncService
         _logger.LogInformation("Completed bank sync for {UserCount} users", userIdList.Count);
     }
 
-    private async Task<IReadOnlyList<SyncResult>> SyncConnectionAsync(
-        int userId, IBankSyncProvider provider, IReadOnlyList<Account> accounts, CancellationToken cancellationToken,
-        DateTime? overrideSince = null, bool fullResync = false)
+    private async Task<IReadOnlyList<SyncResult>> SyncConnectionAsync(int userId, IBankSyncProvider provider, IReadOnlyList<Account> accounts, CancellationToken cancel, bool fullResync = false)
     {
         IReadOnlyDictionary<int, ProviderSyncResult> fetched;
         try
         {
-            // A user-initiated full resync supplies its own lookback window; use it verbatim and skip the
-            // per-account "since last sync" computation so the whole window is re-fetched.
-            DateTime? since = overrideSince;
-            if (since is null)
+            // The provider's single upstream call covers the whole group, so fetch from the earliest
+            // point any account in it needs. Overlap by some time to avoid missing transactions posted
+            // near the boundary; deduplication via ProviderTransactionId prevents double-imports.
+            var since = new DateTime(2100, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            foreach (var account in accounts)
             {
-                // The provider's single upstream call covers the whole group, so fetch from the earliest
-                // point any account in it needs. Overlap by 12 hours to avoid missing transactions posted
-                // near the boundary; deduplication via ProviderTransactionId prevents double-imports.
-                foreach (var account in accounts)
+                var lastSync = await _syncLogRepo.GetLastSuccessfulAsync(account.Id);
+                _logger.LogInformation("Last successful sync for account {AccountId} ({AccountName}) was at {LastSyncTime}", account.Id, account.Name, lastSync?.SyncedAt);
+
+                // going back 7 days from last sync time per simplefin support suggestion email on 7/29/2026
+                var accountSince = (lastSync?.SyncedAt.AddDays(-7) ?? DateTime.UtcNow.AddDays(-180));
+                if (accountSince < since)
                 {
-                    var lastSync = await _syncLogRepo.GetLastSuccessfulAsync(account.Id);
-                    _logger.LogInformation("Last successful sync for account {AccountId} ({AccountName}) was at {LastSyncTime}", account.Id, account.Name, lastSync?.SyncedAt);
-                    var accountSince = (lastSync?.SyncedAt ?? DateTime.UtcNow.AddDays(-180));
-                    if (since is null || accountSince < since)
-                    {
-                        since = accountSince;
-                    }
+                    since = accountSince;
                 }
             }
 
-            _logger.LogInformation("Syncing {AccountCount} account(s) for user {UserId} via {SourceType} (fullResync: {FullResync})", accounts.Count, userId, provider.SourceType, fullResync);
-            fetched = await provider.FetchTransactionsForConnectionAsync(accounts, since, fullResync, cancellationToken);
+            _logger.LogInformation("Syncing {AccountCount} account(s) for user {UserId} via {SourceType} since {since} (fullResync: {FullResync})", accounts.Count, userId, provider.SourceType, since.ToString("u"), fullResync);
+            fetched = await provider.FetchTransactionsForConnectionAsync(accounts, since, fullResync, cancel);
         }
         catch (Exception ex)
         {

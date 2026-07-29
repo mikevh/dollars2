@@ -219,14 +219,18 @@ describe('AccountsPage', () => {
     error: null,
   }
 
-  it('opens the re-sync dialog with a default of 180 days', async () => {
+  it('opens the re-sync dialog as a confirmation prompt', async () => {
     getMock.mockResolvedValue(singleSimplefinGroup)
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Re-sync' }))
 
-    const input = screen.getByRole('spinbutton') as HTMLInputElement
-    expect(input.value).toBe('180')
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/Re-sync SimpleFIN/)).toBeInTheDocument()
+    // The window is the server's to choose now — nothing left for the user to fill in.
+    expect(within(dialog).queryByRole('spinbutton')).not.toBeInTheDocument()
+    // With no input to seed, focus lands on confirm so Enter still activates it.
+    expect(within(dialog).getByRole('button', { name: 'Re-sync' })).toHaveFocus()
   })
 
   it('dismisses the re-sync dialog on Escape and returns focus to the trigger', async () => {
@@ -236,39 +240,15 @@ describe('AccountsPage', () => {
     const trigger = await screen.findByRole('button', { name: 'Re-sync' })
     trigger.focus()
     fireEvent.click(trigger)
-    expect(screen.getByRole('spinbutton')).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(trigger).toHaveFocus()
   })
 
-  it('disables the confirm button for out-of-range or blank day counts', async () => {
-    getMock.mockResolvedValue(singleSimplefinGroup)
-    renderPage()
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Re-sync' }))
-    const input = screen.getByRole('spinbutton')
-    // The dialog's confirm button shares the 'Re-sync' name; it's the one inside the dialog.
-    const confirm = screen.getAllByRole('button', { name: 'Re-sync' }).at(-1)!
-
-    expect(confirm).toBeEnabled() // default 180 is valid
-
-    fireEvent.change(input, { target: { value: '0' } })
-    expect(confirm).toBeDisabled()
-
-    fireEvent.change(input, { target: { value: '731' } })
-    expect(confirm).toBeDisabled()
-
-    fireEvent.change(input, { target: { value: '' } })
-    expect(confirm).toBeDisabled()
-
-    fireEvent.change(input, { target: { value: '365' } })
-    expect(confirm).toBeEnabled()
-  })
-
-  it('resyncs the connection with the chosen day count and toasts the new count', async () => {
+  it('resyncs the connection with no request body and toasts the new count', async () => {
     const toast = (await import('react-hot-toast')).default
     getMock.mockResolvedValue(singleSimplefinGroup)
     postMock.mockResolvedValue({
@@ -279,18 +259,18 @@ describe('AccountsPage', () => {
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Re-sync' }))
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '90' } })
     getMock.mockClear()
+    // The dialog's confirm button shares the 'Re-sync' name; it's the one inside the dialog.
     fireEvent.click(screen.getAllByRole('button', { name: 'Re-sync' }).at(-1)!)
 
     await waitFor(() =>
-      expect(postMock).toHaveBeenCalledWith('/api/sync/connection/abc123/resync', { days: 90 }),
+      expect(postMock).toHaveBeenCalledWith('/api/sync/connection/abc123/resync', undefined),
     )
     // Accounts are refetched after a successful resync.
     await waitFor(() => expect(getMock).toHaveBeenCalledWith('/api/accounts'))
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Synced 3 new transactions'))
     // Dialog closes on success.
-    await waitFor(() => expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
   it('shows an error toast when a group sync fails', async () => {

@@ -43,8 +43,8 @@ export const syncConnection = createAsyncThunk(
 
 export const resyncConnection = createAsyncThunk(
   'accounts/resyncConnection',
-  async ({ connectionId, days }: { connectionId: string; days: number }, { dispatch, rejectWithValue }) => {
-    const result = await api.post<SyncResult[]>(`/api/sync/connection/${connectionId}/resync`, { days })
+  async (connectionId: string, { dispatch, rejectWithValue }) => {
+    const result = await api.post<SyncResult[]>(`/api/sync/connection/${connectionId}/resync`)
     if (result.error) {
       return rejectWithValue(result.error.message)
     }
@@ -82,7 +82,7 @@ const accountsSlice = createSlice({
         state.syncingConnectionId = null
       })
       .addCase(resyncConnection.pending, (state, action) => {
-        state.syncingConnectionId = action.meta.arg.connectionId
+        state.syncingConnectionId = action.meta.arg
       })
       .addCase(resyncConnection.fulfilled, (state) => {
         state.syncingConnectionId = null
