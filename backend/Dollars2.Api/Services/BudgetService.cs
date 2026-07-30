@@ -249,7 +249,7 @@ public class BudgetService
         await _lineItemRepo.UpdateAsync(id, name, plannedAmount, notes);
         item.Name = name;
         item.PlannedAmount = plannedAmount;
-        item.Notes = notes;
+        item.Notes = notes ?? "";
 
         var group = (await _groupRepo.GetByIdAsync(item.GroupId))!;
         return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item, group.IsIncome));
@@ -397,7 +397,7 @@ public class BudgetService
 
             foreach (var sourceItem in sourceItems)
             {
-                await _lineItemRepo.CreateAsync(newGroupId, sourceItem.Name, sourceItem.PlannedAmount, sourceItem.SortOrder, sourceItem.Id);
+                await _lineItemRepo.CreateAsync(newGroupId, sourceItem.Name, sourceItem.PlannedAmount, sourceItem.SortOrder, sourceItem.Id, sourceItem.Notes);
             }
         }
     }
