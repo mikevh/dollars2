@@ -53,11 +53,18 @@ export default function BudgetPage() {
     }
   }
 
+  // A fetch in flight (or a rejected fetch) leaves the previous month's budget in the
+  // store rather than nulling it out, so the pane can stay mounted during a same-month
+  // refresh. Gate rendering on the budget actually matching the month being viewed —
+  // otherwise a month navigation would flash the month being left behind.
+  const currentMonthBudget =
+    budget && budget.year === currentYear && budget.month === currentMonth ? budget : null
+
   const selectedLineItem = (() => {
-    if (!budget || !selectedLineItemId) {
+    if (!currentMonthBudget || !selectedLineItemId) {
       return null
     }
-    for (const group of budget.groups) {
+    for (const group of currentMonthBudget.groups) {
       const lineItem = group.lineItems.find((li) => li.id === selectedLineItemId)
       if (lineItem) {
         return { lineItem, isIncome: group.isIncome }
@@ -66,8 +73,11 @@ export default function BudgetPage() {
     return null
   })()
 
-  const handleBudgetMutate = () => {
-    dispatch(fetchBudget({ year: currentYear, month: currentMonth }))
+  const handleBudgetMutate = async () => {
+    const result = await dispatch(fetchBudget({ year: currentYear, month: currentMonth }))
+    if (fetchBudget.rejected.match(result)) {
+      toast.error(result.payload as string)
+    }
   }
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -115,11 +125,11 @@ export default function BudgetPage() {
 
         <div className="mx-auto flex w-full max-w-[1180px] items-start gap-6 px-4 py-6">
           <div className="min-w-0 flex-1">
-            {loading && (
+            {loading && !currentMonthBudget && (
               <div className="text-muted py-12 text-center">Loading...</div>
             )}
 
-            {!loading && error === 'BUDGET_NOT_FOUND' && (
+            {!loading && !currentMonthBudget && error === 'BUDGET_NOT_FOUND' && (
               <div className="py-12 text-center">
                 <p className="text-muted mb-4">
                   No budget for this month.
@@ -135,11 +145,15 @@ export default function BudgetPage() {
               </div>
             )}
 
-            {!loading && error && error !== 'BUDGET_NOT_FOUND' && (
+            {!loading && !currentMonthBudget && error && error !== 'BUDGET_NOT_FOUND' && (
               <div className="py-12 text-center text-accent-700">{error}</div>
             )}
 
-            {!loading && budget && <BudgetPane budget={budget} onSelectLineItem={setSelectedLineItemId} />}
+            {currentMonthBudget && (
+              <div className={loading ? 'opacity-60' : ''} aria-busy={loading}>
+                <BudgetPane budget={currentMonthBudget} onSelectLineItem={setSelectedLineItemId} />
+              </div>
+            )}
           </div>
 
           {/* Pinned so the drag source stays on screen while the budget list scrolls past it.
