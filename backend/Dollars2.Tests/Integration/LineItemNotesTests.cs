@@ -6,9 +6,11 @@ namespace Dollars2.Tests.Integration;
 
 /// <summary>
 /// Proves the line-item notes write path (issue #64): <see cref="LineItemRepository.UpdateAsync"/>
-/// persists the <c>Notes</c> column verbatim (no trimming, no empty→NULL coercion) while still
-/// updating <c>Name</c>/<c>PlannedAmount</c>, and a subsequent read returns the stored value.
-/// Each test runs inside a transaction that is rolled back, so nothing persists.
+/// persists the <c>Notes</c> column verbatim (no trimming) while still updating
+/// <c>Name</c>/<c>PlannedAmount</c>, and a subsequent read returns the stored value. Since issue
+/// #163, <c>Notes</c> is <c>NOT NULL DEFAULT ''</c>, so a caller clearing notes with <c>null</c>
+/// gets coerced to <c>""</c> rather than failing the update. Each test runs inside a transaction
+/// that is rolled back, so nothing persists.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public sealed class LineItemNotesTests
@@ -67,7 +69,7 @@ public sealed class LineItemNotesTests
     }
 
     [Fact]
-    public async Task UpdateAsync_can_clear_notes_back_to_null()
+    public async Task UpdateAsync_clearing_notes_with_null_stores_empty_string()
     {
         using var db = _fixture.CreateSession();
         db.BeginTransaction();
@@ -80,7 +82,7 @@ public sealed class LineItemNotesTests
             await repository.UpdateAsync(lineItemId, "Item", 0m, null);
 
             var item = await repository.GetByIdAsync(lineItemId);
-            Assert.Null(item!.Notes);
+            Assert.Equal("", item!.Notes);
         }
         finally
         {
