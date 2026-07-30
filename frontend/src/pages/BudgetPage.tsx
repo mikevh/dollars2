@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
@@ -10,18 +10,21 @@ import BudgetPane from '../features/budget/BudgetPane'
 import ActivityPane from '../features/budget/ActivityPane'
 import TransactionPane from '../features/transactions/TransactionPane'
 import TransactionRow from '../features/transactions/TransactionRow'
-import Dialog from '../components/Dialog'
 import type { TransactionResponse } from '../types/transaction'
 
-export default function BudgetPage() {
-  const dispatch = useAppDispatch()
-  const { budget, loading, error, currentYear, currentMonth } = useAppSelector(
-    (state) => state.budget
-  )
-  const [draggingTransaction, setDraggingTransaction] = useState<TransactionResponse | null>(null)
-  const [selectedLineItemId, setSelectedLineItemId] = useState<number | null>(null)
-  const [crossMonthPending, setCrossMonthPending] = useState<{ transaction: TransactionResponse; lineItemId: number } | null>(null)
-  const crossMonthTitleId = useId()
+export default function BudgetPage() 
+{
+  const dispatch = useAppDispatch();
+  const { 
+    budget, 
+    loading, 
+    error, 
+    currentYear, 
+    currentMonth
+  } = useAppSelector(s => s.budget);
+  
+  const [draggingTransaction, setDraggingTransaction] = useState<TransactionResponse | null>(null);
+  const [selectedLineItemId, setSelectedLineItemId] = useState<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -110,9 +113,12 @@ export default function BudgetPage() {
 
     const txDate = new Date(transaction.date.slice(0, 10) + 'T00:00:00')
     const isCrossMonth = txDate.getFullYear() !== currentYear || txDate.getMonth() + 1 !== currentMonth
+
     if (isCrossMonth) {
-      setCrossMonthPending({ transaction, lineItemId })
-      return
+      const confirmed = window.confirm('This transaction is from a different month than the budget you are viewing. Are you sure you want to assign it?');
+      if (!confirmed) {
+        return;
+      }
     }
 
     await doAssign(transaction, lineItemId)
@@ -123,7 +129,7 @@ export default function BudgetPage() {
       <div className="flex min-h-screen flex-col bg-bg pb-14 text-text" onClick={() => setSelectedLineItemId(null)}>
         <MonthNav />
 
-        <div className="mx-auto flex w-full max-w-[1180px] items-start gap-6 px-4 py-6">
+        <div className="mx-auto flex w-full max-w-295 items-start gap-6 px-4 py-6">
           <div className="min-w-0 flex-1">
             {loading && !currentMonthBudget && (
               <div className="text-muted py-12 text-center">Loading...</div>
@@ -163,7 +169,7 @@ export default function BudgetPage() {
               taller than its slot pins at `top` and its overflowing bottom becomes unreachable.
               TransactionPane scrolls its own list, so fitting the viewport costs nothing. */}
           <div
-            className="sticky top-[86px] flex h-[calc(100vh-150px)] w-[380px] flex-none flex-col border border-divider bg-surface shadow-elev-sm"
+            className="sticky top-21.5 flex h-[calc(100vh-150px)] w-95 flex-none flex-col border border-divider bg-surface shadow-elev-sm"
             onClick={(e) => e.stopPropagation()}
           >
             {selectedLineItem ? (
@@ -181,45 +187,9 @@ export default function BudgetPage() {
         </div>
       </div>
 
-      {crossMonthPending && (() => {
-        const txDate = new Date(crossMonthPending.transaction.date.slice(0, 10) + 'T00:00:00')
-        const txMonthName = txDate.toLocaleString('default', { month: 'long' })
-        const budgetMonthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long' })
-        return (
-          <Dialog
-            onClose={() => setCrossMonthPending(null)}
-            labelledBy={crossMonthTitleId}
-            className="max-w-[420px]"
-          >
-            <h2 id={crossMonthTitleId} className="mb-2 text-[18px]">Cross-month assignment</h2>
-            <p className="text-muted mb-5 text-[14px]">
-              This transaction is from <strong className="text-text">{txMonthName}</strong> but you're viewing <strong className="text-text">{budgetMonthName}</strong>. Assign it anyway?
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setCrossMonthPending(null)}
-                className="btn btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  const { transaction, lineItemId } = crossMonthPending
-                  setCrossMonthPending(null)
-                  await doAssign(transaction, lineItemId)
-                }}
-                className="btn btn-primary"
-              >
-                Assign anyway
-              </button>
-            </div>
-          </Dialog>
-        )
-      })()}
-
       <DragOverlay dropAnimation={null}>
         {draggingTransaction && (
-          <div className="w-[380px] border border-divider bg-surface shadow-elev-lg">
+          <div className="w-95 border border-divider bg-surface shadow-elev-lg">
             <TransactionRow transaction={draggingTransaction} />
           </div>
         )}

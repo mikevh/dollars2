@@ -9,8 +9,8 @@ import AccountTransactionsPage from './pages/AccountTransactionsPage'
 import Footer from './components/Footer'
 
 function App() {
-  const { isAuthenticated } = useAppSelector((state) => state.auth)
-  useTheme()
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  useTheme();
 
   return (
     <BrowserRouter>

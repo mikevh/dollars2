@@ -21,8 +21,7 @@ const initialState: AuthState = {
   error: null,
 }
 
-export const login = createAsyncThunk(
-  'auth/login',
+export const loginThunkAsync = createAsyncThunk('auth/login',
   async (email: string, { rejectWithValue }) => {
     const result = await api.post<AuthResponse>('/api/auth/login', { email })
     if (result.error) {
@@ -46,18 +45,18 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(login.pending, (state) => {
+      .addCase(loginThunkAsync.pending, (state) => {
         state.loading = true
         state.error = null
       })
-      .addCase(login.fulfilled, (state, action) => {
+      .addCase(loginThunkAsync.fulfilled, (state, action) => {
         state.loading = false
         state.token = action.payload.token
         state.isAuthenticated = true
         localStorage.setItem('token', action.payload.token)
         localStorage.setItem('refreshToken', action.payload.refreshToken)
       })
-      .addCase(login.rejected, (state, action) => {
+      .addCase(loginThunkAsync.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload as string
       })

@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
-import { login } from '../features/auth/authSlice'
+import { loginThunkAsync } from '../features/auth/authSlice'
 
 interface LoginForm {
   email: string
@@ -20,11 +20,11 @@ export default function LoginPage() {
   } = useForm<LoginForm>()
 
   const onSubmit = async (data: LoginForm) => {
-    const result = await dispatch(login(data.email))
-    if (login.fulfilled.match(result)) {
-      navigate('/')
+    const result = await dispatch(loginThunkAsync(data.email));
+    if (loginThunkAsync.fulfilled.match(result)) {
+      navigate('/');
     } else {
-      toast.error(result.payload as string)
+      toast.error(result.payload as string);
     }
   }
 
@@ -40,12 +40,13 @@ export default function LoginPage() {
             <label htmlFor="email">Email</label>
             <input id="email" type="email" autoFocus placeholder="you@example.com" className="input"
               {...register('email', {
-                required: 'Email is required',
-                pattern: {
-                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                  message: 'Invalid email address',
-                },
-              })}
+                              required: 'Email is required',
+                              pattern: {
+                                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                                message: 'Invalid email address',
+                              }}
+                          )
+              }
             />
             {errors.email && (
               <p className="mt-1 text-[12px] text-accent-700">{errors.email.message}</p>
