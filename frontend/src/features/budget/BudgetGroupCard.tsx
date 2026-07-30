@@ -63,83 +63,83 @@ export default function BudgetGroupCard({ group, onSelectLineItem }: BudgetGroup
   }
 
   return (
-    <div className="mb-4 border border-divider bg-surface shadow-elev-sm">
-      <div className="flex items-center justify-between border-b-2 border-divider px-4 py-3">
-        <div className="flex items-center gap-2">
-          {editingName ? (
-            <input
-              type="text"
-              value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
-              onBlur={handleSaveName}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSaveName()
-                } else if (e.key === 'Escape') {
-                  setEditingName(false)
-                  setNameValue(group.name)
-                }
-              }}
-              autoFocus
-              className="input max-w-[240px] font-heading text-sm font-extrabold uppercase tracking-wide"
+    <div className="mb-4">
+      <div className="border border-divider bg-surface shadow-elev-sm">
+        <div className="flex items-center justify-between border-b-2 border-divider px-4 py-3">
+          <div className="flex items-center gap-2">
+            {editingName ? (
+              <input
+                type="text"
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onBlur={handleSaveName}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveName()
+                  } else if (e.key === 'Escape') {
+                    setEditingName(false)
+                    setNameValue(group.name)
+                  }
+                }}
+                autoFocus
+                className="input max-w-[240px] font-heading text-sm font-extrabold uppercase tracking-wide"
+              />
+            ) : (
+              <h3
+                onClick={() => {
+                  if (!group.isIncome) {
+                    setEditingName(true)
+                  }
+                }}
+                className={`font-heading text-sm font-extrabold uppercase tracking-wide text-text ${
+                  !group.isIncome ? 'cursor-pointer hover:text-accent-700' : ''
+                }`}
+              >
+                {group.name}
+              </h3>
+            )}
+            {!group.isIncome && editingName && (
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleDelete}
+                className="text-muted hover:text-accent-700"
+                title="Delete group"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                  <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <div className="flex gap-6 font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
+            <span className="w-24 text-right">{columnLabels.col1}</span>
+            <span className="w-24 text-right">{columnLabels.col2}</span>
+            <span className="w-24 text-right">{columnLabels.col3}</span>
+          </div>
+        </div>
+
+        {group.lineItems.length === 0 ? (
+          <div className="px-4 py-3 text-sm text-muted">
+            No items
+          </div>
+        ) : (
+          group.lineItems.map((item) => (
+            <LineItemRow
+              key={item.id}
+              lineItem={item}
+              groupId={group.id}
+              isIncome={group.isIncome}
+              startEditing={item.id === editingNewItemId}
+              onEditComplete={() => setEditingNewItemId(null)}
+              onSelect={() => onSelectLineItem?.(item.id)}
             />
-          ) : (
-            <h3
-              onClick={() => {
-                if (!group.isIncome) {
-                  setEditingName(true)
-                }
-              }}
-              className={`font-heading text-sm font-extrabold uppercase tracking-wide text-text ${
-                !group.isIncome ? 'cursor-pointer hover:text-accent-700' : ''
-              }`}
-            >
-              {group.name}
-            </h3>
-          )}
-          {!group.isIncome && editingName && (
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={handleDelete}
-              className="text-muted hover:text-accent-700"
-              title="Delete group"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.519.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
-              </svg>
-            </button>
-          )}
-        </div>
-        <div className="flex gap-6 font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-muted">
-          <span className="w-24 text-right">{columnLabels.col1}</span>
-          <span className="w-24 text-right">{columnLabels.col2}</span>
-          <span className="w-24 text-right">{columnLabels.col3}</span>
-        </div>
+          ))
+        )}
       </div>
 
-      {group.lineItems.length === 0 ? (
-        <div className="px-4 py-3 text-sm text-muted">
-          No items
-        </div>
-      ) : (
-        group.lineItems.map((item) => (
-          <LineItemRow
-            key={item.id}
-            lineItem={item}
-            groupId={group.id}
-            isIncome={group.isIncome}
-            startEditing={item.id === editingNewItemId}
-            onEditComplete={() => setEditingNewItemId(null)}
-            onSelect={() => onSelectLineItem?.(item.id)}
-          />
-        ))
-      )}
-
-      <div className="border-t border-divider px-4 py-2">
-        <button onClick={handleAddItem} className="btn btn-ghost">
-          + Add Item
-        </button>
-      </div>
+      <button onClick={handleAddItem} className="btn pl-3 btn-ghost">
+        + Add Item
+      </button>
     </div>
   )
 }

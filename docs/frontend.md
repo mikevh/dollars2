@@ -69,7 +69,7 @@
 - Show: planned / spent / remaining
 - Planned amount: inline editable (click to edit, spreadsheet-style)
 - Remaining: red text if negative
-- "+ Add Item" button at the bottom of each group
+- "+ Add Item" button below each group's card, flush with the page background (matching "+ Add Group")
 - Clicking a line item opens the activity pane (replaces transaction pane)
 
 ### Currency Input
