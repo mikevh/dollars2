@@ -33,7 +33,14 @@ function initAssignments(transaction: TransactionResponse | null): PendingAssign
 export default function TransactionEditDialog({ transaction, onClose, onMutate }: TransactionEditDialogProps) {
   const isCreate = !transaction
   const isEditable = isCreate || transaction.isManual
-  const budget = useAppSelector((state) => state.budget.budget)
+  // A fetch in flight (or a rejected fetch) leaves the previous month's budget in the
+  // store rather than nulling it out (see budgetSlice.ts), so gate on it actually
+  // matching the month being viewed — otherwise this dropdown could assign the
+  // transaction to a line item from a different month's budget.
+  const { budget: rawBudget, currentYear, currentMonth } = useAppSelector((state) => state.budget)
+  const budget = rawBudget && rawBudget.year === currentYear && rawBudget.month === currentMonth
+    ? rawBudget
+    : null
   const titleId = useId()
   // Null when the transaction isn't editable and no input renders — Dialog then
   // falls back to focusing the panel.

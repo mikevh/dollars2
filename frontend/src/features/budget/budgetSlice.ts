@@ -154,7 +154,6 @@ const budgetSlice = createSlice({
       .addCase(fetchBudget.pending, (state) => {
         state.loading = true
         state.error = null
-        state.budget = null
       })
       .addCase(fetchBudget.fulfilled, (state, action) => {
         state.loading = false
