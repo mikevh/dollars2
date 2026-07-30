@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../api/client'
@@ -80,5 +80,35 @@ describe('BudgetGroupCard draft re-sync', () => {
     setGroup(makeGroup({ name: 'Utilities' }))
 
     expect(screen.getByRole('textbox')).toHaveValue('Home')
+  })
+})
+
+describe('BudgetGroupCard add item', () => {
+  it('creates a line item and opens it in edit mode on click', async () => {
+    const newItem = {
+      id: 99,
+      name: 'New Item',
+      plannedAmount: 0,
+      spentAmount: 0,
+      receivedAmount: 0,
+      rolloverAmount: 0,
+      sortOrder: 1,
+      notes: null,
+    }
+    vi.mocked(api.post).mockResolvedValueOnce({ data: newItem, error: null })
+
+    // BudgetGroupCard renders lineItems from its `group` prop, not the store — in the real
+    // app the parent re-supplies the prop once the store updates. Simulate that with setGroup,
+    // same as the rename tests above; the assertion retries via waitFor until the component's
+    // internal editingNewItemId state (set after the dispatch resolves) has caught up.
+    const { setGroup } = renderCard()
+    fireEvent.click(screen.getByRole('button', { name: '+ Add Item' }))
+
+    expect(vi.mocked(api.post)).toHaveBeenCalledWith('/api/groups/20/line-items', { name: 'New Item', plannedAmount: 0 })
+
+    await waitFor(() => {
+      setGroup(makeGroup({ lineItems: [newItem] }))
+      expect(screen.getByRole('textbox')).toHaveValue('')
+    })
   })
 })
