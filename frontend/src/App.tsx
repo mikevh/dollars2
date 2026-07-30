@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { useAppSelector } from './app/hooks'
 import { useTheme } from './features/theme/useTheme'
@@ -16,9 +16,11 @@ function App() {
     <BrowserRouter>
       <Toaster position="top-right" />
       <Routes>
-        <Route path="/" element={ isAuthenticated ? <BudgetPage /> : <Navigate to="/login" replace /> }/>
-        <Route path="/accounts" element={ isAuthenticated ? <AccountsPage /> : <Navigate to="/login" replace /> } />
-        <Route path="/accounts/:accountId" element={ isAuthenticated ? <AccountTransactionsPage /> : <Navigate to="/login" replace /> } />
+        <Route element={isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />}>
+          <Route path="/" element={<BudgetPage />} />
+          <Route path="/accounts" element={<AccountsPage />} />
+          <Route path="/accounts/:accountId" element={<AccountTransactionsPage />} />
+        </Route>
         <Route path="/login" element={ isAuthenticated ? <Navigate to="/" replace /> : <LoginPage /> } />
       </Routes>
       { isAuthenticated && <Footer /> }
