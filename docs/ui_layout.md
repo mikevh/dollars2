@@ -10,6 +10,9 @@
 
 - Budget on the left, transaction pane on the right
 - Month navigation at the top to browse past/future months
+- The page has a single (window) scrollbar: the month navigation and the transaction pane stay
+  pinned in the viewport while the budget groups scroll underneath them, so the drag-and-drop
+  source stays reachable no matter how long the budget list is
 
 ## Budget Pane (Left)
 
