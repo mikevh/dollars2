@@ -81,6 +81,8 @@ For a single issue, or each one the user picks from triage:
   close candidates flagged (with reasons), and the suggested priority order.
 
 ## Notes
+- Step 2 of the loop: **new-issue → groom → next-item → /review → merge**. `new-issue` captures raw
+  ideas as one-concern issues; this skill takes them from captured to ready-to-work.
 - User-invoked only; never triggered automatically.
 - **Never auto-close** an issue — always flag close candidates for the user.
 - Interviews happen in single-issue mode and when the user drills into a `needs-info` issue from triage;

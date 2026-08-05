@@ -92,8 +92,21 @@ Both are pinned to `model: sonnet` and report back as condensed text.
 
 - Break work into the smallest possible increments, one concern per sprint
 - Interview for specs, verify decisions explicitly
-- Code review uncommitted changes before committing
-- Never commit or push unless explicitly told to — tell the user things are ready, wait for instruction
+- Never commit or push unless explicitly told to — tell the user things are ready, wait for
+  instruction. Invoking `/next-item` is that instruction, scoped to that one item
+
+### The workflow loop
+
+1. **`/new-issue <description>`** — capture work as one-concern GitHub issues
+2. **`/groom [N]`** — refine to a self-contained spec; applies the `groomed` label
+3. **`/next-item [N]`** — claim, plan, implement, test, open a PR (groomed issues only)
+4. **`/review <PR#>`** — user-invoked code review *of the open PR*; `next-item` pauses for it and
+   pushes the fixes to the same branch
+5. **Merge** — normally by hand in the GitHub UI; `/merge-pr <PR#>` when the full suite should be
+   re-run against the PR head first
+
+Review happens on the PR, not on an uncommitted diff. There is no CI, so nothing tests a PR head
+unless `/merge-pr` does.
 
 ## Backlog
 
