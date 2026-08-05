@@ -26,55 +26,54 @@ export default function BudgetPage()
   const [draggingTransaction, setDraggingTransaction] = useState<TransactionResponse | null>(null);
   const [selectedLineItemId, setSelectedLineItemId] = useState<number | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  )
-
-  const now = new Date()
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const now = new Date();
   const isPastMonth = currentYear < now.getFullYear() ||
-    (currentYear === now.getFullYear() && currentMonth < now.getMonth() + 1)
+    (currentYear === now.getFullYear() && currentMonth < now.getMonth() + 1);
 
   // Drop the activity selection when the month changes — the line item belongs to
   // the month being navigated away from. Adjusting state during render (rather than
   // in an effect) is React's recommended way to reset state on an input change and
   // avoids a cascading re-render.
-  const monthKey = `${currentYear}-${currentMonth}`
-  const [selectedMonthKey, setSelectedMonthKey] = useState(monthKey)
+  const monthKey = `${currentYear}-${currentMonth}`;
+  const [selectedMonthKey, setSelectedMonthKey] = useState(monthKey);
   if (selectedMonthKey !== monthKey) {
-    setSelectedMonthKey(monthKey)
-    setSelectedLineItemId(null)
+    setSelectedMonthKey(monthKey);
+    setSelectedLineItemId(null);
   }
 
   useEffect(() => {
-    dispatch(fetchBudget({ year: currentYear, month: currentMonth }))
-  }, [dispatch, currentYear, currentMonth])
+    dispatch(fetchBudget({ year: currentYear, month: currentMonth }));
+  }, [dispatch, currentYear, currentMonth]);
 
   const handleCreateBudget = async () => {
-    const result = await dispatch(createBudget({ year: currentYear, month: currentMonth }))
+    const result = await dispatch(createBudget({ year: currentYear, month: currentMonth }));
     if (createBudget.rejected.match(result)) {
-      toast.error(result.payload as string)
+      toast.error(result.payload as string);
     }
-  }
+  };
 
   // A fetch in flight (or a rejected fetch) leaves the previous month's budget in the
   // store rather than nulling it out, so the pane can stay mounted during a same-month
   // refresh. Gate rendering on the budget actually matching the month being viewed —
   // otherwise a month navigation would flash the month being left behind.
-  const currentMonthBudget =
-    budget && budget.year === currentYear && budget.month === currentMonth ? budget : null
+  const currentMonthBudget = budget && budget.year === currentYear && 
+    budget.month === currentMonth ? budget : null;
 
   const selectedLineItem = (() => {
     if (!currentMonthBudget || !selectedLineItemId) {
-      return null
+      return null;
     }
+
     for (const group of currentMonthBudget.groups) {
-      const lineItem = group.lineItems.find((li) => li.id === selectedLineItemId)
+      const lineItem = group.lineItems.find(li => li.id === selectedLineItemId);
       if (lineItem) {
-        return { lineItem, isIncome: group.isIncome }
+        return { lineItem, isIncome: group.isIncome };
       }
     }
-    return null
-  })()
+
+    return null;
+  })();
 
   const handleBudgetMutate = async () => {
     const result = await dispatch(fetchBudget({ year: currentYear, month: currentMonth }))
@@ -137,22 +136,18 @@ export default function BudgetPage()
 
             {!loading && !currentMonthBudget && error === 'BUDGET_NOT_FOUND' && (
               <div className="py-12 text-center">
-                <p className="text-muted mb-4">
-                  No budget for this month.
-                </p>
+                <p className="text-muted mb-4">No budget for this month.</p>
                 {!isPastMonth && (
-                  <button
-                    onClick={handleCreateBudget}
-                    className="btn btn-primary"
-                  >
-                    Create Budget
-                  </button>
+                  <button onClick={handleCreateBudget} className="btn btn-primary">Create Budget</button>
                 )}
               </div>
             )}
 
-            {!loading && !currentMonthBudget && error && error !== 'BUDGET_NOT_FOUND' && (
-              <div className="py-12 text-center text-accent-700">{error}</div>
+            {!loading && 
+              !currentMonthBudget && 
+              error && 
+              error !== 'BUDGET_NOT_FOUND' && (
+                <div className="py-12 text-center text-accent-700">{error}</div>
             )}
 
             {currentMonthBudget && (
@@ -170,7 +165,7 @@ export default function BudgetPage()
               TransactionPane scrolls its own list, so fitting the viewport costs nothing. */}
           <div
             className="sticky top-21.5 flex h-[calc(100vh-150px)] w-95 flex-none flex-col border border-divider bg-surface shadow-elev-sm"
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
             {selectedLineItem ? (
               <ActivityPane

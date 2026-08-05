@@ -5,7 +5,8 @@ import { nextMonth, prevMonth } from './budgetSlice'
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-export default function MonthNav() {
+export default function MonthNav()
+{
   const dispatch = useAppDispatch();
   const { currentYear, currentMonth } = useAppSelector(s => s.budget);
 

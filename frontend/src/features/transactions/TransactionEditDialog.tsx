@@ -30,7 +30,8 @@ function initAssignments(transaction: TransactionResponse | null): PendingAssign
   }))
 }
 
-export default function TransactionEditDialog({ transaction, onClose, onMutate }: TransactionEditDialogProps) {
+export default function TransactionEditDialog({ transaction, onClose, onMutate }: TransactionEditDialogProps) 
+{
   const isCreate = !transaction
   const isEditable = isCreate || transaction.isManual
   // A fetch in flight (or a rejected fetch) leaves the previous month's budget in the
