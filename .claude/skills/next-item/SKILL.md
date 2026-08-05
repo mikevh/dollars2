@@ -1,6 +1,6 @@
 ---
 name: next-item
-description: Work one small single-concern item end-to-end in an isolated worktree — pick the GitHub issue, make sure it's fully understood (interview if underspecified), plan it, define how it will be verified, implement it, write tests, review, and open a PR. Use when the user says "next item", "work issue #N", "grab the next item", "do the next thing", or points at an issue and says work it.
+description: Work one small single-concern item end-to-end in an isolated worktree — pick the GitHub issue, make sure it's fully understood (interview if underspecified), plan it, define how it will be verified, implement it, write tests, open a PR, then pause for the user's code review and fix what it finds. Use when the user says "next item", "work issue #N", "grab the next item", "do the next thing", or points at an issue and says work it.
 ---
 
 # Next Item
@@ -12,7 +12,7 @@ toward too small; split anything that smells like two concerns).
 Invoking this skill IS the user's instruction to go all the way through commit, push, and PR — a
 scoped override of the standing "never commit/push without instruction" gate
 (`[[feedback-commit-push]]`), valid only inside this workflow. The one stop along the way is the
-code-review handoff in step 7.
+code-review handoff in step 9, which happens **after** the PR is open — the PR is what gets reviewed.
 
 Delegate the token-heavy phases to the cheaper subagents noted below (`Explore`, `test-runner`,
 `ui-verify`) and keep this session on understanding, implementing, and judging.
@@ -84,21 +84,14 @@ Follow `CLAUDE.md`'s conventions and match the surrounding style.
   what it reports, then continue the *same* agent (`SendMessage`) for the re-run rather than spawning
   a fresh one.
 
-### 7. Verify and review
+### 7. Verify
 - **Spawn `ui-verify` only when the change alters what renders** — frontend components,
   styles/tokens, or an API response shape the UI displays. Point it at the specific changed screen
   (`--url`), not a general sweep.
 - **Skip it** for work with no visible change — migrations, SQL, sync internals, backend-only
   refactors, tests, docs. Say in the PR that you skipped it and why.
-- **Then stop and hand off for code review.** `/code-review` is user-invokable only — you cannot
-  trigger it, and reviewing the diff yourself from memory is not a substitute. Leave the changes
-  uncommitted in the worktree, say the diff is ready, and ask the user to run `/code-review`. This is
-  the one deliberate pause between step 3 and the PR; wait for it.
-- When the findings come back, address them, then continue to step 8. Capture any deliberately
-  deferred finding as a GitHub issue (per `CLAUDE.md`'s backlog convention).
-- If the user says to skip the review, skip it — and say so in the PR body.
 
-### 8. Commit, push, PR, clean up (full auto, once the review clears)
+### 8. Commit, push, open the PR
 - Commit in the repo's style (imperative, concise) with the harness's `Co-Authored-By` and
   `Claude-Session` trailers.
 - Push and open a PR against `master` (`gh`), linking the issue (`Closes #N`); PR body ends with the
@@ -108,10 +101,30 @@ Follow `CLAUDE.md`'s conventions and match the surrounding style.
   closing the issue takes both with it. **Release the claim** (`gh issue edit <N> --remove-label
   in-progress --remove-assignee @me`) only when abandoning the item, or when a split means the
   remainder goes back on the board unworked.
-- Remove the worktree: confirm the HEAD commit is on the remote (`git branch -r --contains <sha>`
-  shows `origin/<branch>`), then `ExitWorktree` `action: "remove"` with `discard_changes: true` (a
-  pushed commit can look "unmerged" against a stale local `master`). Don't remove if the push failed
-  or changes are uncommitted — leave it and say so.
-- Note that the PR branch lives only on the remote; review changes need a fresh checkout.
+- **Keep the worktree.** It is where review findings get fixed. Do not remove it here.
+
+### 9. Stop and hand off for code review
+The PR is the review unit. Review runs against the open PR, not an uncommitted diff.
+
+- **Stop and ask the user to run `/review <PR#>`.** Review commands are user-invokable only — you
+  cannot trigger one, and re-reading your own diff from memory is not a substitute. Say the PR is up
+  and ready for review, give the number, and wait. This is the one deliberate pause in the workflow.
+  (`/code-review ultra <PR#>` is the heavyweight multi-agent variant, also user-triggered.)
+- When findings come back, fix them **in the same worktree**, then commit and push to the same
+  branch so the PR updates in place. Re-run `test-runner` on the fixes before pushing.
+- Capture any deliberately deferred finding as a GitHub issue (per `CLAUDE.md`'s backlog convention).
+- If the user says to skip the review, skip it — and note that in the PR body.
+- If the worktree is already gone when findings arrive (a later session, a crashed run), check out
+  the PR branch fresh — `git worktree add <path> <branch>` after `git fetch` — rather than working in
+  the primary checkout.
+
+### 10. Clean up
+- Only once review has cleared and every fix is pushed: confirm the HEAD commit is on the remote
+  (`git branch -r --contains <sha>` shows `origin/<branch>`), then `ExitWorktree` `action: "remove"`
+  with `discard_changes: true` (a pushed commit can look "unmerged" against a stale local `master`).
+  Don't remove if the push failed or changes are uncommitted — leave it and say so.
+- The branch now lives only on the remote. The user merges the PR themselves (GitHub UI, or
+  `/merge-pr <PR#>` when they want the full suite re-run against the PR head first) — **you do not
+  merge it**, and this skill ends here.
 - Other agents are working other issues concurrently. Touch only the claimed issue and your own
   worktree; never `git worktree remove` or push a branch that isn't yours.

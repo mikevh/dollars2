@@ -12,6 +12,10 @@ force anything on failure**.
 Requires a PR number as the argument (`/merge-pr <N>`). The `next-item` workflow leaves PR branches
 remote-only, so "the current branch" is unreliable — always operate on the explicit number.
 
+**This is the opt-in merge path, not the default one.** The user normally merges in the GitHub UI.
+They reach for this skill when they want the full suite re-run against the PR head first — with no
+CI configured in `.github/workflows`, step 2 here is the only automated test gate a PR ever gets.
+
 ## Steps
 
 ### 1. Confirm the PR
@@ -50,6 +54,8 @@ remote-only, so "the current branch" is unreliable — always operate on the exp
   confirm explicitly. Read the linked issues:
   `gh pr view <N> --json closingIssuesReferences -q '.closingIssuesReferences[].number'`.
 - For each linked issue still `OPEN`, close it: `gh issue close <ISSUE> --comment "Merged in #<N>."`.
+- Release each linked issue's `next-item` claim, whether the auto-close fired or you closed it:
+  `gh issue edit <ISSUE> --remove-label in-progress` (ignore a "label not found" error).
 - Report which issues were closed.
 
 ### 6. Clean up
