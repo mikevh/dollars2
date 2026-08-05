@@ -65,6 +65,8 @@ builder.Services.AddSingleton<IAmazonDynamoDB>(_ =>
             ServiceURL = dynamoDbOptions.ServiceUrl,
             AuthenticationRegion = "us-east-1",
         }));
+// Registered ahead of BankSyncHostedService so the archive table is settled before the first sync.
+builder.Services.AddHostedService<SyncArchiveTableInitializer>();
 builder.Services.AddHttpClient("simplefin", client =>
     client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddScoped<IBankSyncProvider, SimplefinProvider>();
