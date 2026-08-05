@@ -18,8 +18,15 @@ services:
       Plaid__Enabled: ${Plaid__Enabled:-false}
       SimpleFin__Enabled: ${SimpleFin__Enabled:-false}
       Elasticsearch__Uri: http://elasticsearch:9200
+      DynamoDb__ServiceUrl: http://dynamodb:8000
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_started
+      # Wait for DynamoDB to actually answer, not just for the container to exist. The table
+      # initializer runs once at startup, so losing this race would leave the archive table
+      # uncreated and every archive write failing silently.
+      dynamodb:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -59,5 +66,39 @@ services:
       - elasticsearch
     restart: unless-stopped
 
+  # Archive of the raw JSON returned by the bank sync providers (SimpleFIN, Plaid). Runs the
+  # dynamodb-local container in production too — there is no AWS account behind this, so no
+  # credentials, IAM, billing, or egress are involved. LAN/Tailscale only, like the rest of the stack.
+  #
+  # Three settings below look wrong and are not; all three were verified against the image:
+  #   user: root      /home/dynamodblocal/data does not exist in the image, so Docker creates the
+  #                   volume mount point as root while the container's default user is uid 1000.
+  #                   Without this the container starts, reports healthy, and silently persists
+  #                   nothing.
+  #   -dbPath ./data  The absolute path fails outright with "Invalid directory for database
+  #                   creation."; the relative form resolves against the image's workdir.
+  #   curl (no -f)    A bare GET / returns HTTP 400, so -f would mark the container permanently
+  #                   unhealthy and the backend would never start. The image ships curl and bash
+  #                   but no wget or nc.
+  #
+  # The image's entrypoint is already `java`, so `command` supplies arguments only. Its default
+  # -inMemory must be overridden or the archive is discarded on every restart.
+  dynamodb:
+    image: amazon/dynamodb-local
+    user: root
+    command: -jar DynamoDBLocal.jar -sharedDb -dbPath ./data
+    volumes:
+      - dynamodata:/home/dynamodblocal/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
 volumes:
   esdata:
+  dynamodata:

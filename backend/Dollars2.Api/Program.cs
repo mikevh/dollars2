@@ -1,4 +1,6 @@
 using System.Text;
+using Amazon.DynamoDBv2;
+using Amazon.Runtime;
 using Dollars2.Api.Data;
 using Dollars2.Api.Json;
 using Dollars2.Api.Logging;
@@ -45,6 +47,24 @@ builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<SyncLogRepository>();
 builder.Services.AddScoped<AccountBalanceRepository>();
+
+// Sync archive store. This is always the dynamodb-local container — in production as well as in
+// development — so there is no AWS account, no IAM, and nothing to bill.
+var dynamoDbOptions = builder.Configuration.GetSection(DynamoDbOptions.SectionName).Get<DynamoDbOptions>()
+    ?? new DynamoDbOptions();
+builder.Services.AddSingleton(dynamoDbOptions);
+builder.Services.AddSingleton<IAmazonDynamoDB>(_ =>
+    // dynamodb-local validates neither of these, and -sharedDb makes the region meaningless, but the
+    // SDK refuses to sign a request without them. Hardcoded rather than configured on purpose: there
+    // is no account behind this endpoint, so there is nothing for a deployer to fill in and no secret
+    // to protect. Surfacing them as config would imply otherwise and invite pointing this at real AWS.
+    new AmazonDynamoDBClient(
+        new BasicAWSCredentials("local", "local"),
+        new AmazonDynamoDBConfig
+        {
+            ServiceURL = dynamoDbOptions.ServiceUrl,
+            AuthenticationRegion = "us-east-1",
+        }));
 builder.Services.AddHttpClient("simplefin", client =>
     client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddScoped<IBankSyncProvider, SimplefinProvider>();
