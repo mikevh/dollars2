@@ -85,7 +85,7 @@ public sealed class SyncTextTruncationTests
     private static SyncedTransaction SyncedWithTextOfLength(int length, string providerTransactionId)
     {
         var text = new string('x', length);
-        return new SyncedTransaction(providerTransactionId, Date, text, text, text, -12.50m, IsPending: false);
+        return new SyncedTransaction(providerTransactionId, Date, text, text, text, -12.50m, IsPending: false, RawJson: "{}");
     }
 
     private static async Task<(int UserId, int AccountId)> SeedAsync(DbSession db, string email)

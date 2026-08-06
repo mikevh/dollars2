@@ -313,6 +313,10 @@ public class PlaidProvider : IBankSyncProvider
             payee,
             "",
             amount,
-            t.Pending ?? false);
+            t.Pending ?? false,
+            // TODO #168: Plaid raw JSON capture. Going.Plaid hands back deserialized objects, so getting
+            // at the original payload takes more than a GetRawText() — that is its own issue. Empty until
+            // then, which archives nothing for Plaid rather than archiving something re-serialized.
+            RawJson: "");
     }
 }
