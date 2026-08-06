@@ -302,46 +302,44 @@ public class PlaidProvider : IBankSyncProvider
             .ToList();
 
     /// <summary>
-    /// Picks the current balance for a stored account from the Item's account snapshot. When the stored
-    /// account carries a Plaid account_id, the matching snapshot account is used; a lone account with a
-    /// blank account_id (unambiguous on its token) falls back to the single snapshot account. Returns
-    /// null when there is no unambiguous match or the provider reported no current balance.
+    /// Finds a stored account's entry in the Item's account snapshot. When the stored account carries a
+    /// Plaid account_id, the matching snapshot entry is used; a lone account with a blank account_id
+    /// (unambiguous on its token) falls back to the single snapshot entry. Returns null when there is no
+    /// unambiguous match.
     /// </summary>
-    internal static decimal? ExtractCurrentBalance(IReadOnlyList<PlaidAccount> accounts, string? accountId)
+    /// <remarks>
+    /// Shared by the balance and raw-metadata lookups rather than written out in each. Both read a
+    /// snapshot of the same accounts — one typed, one raw — so a rule that drifted between them could
+    /// pair one account's balance with another's archived metadata. Having a single implementation makes
+    /// that impossible by construction instead of by comment.
+    /// </remarks>
+    private static T? MatchSnapshotEntry<T>(IReadOnlyList<T> snapshot, Func<T, string?> accountIdOf, string? accountId)
+        where T : class
     {
-        PlaidAccount? match;
         if (!string.IsNullOrEmpty(accountId))
         {
-            match = accounts.FirstOrDefault(a => a.AccountId == accountId);
-        }
-        else
-        {
-            match = accounts.Count == 1 ? accounts[0] : null;
+            return snapshot.FirstOrDefault(a => accountIdOf(a) == accountId);
         }
 
-        return match?.Balances?.Current;
+        return snapshot.Count == 1 ? snapshot[0] : null;
     }
 
     /// <summary>
-    /// Picks the raw JSON of a stored account's entry in the Item's account snapshot, using the same
-    /// matching rule as <see cref="ExtractCurrentBalance"/> so the two never describe different accounts:
-    /// by Plaid account_id when the stored account carries one, falling back to the sole snapshot account
-    /// for a lone account with a blank account_id. Returns null when there is no unambiguous match.
+    /// Picks the current balance for a stored account from the Item's account snapshot, or null when
+    /// <see cref="MatchSnapshotEntry"/> finds no unambiguous match or the provider reported no current
+    /// balance.
     /// </summary>
-    internal static string? ExtractRawAccountMetadata(IReadOnlyList<RawPlaidAccount> accounts, string? accountId)
-    {
-        RawPlaidAccount? match;
-        if (!string.IsNullOrEmpty(accountId))
-        {
-            match = accounts.FirstOrDefault(a => a.AccountId == accountId);
-        }
-        else
-        {
-            match = accounts.Count == 1 ? accounts[0] : null;
-        }
+    internal static decimal? ExtractCurrentBalance(IReadOnlyList<PlaidAccount> accounts, string? accountId) =>
+        MatchSnapshotEntry(accounts, a => a.AccountId, accountId)?.Balances?.Current;
 
-        return match?.Json;
-    }
+    /// <summary>
+    /// Picks the raw JSON of a stored account's entry in the Item's account snapshot, through the same
+    /// <see cref="MatchSnapshotEntry"/> rule <see cref="ExtractCurrentBalance"/> uses, so the archived
+    /// account object and the recorded balance always describe the same account. Returns null when there
+    /// is no unambiguous match.
+    /// </summary>
+    internal static string? ExtractRawAccountMetadata(IReadOnlyList<RawPlaidAccount> accounts, string? accountId) =>
+        MatchSnapshotEntry(accounts, a => a.AccountId, accountId)?.Json;
 
     /// <summary>
     /// Splits one /transactions/sync page body into the raw JSON of its individual objects, so the sync
@@ -450,7 +448,7 @@ public class PlaidProvider : IBankSyncProvider
         return raw;
     }
 
-    /// <param name="RawJson">
+    /// <param name="rawJson">
     /// The transaction object exactly as it appeared in the /transactions/sync body, or an empty string
     /// when the page's raw JSON could not be correlated. Passed in rather than derived here because a
     /// <see cref="PlaidTransaction"/> offers no route back to its own JSON.
