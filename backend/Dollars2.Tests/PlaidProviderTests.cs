@@ -327,7 +327,10 @@ public class PlaidProviderTests
     private const string SecondAccount =
         """{"account_id":"acct-2","name":"Savings","balances":{"current":5000.0},"unmodelled":{"holder":"joint"}}""";
 
-    private static PlaidProvider CreateProvider(string responseJson)
+    private static PlaidProvider CreateProvider(string responseJson) =>
+        CreateProvider(new StubHttpClientFactory(responseJson));
+
+    private static PlaidProvider CreateProvider(IHttpClientFactory httpClientFactory)
     {
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -339,7 +342,7 @@ public class PlaidProviderTests
             })
             .Build();
 
-        return new PlaidProvider(config, new StubHttpClientFactory(responseJson), NullLoggerFactory.Instance);
+        return new PlaidProvider(config, httpClientFactory, NullLoggerFactory.Instance);
     }
 
     private static Account StoredAccount(int id, string? accountId) => new()
@@ -356,10 +359,12 @@ public class PlaidProviderTests
         }),
     };
 
-    // has_more is false so the stub — which answers every request identically — drains in one page.
-    private static string SyncResponse(string accounts, string added, string modified = "") =>
+    // hasMore defaults to false so the single-response stub — which answers every request identically —
+    // drains in one page rather than looping forever.
+    private static string SyncResponse(
+        string accounts, string added, string modified = "", bool hasMore = false, string cursor = "cursor-next") =>
         $$"""
-        {"accounts":[{{accounts}}],"added":[{{added}}],"modified":[{{modified}}],"removed":[],"next_cursor":"cursor-next","has_more":false,"request_id":"req-1"}
+        {"accounts":[{{accounts}}],"added":[{{added}}],"modified":[{{modified}}],"removed":[],"next_cursor":"{{cursor}}","has_more":{{(hasMore ? "true" : "false")}},"request_id":"req-1"}
         """;
 
     [Fact]
@@ -395,8 +400,10 @@ public class PlaidProviderTests
         Assert.Equal("primary", parsed.RootElement.GetProperty("unmodelled").GetProperty("holder").GetString());
     }
 
+    // Plaid has no analogue to SimpleFIN's errlist, and MapTransaction never rejects a transaction, so
+    // both of these lists are empty for Plaid by construction — but they must be empty, never null.
     [Fact]
-    public async Task ErrorsJson_is_empty_rather_than_null_because_Plaid_reports_none()
+    public async Task ErrorsJson_and_SkippedTransactionsJson_are_empty_rather_than_null()
     {
         var provider = CreateProvider(SyncResponse(FirstAccount, AddedTransaction));
 
@@ -450,6 +457,81 @@ public class PlaidProviderTests
         // Added entries come first, then modified — the ordering FetchTransactionsForConnectionAsync builds.
         Assert.Equal(AddedTransaction, upserts[0].RawJson);
         Assert.Equal(modifiedTransaction, upserts[1].RawJson);
+    }
+
+    // ---- Issue #168: capture across a paged /transactions/sync stream ----
+
+    // The same account as FirstAccount, as a later page reports it: a moved balance and a marker field.
+    private const string FirstAccountLaterPage =
+        """{"account_id":"acct-1","name":"Checking","balances":{"current":97.25,"available":87.25,"iso_currency_code":"USD"},"unmodelled":{"holder":"primary","page":2}}""";
+
+    // The real form of the case that rules out id-keyed correlation, which the single-page test above can
+    // only simulate: Plaid reports a transaction as added on one page and modified on a later one, and
+    // the two objects differ. Both views are accumulated across pages, so an id-keyed map built over the
+    // whole stream would hold one version and archive it under both upserts.
+    [Fact]
+    public async Task A_transaction_added_on_one_page_and_modified_on_the_next_keeps_both_versions_of_its_bytes()
+    {
+        const string modifiedOnPageTwo =
+            """{"transaction_id":"txn-1","account_id":"acct-1","amount":13.75,"date":"2026-07-15","original_description":"COFFEE SHOP #123","merchant_name":"Blue Bottle","pending":false,"unmodelled":{"revision":2}}""";
+
+        var pages = new QueuedHttpClientFactory(
+            SyncResponse(FirstAccount, AddedTransaction, hasMore: true, cursor: "cursor-page-1"),
+            SyncResponse(FirstAccountLaterPage, added: "", modified: modifiedOnPageTwo, cursor: "cursor-page-2"));
+
+        var results = await CreateProvider(pages).FetchTransactionsForConnectionAsync(
+            new[] { StoredAccount(1, accountId: "acct-1") },
+            since: null,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, pages.RemainingResponses);
+
+        var upserts = results[1].Upserts;
+        Assert.Equal(2, upserts.Count);
+        Assert.All(upserts, u => Assert.Equal("txn-1", u.ProviderTransactionId));
+        // Added entries across the whole stream come first, then modified.
+        Assert.Equal(AddedTransaction, upserts[0].RawJson);
+        Assert.Equal(modifiedOnPageTwo, upserts[1].RawJson);
+    }
+
+    // The archived account object and the recorded balance are taken from the same page, so a stream
+    // whose snapshot moves between pages can never leave them describing different states.
+    [Fact]
+    public async Task Account_metadata_and_balance_both_come_from_the_last_page_that_carried_a_snapshot()
+    {
+        var pages = new QueuedHttpClientFactory(
+            SyncResponse(FirstAccount, AddedTransaction, hasMore: true, cursor: "cursor-page-1"),
+            SyncResponse(FirstAccountLaterPage, added: "", cursor: "cursor-page-2"));
+
+        var results = await CreateProvider(pages).FetchTransactionsForConnectionAsync(
+            new[] { StoredAccount(1, accountId: "acct-1") },
+            since: null,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(FirstAccountLaterPage, results[1].AccountMetadataJson);
+        Assert.Equal(97.25m, results[1].Balance);
+        // The advanced cursor from the final page is what gets persisted.
+        Assert.Contains("cursor-page-2", results[1].UpdatedConnectionDetailsJson!);
+    }
+
+    // A page with no account snapshot must not blank out the one an earlier page established — the typed
+    // and raw snapshots are only replaced together, and only when the page actually carries accounts.
+    [Fact]
+    public async Task A_later_page_without_an_account_snapshot_leaves_the_earlier_one_intact()
+    {
+        var pages = new QueuedHttpClientFactory(
+            SyncResponse(FirstAccount, AddedTransaction, hasMore: true, cursor: "cursor-page-1"),
+            SyncResponse(accounts: "", added: "", cursor: "cursor-page-2"));
+
+        var results = await CreateProvider(pages).FetchTransactionsForConnectionAsync(
+            new[] { StoredAccount(1, accountId: "acct-1") },
+            since: null,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(FirstAccount, results[1].AccountMetadataJson);
+        Assert.Equal(110.0m, results[1].Balance);
+        // The page-1 transaction survives the empty page rather than being dropped by it.
+        Assert.Equal(AddedTransaction, Assert.Single(results[1].Upserts).RawJson);
     }
 
     // ---- Issue #168: the raw-page reader's degradation contract ----
