@@ -100,13 +100,19 @@ public class SimplefinProvider : IBankSyncProvider
             _logger.LogWarning("SimpleFIN returned error: {Error}", error.ToString());
         }
 
+        // errlist is response-level, not per-account, so every result in this connection group carries
+        // the same entries — including the failure results, where they are often the explanation.
+        var errorsJson = accountSet.Errlist.Select(e => e.GetRawText()).ToList();
+
+        var rawAccounts = IndexRawAccounts(json);
+
         var results = new Dictionary<int, ProviderSyncResult>();
         foreach (var (account, details) in parsed)
         {
             if (details is null || string.IsNullOrEmpty(details.AccountId))
             {
                 _logger.LogWarning("SimpleFIN account {AccountId} has no configured SimpleFIN AccountId.", account.Id);
-                results[account.Id] = new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null, "SimpleFIN connection details are missing an AccountId.");
+                results[account.Id] = new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null, "SimpleFIN connection details are missing an AccountId.", ErrorsJson: errorsJson);
                 continue;
             }
 
@@ -114,16 +120,24 @@ public class SimplefinProvider : IBankSyncProvider
             if (simplefinAccount is null)
             {
                 _logger.LogWarning("No matching account found in SimpleFIN response for account {AccountId} with SimpleFIN AccountId {SimplefinAccountId}.", account.Id, details.AccountId);
-                results[account.Id] = new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null, $"SimpleFIN returned no account matching AccountId '{details.AccountId}'.");
+                results[account.Id] = new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null, $"SimpleFIN returned no account matching AccountId '{details.AccountId}'.", ErrorsJson: errorsJson);
                 continue;
             }
 
+            rawAccounts.TryGetValue(details.AccountId, out var raw);
+
             var transactions = new List<SyncedTransaction>();
+            var skippedTransactionsJson = new List<string>();
             foreach (var t in simplefinAccount.Transactions)
             {
+                // Looked up by id rather than re-serialized from the DTO, so the archive holds the bytes
+                // SimpleFIN sent — including fields the DTO does not model.
+                var rawTransaction = raw?.TransactionsById.GetValueOrDefault(t.Id) ?? "";
+
                 if (!decimal.TryParse(t.Amount, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount))
                 {
                     _logger.LogWarning("Skipping transaction {TransactionId} for account {AccountId} with invalid amount: '{Amount}'", t.Id, account.Id, t.Amount);
+                    skippedTransactionsJson.Add(rawTransaction);
                     continue;
                 }
 
@@ -131,7 +145,7 @@ public class SimplefinProvider : IBankSyncProvider
                     ? DateOnly.FromDateTime(DateTime.UtcNow)
                     : DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(t.Posted).UtcDateTime);
 
-                transactions.Add(new SyncedTransaction(t.Id, date, t.Description, t.Payee, t.Memo, amount, t.Pending));
+                transactions.Add(new SyncedTransaction(t.Id, date, t.Description, t.Payee, t.Memo, amount, t.Pending, rawTransaction));
             }
 
             decimal? balance = null;
@@ -144,9 +158,95 @@ public class SimplefinProvider : IBankSyncProvider
                 _logger.LogWarning("Skipping unparseable balance '{Balance}' for account {AccountId}", simplefinAccount.Balance, account.Id);
             }
 
-            results[account.Id] = new ProviderSyncResult(transactions, Array.Empty<string>(), null, Balance: balance);
+            results[account.Id] = new ProviderSyncResult(
+                transactions,
+                Array.Empty<string>(),
+                null,
+                Balance: balance,
+                AccountMetadataJson: raw?.MetadataJson,
+                ErrorsJson: errorsJson,
+                SkippedTransactionsJson: skippedTransactionsJson);
         }
 
         return results;
     }
+
+    /// <summary>
+    /// Indexes the response body by SimpleFIN account id, so the typed mapping loop above can attach the
+    /// raw text of each account and transaction object without re-serializing its own DTOs.
+    /// </summary>
+    private static Dictionary<string, RawAccount> IndexRawAccounts(string json)
+    {
+        var indexed = new Dictionary<string, RawAccount>();
+
+        using var document = JsonDocument.Parse(json);
+        if (!document.RootElement.TryGetProperty("accounts", out var accounts) || accounts.ValueKind != JsonValueKind.Array)
+        {
+            return indexed;
+        }
+
+        foreach (var account in accounts.EnumerateArray())
+        {
+            if (account.ValueKind != JsonValueKind.Object || !TryGetId(account, out var accountId))
+            {
+                continue;
+            }
+
+            var transactionsById = new Dictionary<string, string>();
+            if (account.TryGetProperty("transactions", out var transactions) && transactions.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var transaction in transactions.EnumerateArray())
+                {
+                    if (transaction.ValueKind == JsonValueKind.Object && TryGetId(transaction, out var transactionId))
+                    {
+                        // Indexer rather than Add: a provider repeating an id must not throw here. The
+                        // duplicate is already a problem for ProviderTransactionId dedup downstream.
+                        transactionsById[transactionId] = transaction.GetRawText();
+                    }
+                }
+            }
+
+            indexed[accountId] = new RawAccount(WriteMetadataWithoutTransactions(account), transactionsById);
+        }
+
+        return indexed;
+    }
+
+    private static bool TryGetId(JsonElement element, out string id)
+    {
+        id = "";
+
+        if (element.TryGetProperty("id", out var value) && value.ValueKind == JsonValueKind.String)
+        {
+            id = value.GetString() ?? "";
+        }
+
+        return id.Length > 0;
+    }
+
+    /// <summary>
+    /// Copies the account object property for property, dropping only the nested transactions array so
+    /// the archived metadata does not duplicate every transaction that is already archived on its own.
+    /// Everything kept is written through unchanged.
+    /// </summary>
+    private static string WriteMetadataWithoutTransactions(JsonElement account)
+    {
+        var buffer = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            foreach (var property in account.EnumerateObject())
+            {
+                if (!property.NameEquals("transactions"))
+                {
+                    property.WriteTo(writer);
+                }
+            }
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(buffer.ToArray());
+    }
+
+    private sealed record RawAccount(string MetadataJson, Dictionary<string, string> TransactionsById);
 }

@@ -2,6 +2,12 @@ using Dollars2.Api.Models;
 
 namespace Dollars2.Api.Providers;
 
+/// <param name="RawJson">
+/// The provider's transaction object, verbatim. Deliberately exempt from the
+/// <see cref="TransactionText.Truncate"/> clamping applied below: that clamp exists because
+/// Description/Payee/Memo map to nvarchar(500) columns, and this field is never persisted to MSSQL —
+/// it feeds the sync archive, whose entire purpose is keeping what the bank actually sent.
+/// </param>
 public record SyncedTransaction(
     string ProviderTransactionId,
     DateOnly Date,
@@ -9,7 +15,8 @@ public record SyncedTransaction(
     string Payee,
     string Memo,
     decimal Amount,
-    bool IsPending)
+    bool IsPending,
+    string RawJson)
 {
     // Clamped here rather than in each provider so that for these three free-text fields no provider —
     // and neither the create- nor the update-from-sync repository path — can route unbounded bank text at
@@ -41,12 +48,40 @@ public record SyncedTransaction(
 /// The account's current balance as reported by the provider, or null if the provider did not report a
 /// parseable balance. When non-null it is appended to the AccountBalances history on a successful sync.
 /// </param>
+/// <param name="AccountMetadataJson">
+/// The provider's account object, verbatim — balance, available balance, currency, org, name. Null when
+/// the provider reported no matching account. Providers may drop a nested transactions array from it so
+/// the archive does not store every transaction twice; every retained property is copied unchanged.
+/// </param>
+/// <param name="ErrorsJson">
+/// Provider-reported errors, verbatim, one raw JSON object per entry. Distinct from <paramref name="Error"/>:
+/// that is our own single message explaining why *this* account could not be synced, while these are
+/// whatever the upstream response carried, often about the connection as a whole rather than one account.
+/// Empty when the provider reported none.
+/// </param>
+/// <param name="SkippedTransactionsJson">
+/// Raw text of provider transactions that could not be mapped into <paramref name="Upserts"/> — today,
+/// ones whose amount would not parse. They are deliberately still surfaced: a transaction our parser
+/// rejected is exactly what the archive's forensics exist for, and it has nowhere else to go, since a
+/// SyncedTransaction cannot represent an unparseable amount without inventing one.
+/// </param>
 public record ProviderSyncResult(
     IReadOnlyList<SyncedTransaction> Upserts,
     IReadOnlyList<string> RemovedProviderTransactionIds,
     string? UpdatedConnectionDetailsJson,
     string? Error = null,
-    decimal? Balance = null);
+    decimal? Balance = null,
+    string? AccountMetadataJson = null,
+    IReadOnlyList<string>? ErrorsJson = null,
+    IReadOnlyList<string>? SkippedTransactionsJson = null)
+{
+    // Coalesced here rather than defaulted in the parameter list: a positional record's default has to
+    // be a compile-time constant, so Array.Empty<string>() is not available there. Callers that have
+    // nothing to report can omit these entirely and consumers still never see a null list.
+    public IReadOnlyList<string> ErrorsJson { get; init; } = ErrorsJson ?? Array.Empty<string>();
+
+    public IReadOnlyList<string> SkippedTransactionsJson { get; init; } = SkippedTransactionsJson ?? Array.Empty<string>();
+}
 
 public interface IBankSyncProvider
 {
