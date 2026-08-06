@@ -66,7 +66,10 @@
 - Multiple line item assignments with amount inputs for splits (amounts must total to transaction amount)
 - Actions: unassign, delete
 
-## Settings Page
+## Accounts Pages
 
-- Manage Plaid and SimpleFIN connections (future version — v1 uses direct DB setup)
-- User profile
+- `/accounts` — accounts grouped by connection, with sync / re-sync per connection
+- `/accounts/:accountId` — paged transactions for a single account
+- Read-only views: account creation and editing stay in the database for v1
+
+A settings page (connection management, user profile) is deferred — see `out_of_scope.md`.

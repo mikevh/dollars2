@@ -18,6 +18,14 @@
 
 - `/login` — login page
 - `/` — budget view (main app)
+- `/accounts` — accounts list, grouped by connection, with per-connection sync + re-sync actions
+- `/accounts/:accountId` — paged transactions for one account (includes accounts excluded from the
+  budget via `IncludeInBudget = 0`)
+
+All routes except `/login` sit behind an authenticated `Outlet` that redirects to `/login`.
+
+> These are read-only views over accounts created directly in the database — account *management*
+> UI remains out of scope for v1 (see `out_of_scope.md`).
 
 ## Theme
 

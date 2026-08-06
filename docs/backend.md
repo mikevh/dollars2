@@ -9,8 +9,10 @@
 
 ## Project Structure
 
-- Single project for v1
-- No unit or integration tests for v1
+- `Dollars2.Api` — the single application project
+- `Dollars2.Tests` — xUnit unit tests plus a Testcontainers-backed integration suite that runs
+  migrations against an ephemeral MSSQL container, so `dotnet test` needs a running Docker daemon.
+  `ConstraintNamingTests` fails the build if a system-named constraint reaches the schema
 
 ## API Design
 
@@ -39,7 +41,8 @@
 - Email-only login for v1 (no password)
 - JWT with 30-day expiration
 - Refresh tokens
-- JWT secret in appsettings.json
+- JWT secret via `dotnet user-secrets` locally / environment variable in the container deploy —
+  `appsettings.json` holds only the `<dotnet user secret>` placeholder
 - Users created directly in the database
 - **Retention:** a login or refresh mints a new refresh-token row, and a token that is never used
   again (cleared browser, second device, failed refresh) would otherwise linger forever. Both auth
@@ -72,7 +75,8 @@
   file as a single batch, so anything needing multiple steps uses dynamic SQL inside the guard
 - Every constraint is named explicitly (`CONSTRAINT <name> ...`), never the inline shorthand — see
   the naming table in `docs/database.md`; `ConstraintNamingTests` enforces it
-- Connection string in appsettings.json
+- Connection string via `dotnet user-secrets` locally / environment variable in the container
+  deploy — `appsettings.json` holds only the `<dotnet user secret>` placeholder
 
 ## Logging
 
@@ -93,8 +97,12 @@
 
 - `IHostedService` with a timer running every hour
 - Checks each account's configured sync interval to determine if a sync is needed
-- Default sync interval: 12 hours (configurable per data source)
-- Manual sync endpoint for on-demand sync
+- Minimum sync interval: 6 hours, configurable per provider via `Plaid:MinSyncIntervalHours` /
+  `SimpleFin:MinSyncIntervalHours`
+- Manual sync endpoints for on-demand sync, for the whole user or one connection at a time. A
+  "connection" is the set of accounts sharing provider credentials, derived from
+  `ConnectionDetailsJson` — there is no Connections table
+- `SyncLockService` allows one in-flight sync per user; a second request gets 409 `SYNC_IN_PROGRESS`
 - Only imports posted transactions; pending transactions shown separately
 - Deduplication via provider transaction ID
 - Re-synced soft-deleted transactions: set isDeleted back to false
@@ -140,7 +148,13 @@
 - `PUT /api/groups/{groupId}/line-items/reorder` — update sort order
 - `GET /api/line-items/{id}/activity` — get transactions + rollover history
 
+### Accounts
+- `GET /api/accounts` — the user's accounts, grouped by connection, with per-account sync status
+
 ### Transactions
+- `GET /api/transactions/counts` — per-tab counts (New / Tracked / Deleted / Pending)
+- `GET /api/transactions/by-account/{accountId}` — paged account transactions
+  (`?page=&size=&sort=&dir=`), backing the per-account transactions page
 - `GET /api/transactions/new` — unassigned transactions
 - `GET /api/transactions/tracked?fromDate=...` — assigned transactions from date
 - `GET /api/transactions/deleted` — soft-deleted transactions
@@ -155,8 +169,17 @@
 - `POST /api/transactions/{id}/restore` — restore from deleted
 
 ### Sync
-- `POST /api/sync` — trigger manual sync
+- `POST /api/sync` — sync every connection for the user
+- `POST /api/sync/connection/{connectionId}` — sync one connection
+- `POST /api/sync/connection/{connectionId}/resync` — full refetch for one connection, ignoring the
+  incremental watermark
 - `GET /api/sync/status` — last sync time, status per account
+
+All three sync endpoints return 409 `SYNC_IN_PROGRESS` when that user already has a sync running,
+and the per-connection pair returns 404 `CONNECTION_NOT_FOUND` for an unknown connection.
+
+### Health
+- `GET /api/health` — unauthenticated liveness check
 
 ## Real-Time Updates
 

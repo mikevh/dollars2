@@ -11,7 +11,9 @@
 
 - 30-day token expiration
 - Refresh tokens to get new JWTs without re-logging in
-- JWT secret stored in appsettings.json
+- JWT secret supplied out-of-band, never committed: `dotnet user-secrets` locally, an environment
+  variable in the container deploy. `appsettings.json` carries only the `<dotnet user secret>`
+  placeholder
 
 ## Multi-User
 

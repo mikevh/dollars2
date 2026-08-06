@@ -79,7 +79,6 @@ docker compose up -d --build
 Detailed product and technical specs live in [`docs/`](docs/):
 
 - [`project_overview.md`](docs/project_overview.md) — what the app is and why it exists
-- [`tech_stack.md`](docs/tech_stack.md) — stack and deployment target
 - [`budget_structure.md`](docs/budget_structure.md) — budgets, groups, line items, rollover, the zero-based equation
 - [`transaction_handling.md`](docs/transaction_handling.md) — bank sync, manual entry, drag-and-drop assignment, splits
 - [`accounts.md`](docs/accounts.md) — per-user accounts and connection details
@@ -89,3 +88,4 @@ Detailed product and technical specs live in [`docs/`](docs/):
 - [`frontend.md`](docs/frontend.md) — UI components, interactions, theme, routing, data fetching
 - [`database.md`](docs/database.md) — full schema
 - [`out_of_scope.md`](docs/out_of_scope.md) — explicitly excluded/deferred features
+- [`backups.md`](docs/backups.md) — MSSQL backup schedule, retention, and restore runbook

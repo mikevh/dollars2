@@ -4,7 +4,8 @@
 
 - Primary keys: `int` identity auto-increment
 - Money columns: `decimal(18,2)`
-- All tables have `CreatedAt datetime2` and `UpdatedAt datetime2`
+- All tables have `CreatedAt datetime2` and `UpdatedAt datetime2` — except `AccountBalances`, which
+  is append-only and uses `CreatedOn` / `UpdatedOn`
 - Sort order: `int` starting at 0
 - Raw SQL migration scripts, numbered, run manually, tracked via migrations table
 - Every constraint is named explicitly with the `CONSTRAINT <name> ...` form — never the inline
@@ -94,7 +95,8 @@ Unique constraint: (UserId, Year, Month)
 | Name | nvarchar(256) | |
 | PlannedAmount | decimal(18,2) | |
 | SortOrder | int | starts at 0 |
-| Notes | nvarchar(max) | |
+| Notes | nvarchar(max) | NOT NULL, default `''` (migration 018) |
+| PreviousLineItemId | int | FK → LineItems (self), null. Links this month's line item to its prior-month counterpart — this chain is what rollover walks |
 | CreatedAt | datetime2 | |
 | UpdatedAt | datetime2 | |
 
@@ -108,6 +110,8 @@ Unique constraint: (UserId, Year, Month)
 | ProviderTransactionId | nvarchar(500) | null for manual |
 | Date | date | |
 | Description | nvarchar(500) | |
+| Payee | nvarchar(500) | NOT NULL (migration 014) |
+| Memo | nvarchar(500) | NOT NULL (migration 014) |
 | Amount | decimal(18,2) | positive = income, negative = expense |
 | Notes | nvarchar(max) | |
 | IsDeleted | bit | soft-delete flag |
@@ -166,6 +170,7 @@ CreatedOn DESC)`.
 - Users → RefreshTokens (1:many)
 - Budgets → BudgetGroups (1:many)
 - BudgetGroups → LineItems (1:many)
+- LineItems → LineItems (self, via `PreviousLineItemId` — the month-over-month rollover chain)
 - Accounts → Transactions (1:many)
 - Accounts → SyncLog (1:many)
 - Accounts → AccountBalances (1:many)

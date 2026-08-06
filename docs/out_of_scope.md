@@ -9,7 +9,6 @@
 - Open user registration (v1 users are added directly to DB)
 - Manual-only accounts (no bank link)
 - Responsive / mobile design
-- Docker / containerization
 
 ## Out of Scope
 

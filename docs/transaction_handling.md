@@ -3,8 +3,8 @@
 ## Bank Sync
 
 - Two providers: Plaid (free tier) and SimpleFIN ($1.50/mo)
-- Sync frequency: configurable per data source, default every 12 hours
-- Manual sync button to trigger on-demand
+- Sync frequency: configurable per provider, minimum every 6 hours
+- Manual sync button to trigger on-demand (whole user, or a single connection)
 - Only posted transactions are imported (pending shown in a separate tab)
 - Duplicate detection via provider's transaction ID
 - If a soft-deleted synced transaction is re-synced, the isDeleted flag is set back to false and it reappears in "New" tab
