@@ -31,6 +31,7 @@ Detailed product specs live in `docs/`. Read these before building new features:
 - `docs/backend.md` — Architecture, all API endpoints, bank sync service, provider abstraction
 - `docs/frontend.md` — All UI components, interactions, theme, routing, data fetching
 - `docs/database.md` — Full schema (all tables, columns, types, constraints, relationships)
+- `docs/backups.md` — MSSQL backup job on claw, schedule/retention, and restore procedures
 - `docs/out_of_scope.md` — Explicitly excluded/deferred features
 
 ## Conventions
