@@ -2,8 +2,9 @@
 
 How the Dollars2 MSSQL database is backed up on the home server, and the exact steps to restore it.
 
-Set up 2026-08-06. Verified by restoring a cron-produced backup into a scratch database and
-comparing row counts against the live database.
+Set up 2026-08-06. Verified by restoring a cron-produced backup into a scratch database, replaying
+the full log chain, and stopping mid-chain with `STOPAT`. Survival across a claw reboot was
+confirmed the same day.
 
 ## What is being protected
 
@@ -61,15 +62,17 @@ than evidence of runaway growth.
 | Path | What |
 |--------|--------|
 | `/usr/local/bin/mssql-backup.sh` | The job. `root:root`, mode `750` |
-| `/etc/mssql-backup.conf` | Sourced by the script; holds `NAS_DEST`. Mode `600` |
+| `/etc/mssql-backup.conf` | Sourced by the script; holds `NAS_DEST` and the ping URLs. Mode `600` |
 | root crontab | `30 2 * * * … full` and `15 * * * * … log` |
 | `/var/log/mssql-backup.log` | Append-only log of every run |
 | `/home/m/backups/mssql` | Local gzipped archive |
 
-`/etc/mssql-backup.conf` contains one line:
+`/etc/mssql-backup.conf`:
 
 ```
 NAS_DEST="michael@10.0.0.10:/share/clawsql"
+HC_URL_FULL="https://hc-ping.com/<uuid>"
+HC_URL_LOG="https://hc-ping.com/<uuid>"
 ```
 
 Any variable in the script's config block can be overridden there without editing the script.
@@ -295,6 +298,25 @@ sudo grep -E 'FAILED|WARNING' /var/log/mssql-backup.log | tail
 `WARNING: newest log backup is Nh old` means the hourly job has stopped — investigate immediately,
 because the transaction log is now growing unbounded.
 
+### Alerting
+
+Two healthchecks.io checks act as a dead-man's switch:
+
+| Check | Period | Grace | Pinged by |
+|--------|--------|--------|--------|
+| `mssql-backup-log` | 1 hour | 20 min | the `:15` hourly run |
+| `mssql-backup-full` | 1 day | 1 hour | the 02:30 nightly run |
+
+Every successful run pings its URL; the `ERR` trap pings `<url>/fail`. This catches what log
+inspection cannot: if cron dies, claw is off, or the network is down, no log line is ever written,
+but the *missing* ping still fires an alert.
+
+Two deliberate properties. A failed ping is logged and ignored rather than failing the run — the
+monitoring must not be able to break the thing it monitors. And `check` mode never pings, so a
+manual run cannot reset the timer and mask a dead cron.
+
+Only a ping leaves the network; no backup content is sent.
+
 ## Restore procedures
 
 All of these use a `sq` helper for SQL and a staging step to get a gzipped backup into a path
@@ -375,6 +397,11 @@ Everything since 02:30 is lost by this procedure. Use C instead unless the log c
 ### C. Point-in-time restore (full + log chain)
 
 Recovers to any moment covered by the log backups — up to the last `:15`.
+
+Verified 2026-08-06 against a scratch database, both replaying a full 19-log chain (landing within
+one row of live) and stopping mid-chain with `STOPAT` (landing at genuinely intermediate row
+counts). Issue each `RESTORE` as its own `sqlcmd` call — see the `-Q` truncation note under
+Gotchas.
 
 Restore the full backup **`WITH NORECOVERY`**, leaving the database able to accept more log files,
 then apply every `.trn` taken after it in chronological order:
@@ -465,6 +492,12 @@ also no `mssql-tools18` image on MCR. Use `mcr.microsoft.com/mssql-tools`, where
 
 **`STATS=0` is invalid** in `BACKUP` — the parameter accepts 1–100. Omit it entirely.
 
+**`sqlcmd -Q` truncates around 1 KB.** Long batches are cut mid-statement, producing a misleading
+`Msg 105, unclosed quotation mark` that looks like a quoting bug. This bites hard on procedure C,
+where a full log chain is many statements. Issue **one `sqlcmd` invocation per statement** (as the
+procedure below does) or pass a script with `-i` instead of `-Q`. Always use `-b` so sqlcmd exits
+non-zero on error — without it, a failed `RESTORE` inside a loop passes silently.
+
 **Backup compression is unavailable.** `MSSQL_PID=Express` does not support `WITH COMPRESSION`;
 that is why the script gzips on the host instead. Express also has no SQL Server Agent, which is
 why scheduling is host cron.
@@ -495,11 +528,11 @@ for a backup job.
 
 - **NAS retention is unbounded.** Nothing prunes the offsite copy. Deliberate: deletion logic
   running against the only offsite copy is a worse risk than ~130 MB/year.
-- **Failures are logged, not alerted.** Nothing emails or pings on `FAILED`. Discovering a broken
-  job depends on reading the log. A healthchecks.io ping or similar dead-man's switch would close
-  this.
-- **Backups have never been tested across a claw reboot.** Cron is enabled and the container is
-  `unless-stopped`, so it should survive, but this is reasoning rather than evidence.
+- **Procedure B has never been executed.** It is destructive by nature, so it was written rather
+  than tested. Its mechanics are a subset of procedure C (verified) apart from
+  `SINGLE_USER WITH ROLLBACK IMMEDIATE` and restoring over a live database.
+- **The `dollars` and `kidsavings` databases are backed up but their restores are untested.** Only
+  `dollars2` has been through procedures A and C.
 - **claw's IP is a DHCP lease** (`10.0.0.215`). Nothing depends on it today, but adding a
   `from="10.0.0.215"` restriction to the NAS `authorized_keys` would break when the lease moves,
   unless a reservation is set first.
