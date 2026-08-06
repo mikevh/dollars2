@@ -325,10 +325,81 @@ public class SimplefinProviderTests
             since: null,
             cancel: TestContext.Current.CancellationToken);
 
-        Assert.Contains("\"t1\"", Assert.Single(results[1].Upserts).RawJson);
+        var first = Assert.Single(results[1].Upserts).RawJson;
+        Assert.Contains("\"t1\"", first);
         Assert.Contains("Checking", results[1].AccountMetadataJson!);
 
-        Assert.Contains("\"t2\"", Assert.Single(results[2].Upserts).RawJson);
+        var second = Assert.Single(results[2].Upserts).RawJson;
+        Assert.Contains("\"t2\"", second);
         Assert.Contains("Savings", results[2].AccountMetadataJson!);
+
+        // The assertions above alone would pass if every field were handed the whole response body.
+        // Correlation is only proven by each slice *excluding* the other account's data.
+        Assert.DoesNotContain("t2", first);
+        Assert.DoesNotContain("Savings", results[1].AccountMetadataJson!);
+        Assert.DoesNotContain("t1", second);
+        Assert.DoesNotContain("Checking", results[2].AccountMetadataJson!);
+    }
+
+    // A response repeating an account id would otherwise pair the first account's transactions (which is
+    // what FirstOrDefault selects) with the second's raw text — the archive holding the wrong bytes under
+    // the right id, which is worse than holding none.
+    [Fact]
+    public async Task A_repeated_account_id_resolves_raw_capture_to_the_same_entry_the_mapping_uses()
+    {
+        var provider = CreateProvider("""
+        {"accounts":[
+            {"id":"sf-dup","name":"First","transactions":[{"id":"t1","posted":1700000000,"amount":"-1.00","description":"One","payee":"","memo":"","pending":false}]},
+            {"id":"sf-dup","name":"Second","transactions":[{"id":"t2","posted":1700000000,"amount":"-2.00","description":"Two","payee":"","memo":"","pending":false}]}
+        ],"errlist":[]}
+        """);
+
+        var results = await provider.FetchTransactionsForConnectionAsync(
+            new[] { Account(1, accountId: "sf-dup") }, since: null, cancel: TestContext.Current.CancellationToken);
+
+        // The typed mapping takes the first entry, so the raw capture has to as well.
+        var mapped = Assert.Single(results[1].Upserts);
+        Assert.Equal("t1", mapped.ProviderTransactionId);
+        Assert.Contains("\"t1\"", mapped.RawJson);
+        Assert.Contains("First", results[1].AccountMetadataJson!);
+    }
+
+    [Fact]
+    public async Task A_repeated_transaction_id_keeps_the_first_occurrences_own_payload()
+    {
+        var provider = CreateProvider("""
+        {"accounts":[{"id":"sf-1","transactions":[
+            {"id":"t-dup","posted":1700000000,"amount":"-1.00","description":"First","payee":"","memo":"","pending":false},
+            {"id":"t-dup","posted":1700000000,"amount":"-2.00","description":"Second","payee":"","memo":"","pending":false}
+        ]}],"errlist":[]}
+        """);
+
+        var results = await provider.FetchTransactionsForConnectionAsync(
+            new[] { Account(1, accountId: "sf-1") }, since: null, cancel: TestContext.Current.CancellationToken);
+
+        // Both are mapped — dedup by ProviderTransactionId happens downstream, not here — but the first
+        // one must carry its own bytes rather than the later duplicate's.
+        Assert.Equal(2, results[1].Upserts.Count);
+        Assert.Contains("First", results[1].Upserts[0].RawJson);
+    }
+
+    // A SimpleFIN access URL can cover accounts the user never added to Dollars2. Those must not leak
+    // into another account's capture.
+    [Fact]
+    public async Task Untracked_accounts_in_the_response_are_not_captured()
+    {
+        var provider = CreateProvider("""
+        {"accounts":[
+            {"id":"sf-1","name":"Tracked","transactions":[{"id":"t1","posted":1700000000,"amount":"-1.00","description":"One","payee":"","memo":"","pending":false}]},
+            {"id":"sf-untracked","name":"Untracked","transactions":[{"id":"t9","posted":1700000000,"amount":"-9.00","description":"Nine","payee":"","memo":"","pending":false}]}
+        ],"errlist":[]}
+        """);
+
+        var results = await provider.FetchTransactionsForConnectionAsync(
+            new[] { Account(1, accountId: "sf-1") }, since: null, cancel: TestContext.Current.CancellationToken);
+
+        Assert.Single(results);
+        Assert.DoesNotContain("Untracked", results[1].AccountMetadataJson!);
+        Assert.DoesNotContain("t9", Assert.Single(results[1].Upserts).RawJson);
     }
 }
