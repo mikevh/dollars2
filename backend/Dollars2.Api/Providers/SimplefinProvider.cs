@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
@@ -104,7 +105,14 @@ public class SimplefinProvider : IBankSyncProvider
         // the same entries — including the failure results, where they are often the explanation.
         var errorsJson = accountSet.Errlist.Select(e => e.GetRawText()).ToList();
 
-        var rawAccounts = IndexRawAccounts(json);
+        // Only the SimpleFIN accounts this group actually tracks: one access URL can cover accounts the
+        // user never added, and indexing those would build the largest strings in the response for nothing.
+        var wantedAccountIds = parsed
+            .Where(p => !string.IsNullOrEmpty(p.Details?.AccountId))
+            .Select(p => p.Details!.AccountId)
+            .ToHashSet();
+
+        var rawAccounts = IndexRawAccounts(json, wantedAccountIds);
 
         var results = new Dictionary<int, ProviderSyncResult>();
         foreach (var (account, details) in parsed)
@@ -132,12 +140,27 @@ public class SimplefinProvider : IBankSyncProvider
             {
                 // Looked up by id rather than re-serialized from the DTO, so the archive holds the bytes
                 // SimpleFIN sent — including fields the DTO does not model.
-                var rawTransaction = raw?.TransactionsById.GetValueOrDefault(t.Id) ?? "";
+                var rawTransaction = raw?.TransactionsById.GetValueOrDefault(t.Id);
+                if (rawTransaction is null)
+                {
+                    // Both views are built from the same response body, so this should be unreachable.
+                    // Logged rather than passed over: an archive that silently holds nothing for a
+                    // transaction is the failure you would most want to find in the logs afterwards.
+                    _logger.LogWarning(
+                        "No raw JSON captured for SimpleFIN transaction {TransactionId} on account {AccountId}",
+                        t.Id,
+                        account.Id);
+                }
 
                 if (!decimal.TryParse(t.Amount, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount))
                 {
                     _logger.LogWarning("Skipping transaction {TransactionId} for account {AccountId} with invalid amount: '{Amount}'", t.Id, account.Id, t.Amount);
-                    skippedTransactionsJson.Add(rawTransaction);
+
+                    // An empty entry would archive nothing while looking like a captured payload.
+                    if (!string.IsNullOrEmpty(rawTransaction))
+                    {
+                        skippedTransactionsJson.Add(rawTransaction);
+                    }
                     continue;
                 }
 
@@ -145,7 +168,7 @@ public class SimplefinProvider : IBankSyncProvider
                     ? DateOnly.FromDateTime(DateTime.UtcNow)
                     : DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(t.Posted).UtcDateTime);
 
-                transactions.Add(new SyncedTransaction(t.Id, date, t.Description, t.Payee, t.Memo, amount, t.Pending, rawTransaction));
+                transactions.Add(new SyncedTransaction(t.Id, date, t.Description, t.Payee, t.Memo, amount, t.Pending, rawTransaction ?? ""));
             }
 
             decimal? balance = null;
@@ -173,11 +196,23 @@ public class SimplefinProvider : IBankSyncProvider
 
     /// <summary>
     /// Indexes the response body by SimpleFIN account id, so the typed mapping loop above can attach the
-    /// raw text of each account and transaction object without re-serializing its own DTOs.
+    /// raw text of each account and transaction object without re-serializing its own DTOs. Restricted to
+    /// <paramref name="wantedAccountIds"/> — the accounts this connection group actually tracks.
     /// </summary>
-    private static Dictionary<string, RawAccount> IndexRawAccounts(string json)
+    /// <remarks>
+    /// Duplicate ids resolve first-wins at both levels, via TryAdd. That is not arbitrary: the typed loop
+    /// selects its account with FirstOrDefault and walks transactions in document order, so last-wins here
+    /// would quietly pair one account's transactions with another's raw text — an archive holding the
+    /// wrong bytes under the right id, which is worse than holding none.
+    /// </remarks>
+    private static Dictionary<string, RawAccount> IndexRawAccounts(string json, IReadOnlySet<string> wantedAccountIds)
     {
         var indexed = new Dictionary<string, RawAccount>();
+
+        if (wantedAccountIds.Count == 0)
+        {
+            return indexed;
+        }
 
         using var document = JsonDocument.Parse(json);
         if (!document.RootElement.TryGetProperty("accounts", out var accounts) || accounts.ValueKind != JsonValueKind.Array)
@@ -187,7 +222,10 @@ public class SimplefinProvider : IBankSyncProvider
 
         foreach (var account in accounts.EnumerateArray())
         {
-            if (account.ValueKind != JsonValueKind.Object || !TryGetId(account, out var accountId))
+            if (account.ValueKind != JsonValueKind.Object
+                || !TryGetId(account, out var accountId)
+                || !wantedAccountIds.Contains(accountId)
+                || indexed.ContainsKey(accountId))
             {
                 continue;
             }
@@ -199,9 +237,9 @@ public class SimplefinProvider : IBankSyncProvider
                 {
                     if (transaction.ValueKind == JsonValueKind.Object && TryGetId(transaction, out var transactionId))
                     {
-                        // Indexer rather than Add: a provider repeating an id must not throw here. The
-                        // duplicate is already a problem for ProviderTransactionId dedup downstream.
-                        transactionsById[transactionId] = transaction.GetRawText();
+                        // TryAdd rather than Add or the indexer: a provider repeating an id must not throw,
+                        // and first-wins keeps the first occurrence paired with its own bytes.
+                        transactionsById.TryAdd(transactionId, transaction.GetRawText());
                     }
                 }
             }
@@ -231,7 +269,7 @@ public class SimplefinProvider : IBankSyncProvider
     /// </summary>
     private static string WriteMetadataWithoutTransactions(JsonElement account)
     {
-        var buffer = new MemoryStream();
+        var buffer = new ArrayBufferWriter<byte>();
         using (var writer = new Utf8JsonWriter(buffer))
         {
             writer.WriteStartObject();
@@ -245,7 +283,7 @@ public class SimplefinProvider : IBankSyncProvider
             writer.WriteEndObject();
         }
 
-        return Encoding.UTF8.GetString(buffer.ToArray());
+        return Encoding.UTF8.GetString(buffer.WrittenSpan);
     }
 
     private sealed record RawAccount(string MetadataJson, Dictionary<string, string> TransactionsById);
