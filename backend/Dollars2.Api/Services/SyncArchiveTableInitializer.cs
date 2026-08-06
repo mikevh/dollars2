@@ -32,7 +32,6 @@ public class SyncArchiveTableInitializer : IHostedService
     /// <summary>Index behind "show me this account's archive, newest first".</summary>
     public const string SyncedAtIndexName = "LSI_SyncedAt";
 
-    private static readonly TimeSpan ActiveTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ActivePollInterval = TimeSpan.FromMilliseconds(250);
 
     private readonly IAmazonDynamoDB _dynamoDb;
@@ -49,11 +48,30 @@ public class SyncArchiveTableInitializer : IHostedService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Ceiling on everything <see cref="StartAsync"/> does, not just the wait for ACTIVE. The host
+    /// awaits StartAsync before it serves a single request, and the SDK's own defaults are no help:
+    /// the client Program.cs registers overrides neither Timeout nor MaxErrorRetry, so a DynamoDB
+    /// that accepts connections and then never answers would otherwise stall the app for minutes.
+    /// Settable so tests can assert the bound without sitting through it; DI leaves it at the default.
+    /// </summary>
+    /// <remarks>
+    /// Ten seconds is generous for the work itself — compose starts this only after dynamodb-local
+    /// reports healthy, and a create there is effectively instant. The budget exists for the degraded
+    /// case, and in that case it is dead time the whole app waits through, so it is kept short.
+    /// </remarks>
+    public TimeSpan StartupTimeout { get; init; } = TimeSpan.FromSeconds(10);
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        // Every SDK call below runs on this token, so a call that hangs is bounded too — a deadline
+        // checked between calls would not be, and one hung DescribeTable would sail past it.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(StartupTimeout);
+
         try
         {
-            if (await DescribeAsync(_options.TableName, cancellationToken) is not null)
+            if (await DescribeAsync(timeout.Token) is not null)
             {
                 _logger.LogDebug("Sync archive table {TableName} already exists", _options.TableName);
                 return;
@@ -61,21 +79,22 @@ public class SyncArchiveTableInitializer : IHostedService
 
             try
             {
-                await _dynamoDb.CreateTableAsync(BuildCreateTableRequest(_options.TableName), cancellationToken);
+                await _dynamoDb.CreateTableAsync(BuildCreateTableRequest(_options.TableName), timeout.Token);
+
+                await WaitForActiveAsync(timeout.Token);
+
+                _logger.LogInformation(
+                    "Created sync archive table {TableName} with local secondary index {IndexName}",
+                    _options.TableName,
+                    SyncedAtIndexName);
             }
             catch (ResourceInUseException)
             {
-                // Another process won the race between DescribeTable and CreateTable. Fall through to
-                // the wait below — the table it created is the table this one would have created.
+                // Another process won the race between DescribeTable and CreateTable. Its table is the
+                // table this one would have created, so wait on that instead — and don't claim credit.
                 _logger.LogDebug("Sync archive table {TableName} was created concurrently", _options.TableName);
+                await WaitForActiveAsync(timeout.Token);
             }
-
-            await WaitForActiveAsync(cancellationToken);
-
-            _logger.LogInformation(
-                "Created sync archive table {TableName} with local secondary index {IndexName}",
-                _options.TableName,
-                SyncedAtIndexName);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -84,7 +103,8 @@ public class SyncArchiveTableInitializer : IHostedService
         catch (Exception ex)
         {
             // Sync archiving is best-effort, so an unreachable or unhappy DynamoDB must never keep the
-            // app from serving budgets. The next startup tries again.
+            // app from serving budgets. The next startup tries again. This deliberately catches the
+            // OperationCanceledException thrown by StartupTimeout, which the filter above lets past.
             _logger.LogError(
                 ex,
                 "Could not ensure sync archive table {TableName} exists at {ServiceUrl}; sync archiving will not work until this is resolved",
@@ -143,11 +163,11 @@ public class SyncArchiveTableInitializer : IHostedService
         };
     }
 
-    private async Task<TableDescription?> DescribeAsync(string tableName, CancellationToken cancellationToken)
+    private async Task<TableDescription?> DescribeAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var response = await _dynamoDb.DescribeTableAsync(tableName, cancellationToken);
+            var response = await _dynamoDb.DescribeTableAsync(_options.TableName, cancellationToken);
             return response.Table;
         }
         catch (ResourceNotFoundException)
@@ -156,23 +176,17 @@ public class SyncArchiveTableInitializer : IHostedService
         }
     }
 
+    // Bounded by the caller's StartupTimeout token rather than a deadline of its own — cancellation
+    // is the only thing that can stop a poll already in flight.
     private async Task WaitForActiveAsync(CancellationToken cancellationToken)
     {
-        var deadline = DateTime.UtcNow + ActiveTimeout;
-
         while (true)
         {
-            var table = await DescribeAsync(_options.TableName, cancellationToken);
+            var table = await DescribeAsync(cancellationToken);
 
             if (table is not null && table.TableStatus == TableStatus.ACTIVE)
             {
                 return;
-            }
-
-            if (DateTime.UtcNow >= deadline)
-            {
-                throw new TimeoutException(
-                    $"Sync archive table {_options.TableName} did not become ACTIVE within {ActiveTimeout.TotalSeconds:0} seconds.");
             }
 
             await Task.Delay(ActivePollInterval, cancellationToken);
