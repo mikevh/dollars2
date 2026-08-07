@@ -10,10 +10,12 @@ namespace Dollars2.Api.Controllers;
 public class TransactionsController : DollarsControllerBase
 {
     private readonly TransactionService _transactionService;
+    private readonly TransactionRawHistoryService _rawHistoryService;
 
-    public TransactionsController(TransactionService transactionService)
+    public TransactionsController(TransactionService transactionService, TransactionRawHistoryService rawHistoryService)
     {
         _transactionService = transactionService;
+        _rawHistoryService = rawHistoryService;
     }
 
     [HttpGet("counts")]
@@ -84,6 +86,24 @@ public class TransactionsController : DollarsControllerBase
         var result = await _transactionService.GetByAccountAsync(accountId, GetUserId(), page, size, sort, dir, q, includeDeleted);
         if (result.Error is not null)
         {
+            return BadRequest(result);
+        }
+        return Ok(result);
+    }
+
+    [HttpGet("{id}/raw-history")]
+    public async Task<IActionResult> GetRawHistory(int id, CancellationToken cancellationToken)
+    {
+        var result = await _rawHistoryService.GetRawHistoryAsync(id, GetUserId(), cancellationToken);
+        if (result.Error is not null)
+        {
+            // A dead archive is a dependency outage, not a bad request — the one error on this
+            // controller that is not the caller's doing. Everything else keeps the 400 shape its
+            // siblings use for an unknown or someone else's transaction id.
+            if (result.Error.Code == TransactionRawHistoryService.ArchiveUnavailableCode)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, result);
+            }
             return BadRequest(result);
         }
         return Ok(result);

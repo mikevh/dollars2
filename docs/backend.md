@@ -167,6 +167,12 @@
 - `DELETE /api/transactions/{id}` — soft-delete
 - `DELETE /api/transactions/{id}/permanent` — hard-delete (manual only, must be soft-deleted first)
 - `POST /api/transactions/{id}/restore` — restore from deleted
+- `GET /api/transactions/{id}/raw-history` — every archived sighting of this transaction from the
+  sync archive, newest first: `{ syncedAt, sourceType, syncRunId, rawJson }`. `rawJson` is the
+  provider's payload verbatim, passed through as a string and pretty-printed client-side. A manual
+  transaction has no provider payload and returns an empty list, not an error. Returns 503
+  `ARCHIVE_UNAVAILABLE` when the archive store cannot be reached — unlike the sync's best-effort
+  write, a failed read has no useful answer to fall back on.
 
 ### Sync
 - `POST /api/sync` — sync every connection for the user
