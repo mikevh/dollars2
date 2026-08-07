@@ -7,6 +7,9 @@ namespace Dollars2.Api.Services;
 
 public class BankSyncService
 {
+    /// <summary>Signals a manual sync/resync against a provider disabled in configuration, which the controller answers with a 400.</summary>
+    public const string ProviderDisabledCode = "PROVIDER_DISABLED";
+
     private readonly DbSession _dbSession;
     private readonly AccountRepository _accountRepo;
     private readonly TransactionRepository _transactionRepo;
@@ -94,7 +97,7 @@ public class BankSyncService
     /// null when no syncable connection matches (unknown id, or the "manual" group). Callers must hold
     /// the per-user <see cref="SyncLockService"/>.
     /// </summary>
-    public async Task<IReadOnlyList<SyncResult>?> SyncConnectionForUserAsync(int userId, string connectionId, CancellationToken cancellationToken = default)
+    public async Task<DollarsApiResponse<IReadOnlyList<SyncResult>>?> SyncConnectionForUserAsync(int userId, string connectionId, CancellationToken cancellationToken = default)
     {
         var accounts = (await _accountRepo.GetByUserIdAsync(userId)).ToList();
         var connectionAccounts = ResolveConnectionAccounts(accounts, connectionId, _providers);
@@ -106,14 +109,17 @@ public class BankSyncService
         var provider = GetProvider(connectionAccounts[0].SourceType);
         if (provider is null)
         {
-            // Provider disabled or unregistered — mirror the full sync's skipped handling.
-            return connectionAccounts.Select(SkippedResult).ToList();
+            // A user-initiated sync on a disabled provider is a dead end, not a background skip —
+            // tell the user why rather than silently reporting success with nothing synced.
+            return DollarsApiResponse<IReadOnlyList<SyncResult>>.Fail(
+                ProviderUnavailableMessage(connectionAccounts[0].SourceType),
+                ProviderDisabledCode);
         }
 
         // Manual sync bypasses MinSyncInterval by design.
         var rv = await SyncConnectionAsync(userId, provider, connectionAccounts, cancellationToken);
 
-        return rv;
+        return DollarsApiResponse<IReadOnlyList<SyncResult>>.Success(rv);
     }
 
     /// <summary>
@@ -125,7 +131,7 @@ public class BankSyncService
     /// but reset their cursor to re-stream from scratch. Returns null when no syncable connection matches
     /// (unknown id, or the "manual" group). Callers must hold the per-user <see cref="SyncLockService"/>.
     /// </summary>
-    public async Task<IReadOnlyList<SyncResult>?> ResyncConnectionForUserAsync(int userId, string connectionId, CancellationToken cancellationToken = default)
+    public async Task<DollarsApiResponse<IReadOnlyList<SyncResult>>?> ResyncConnectionForUserAsync(int userId, string connectionId, CancellationToken cancellationToken = default)
     {
         var accounts = (await _accountRepo.GetByUserIdAsync(userId)).ToList();
         var connectionAccounts = ResolveConnectionAccounts(accounts, connectionId, _providers);
@@ -137,13 +143,16 @@ public class BankSyncService
         var provider = GetProvider(connectionAccounts[0].SourceType);
         if (provider is null)
         {
-            // Provider disabled or unregistered — mirror the full sync's skipped handling.
-            return connectionAccounts.Select(SkippedResult).ToList();
+            // A user-initiated resync on a disabled provider is a dead end, not a background skip —
+            // tell the user why rather than silently reporting success with nothing synced.
+            return DollarsApiResponse<IReadOnlyList<SyncResult>>.Fail(
+                ProviderUnavailableMessage(connectionAccounts[0].SourceType),
+                ProviderDisabledCode);
         }
-        
+
         var rv = await SyncConnectionAsync(userId, provider, connectionAccounts, cancellationToken, fullResync: true);
 
-        return rv;
+        return DollarsApiResponse<IReadOnlyList<SyncResult>>.Success(rv);
     }
 
     /// <summary>
@@ -404,6 +413,16 @@ public class BankSyncService
             ErrorMessage = errorMessage,
         };
     }
+
+    /// <summary>
+    /// Message for a manual sync/resync whose provider lookup failed. Distinguishes a provider
+    /// that's registered but toggled off in config from a source type with no provider at all —
+    /// the latter shouldn't claim there's a config toggle that doesn't exist.
+    /// </summary>
+    private string ProviderUnavailableMessage(string sourceType) =>
+        _providers.ContainsKey(sourceType)
+            ? $"{sourceType} sync is currently disabled."
+            : $"{sourceType} sync is not available.";
 
     private IBankSyncProvider? GetProvider(string sourceType)
     {

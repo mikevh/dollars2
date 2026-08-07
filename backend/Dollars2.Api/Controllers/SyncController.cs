@@ -52,12 +52,16 @@ public class SyncController : DollarsControllerBase
         }
         try
         {
-            var results = await _syncService.SyncConnectionForUserAsync(userId, connectionId, HttpContext.RequestAborted);
-            if (results is null)
+            var result = await _syncService.SyncConnectionForUserAsync(userId, connectionId, HttpContext.RequestAborted);
+            if (result is null)
             {
                 return NotFound(DollarsApiResponse<IEnumerable<SyncResult>>.Fail("Connection not found.", "CONNECTION_NOT_FOUND"));
             }
-            return Ok(DollarsApiResponse<IEnumerable<SyncResult>>.Success(results));
+            if (result.Error is not null)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
         }
         finally
         {
@@ -75,12 +79,16 @@ public class SyncController : DollarsControllerBase
         }
         try
         {
-            var results = await _syncService.ResyncConnectionForUserAsync(userId, connectionId, HttpContext.RequestAborted);
-            if (results is null)
+            var result = await _syncService.ResyncConnectionForUserAsync(userId, connectionId, HttpContext.RequestAborted);
+            if (result is null)
             {
                 return NotFound(DollarsApiResponse<IEnumerable<SyncResult>>.Fail("Connection not found.", "CONNECTION_NOT_FOUND"));
             }
-            return Ok(DollarsApiResponse<IEnumerable<SyncResult>>.Success(results));
+            if (result.Error is not null)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
         }
         finally
         {

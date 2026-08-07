@@ -87,13 +87,14 @@ public class SimplefinProvider : IBankSyncProvider
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64Credentials);
 
         using var response = await http.SendAsync(request, cancel);
+        var json = await response.Content.ReadAsStringAsync(cancel);
+        
+        _logger.LogTrace("SimpleFIN response body for accounts {AccountIds}: {body}", string.Join(", ", accounts.Select(a => a.Id)), json);
         if (!response.IsSuccessStatusCode)
         {
-            var errorBody = await response.Content.ReadAsStringAsync(cancel);
-            throw new HttpRequestException($"SimpleFIN request failed with status {(int)response.StatusCode}: {errorBody}");
+            throw new HttpRequestException($"SimpleFIN request failed with status {(int)response.StatusCode}: {json}");
         }
 
-        var json = await response.Content.ReadAsStringAsync(cancel);
         var accountSet = JsonSerializer.Deserialize<SimplefinAccountSet>(json) ?? throw new InvalidOperationException("Failed to deserialize SimpleFIN response.");
 
         foreach (var error in accountSet.Errlist)

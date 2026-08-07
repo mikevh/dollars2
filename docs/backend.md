@@ -197,7 +197,8 @@
 - `GET /api/sync/status` — last sync time, status per account
 
 All three sync endpoints return 409 `SYNC_IN_PROGRESS` when that user already has a sync running,
-and the per-connection pair returns 404 `CONNECTION_NOT_FOUND` for an unknown connection.
+and the per-connection pair returns 404 `CONNECTION_NOT_FOUND` for an unknown connection and 400
+`PROVIDER_DISABLED` when the connection's provider is disabled in configuration.
 
 ### Health
 - `GET /api/health` — unauthenticated liveness check
