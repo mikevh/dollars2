@@ -6,6 +6,7 @@ import transactionReducer from '../features/transactions/transactionSlice'
 import rawHistoryReducer from '../features/transactions/rawHistorySlice'
 import accountsReducer from '../features/accounts/accountsSlice'
 import accountTransactionsReducer from '../features/accountTransactions/accountTransactionsSlice'
+import syncArchiveReducer from '../features/syncArchive/syncArchiveSlice'
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     rawHistory: rawHistoryReducer,
     accounts: accountsReducer,
     accountTransactions: accountTransactionsReducer,
+    syncArchive: syncArchiveReducer,
   },
 })
 

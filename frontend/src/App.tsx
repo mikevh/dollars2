@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import BudgetPage from './pages/BudgetPage'
 import AccountsPage from './pages/AccountsPage'
 import AccountTransactionsPage from './pages/AccountTransactionsPage'
+import SyncArchivePage from './pages/SyncArchivePage'
 import Footer from './components/Footer'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
           <Route path="/" element={<BudgetPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
           <Route path="/accounts/:accountId" element={<AccountTransactionsPage />} />
+          <Route path="/accounts/:accountId/sync-archive" element={<SyncArchivePage />} />
         </Route>
         <Route path="/login" element={ isAuthenticated ? <Navigate to="/" replace /> : <LoginPage /> } />
       </Routes>

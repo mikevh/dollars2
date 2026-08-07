@@ -1,6 +1,20 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { api } from '../../api/client'
-import type { AccountGroup, SyncResult } from '../../types/account'
+import type { AccountGroup, AccountInfo, SyncResult } from '../../types/account'
+
+/** Finds an account by id across every group, along with the sourceType its group carries. */
+export function findAccount(
+  groups: AccountGroup[],
+  accountId: number
+): { info: AccountInfo; sourceType: string } | undefined {
+  for (const group of groups) {
+    const info = group.accounts.find((a) => a.id === accountId)
+    if (info) {
+      return { info, sourceType: group.sourceType }
+    }
+  }
+  return undefined
+}
 
 interface AccountsState {
   groups: AccountGroup[]
