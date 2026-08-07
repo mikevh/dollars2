@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
-import type { RawHistoryEntryResponse } from '../../types/transaction'
+import JsonDisclosure from '../../components/JsonDisclosure'
+import { formatInstant } from '../../utils/format'
 import { fetchRawHistory } from './rawHistorySlice'
 
 interface RawHistoryTabProps {
@@ -9,44 +10,20 @@ interface RawHistoryTabProps {
   isManual: boolean
 }
 
-/** "2026-08-03 06:00 UTC" — the archive is keyed by instant, so it is shown as one. */
-function formatSyncedAt(iso: string): string {
-  const at = new Date(iso)
-  if (Number.isNaN(at.getTime())) {
-    return iso
-  }
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const day = `${at.getUTCFullYear()}-${pad(at.getUTCMonth() + 1)}-${pad(at.getUTCDate())}`
-  return `${day} ${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())} UTC`
-}
-
-interface ParsedPayload {
-  /** The payload as JS. Meaningless when malformed — read rawJson instead. */
-  value: unknown
-  malformed: boolean
-  /**
-   * Derived from the payload's own `pending` flag, which both providers carry. Null when the
-   * payload doesn't parse or doesn't have one — this view exists to show what the provider
-   * actually sent, so it never invents a status.
-   */
-  status: string | null
-}
-
-function parsePayload(rawJson: string): ParsedPayload {
+/**
+ * Derived from the payload's own `pending` flag, which both providers carry. Null when the payload
+ * doesn't parse or doesn't have one — this view exists to show what the provider actually sent, so it
+ * never invents a status.
+ */
+function statusOf(rawJson: string): string | null {
   try {
     const value: unknown = JSON.parse(rawJson)
     const pending = typeof value === 'object' && value !== null
       ? (value as Record<string, unknown>).pending
       : undefined
-    return {
-      value,
-      malformed: false,
-      status: typeof pending === 'boolean' ? (pending ? 'pending' : 'posted') : null,
-    }
+    return typeof pending === 'boolean' ? (pending ? 'pending' : 'posted') : null
   } catch {
-    // A malformed payload is precisely the thing this view exists to reveal, so it renders
-    // as-is rather than taking the dialog down with it.
-    return { value: undefined, malformed: true, status: null }
+    return null
   }
 }
 
@@ -62,28 +39,9 @@ export default function RawHistoryTab({ transactionId, isManual }: RawHistoryTab
     }
   }, [dispatch, loadedFor, transactionId])
 
-  // Newest sighting open, the rest collapsed. Re-seeded during render rather than in an effect —
-  // the same idiom TransactionEditDialog uses to reset state on an input change.
-  const [expanded, setExpanded] = useState<Set<number>>(() => new Set([0]))
-  const [seededFor, setSeededFor] = useState<RawHistoryEntryResponse[]>(entries)
-  if (seededFor !== entries) {
-    setSeededFor(entries)
-    setExpanded(new Set([0]))
-  }
-
-  // Parsed once per fetch rather than once per render: every row needs its status even while
-  // collapsed, and a long-lived transaction's history has no upper bound.
-  const parsed = useMemo(() => entries.map((entry) => parsePayload(entry.rawJson)), [entries])
-
-  const toggle = (index: number) => {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (!next.delete(index)) {
-        next.add(index)
-      }
-      return next
-    })
-  }
+  // Every row needs its status even while collapsed, and a long-lived transaction's history has no
+  // upper bound, so this is computed once per fetch rather than once per render.
+  const statuses = useMemo(() => entries.map((entry) => statusOf(entry.rawJson)), [entries])
 
   // Anything on screen before the effect above has dispatched belongs to some other transaction —
   // an in-flight fetch that resolved after its own dialog closed leaves entries behind with no id.
@@ -114,31 +72,23 @@ export default function RawHistoryTab({ transactionId, isManual }: RawHistoryTab
       </p>
       <div className="max-h-[50vh] overflow-y-auto border border-divider">
         {entries.map((entry, index) => {
-          const isExpanded = expanded.has(index)
-          const { value, malformed, status } = parsed[index]
+          const status = statuses[index]
           return (
-            <div key={index} className="border-b border-divider last:border-b-0">
-              <button
-                onClick={() => toggle(index)}
-                aria-expanded={isExpanded}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left hover:text-accent"
-              >
-                <span aria-hidden="true" className="text-xs text-muted">{isExpanded ? '▾' : '▸'}</span>
-                <span className="min-w-0 flex-1 truncate font-mono text-xs text-text">
-                  {formatSyncedAt(entry.syncedAt)}
-                </span>
-                {status && (
+            <JsonDisclosure
+              // Re-seeded whenever a new fetch lands (loadedFor changes), so the newest sighting
+              // starts expanded again rather than carrying over the previous transaction's state.
+              key={`${loadedFor}-${index}`}
+              defaultExpanded={index === 0}
+              rawJson={entry.rawJson}
+              header={formatInstant(entry.syncedAt)}
+              trailing={
+                status && (
                   <span className="font-heading text-[11px] font-extrabold uppercase tracking-wide text-muted">
                     {status}
                   </span>
-                )}
-              </button>
-              {isExpanded && (
-                <pre className="overflow-x-auto border-t border-divider bg-bg px-3 py-2 font-mono text-xs text-text">
-                  {malformed ? entry.rawJson : JSON.stringify(value, null, 2)}
-                </pre>
-              )}
-            </div>
+                )
+              }
+            />
           )
         })}
       </div>

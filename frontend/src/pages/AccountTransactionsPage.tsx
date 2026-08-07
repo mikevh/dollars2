@@ -21,6 +21,7 @@ import {
   fetchAccountTransactions,
   clearAccountTransactions,
 } from '../features/accountTransactions/accountTransactionsSlice'
+import { fetchAccounts, findAccount } from '../features/accounts/accountsSlice'
 import { formatCurrency } from '../utils/format'
 import type { TransactionResponse } from '../types/transaction'
 
@@ -85,6 +86,16 @@ export default function AccountTransactionsPage() {
 function AccountTransactions({ accountId }: { accountId: string | undefined }) {
   const dispatch = useAppDispatch()
   const { data, loading, error } = useAppSelector((state) => state.accountTransactions)
+  const { groups } = useAppSelector((state) => state.accounts)
+  const account = findAccount(groups, Number(accountId))
+
+  // Gates the sync archive link — manual accounts never sync, so it never renders for them. A
+  // direct link into this page (rather than via AccountsPage) may not have the groups yet.
+  useEffect(() => {
+    if (groups.length === 0) {
+      dispatch(fetchAccounts())
+    }
+  }, [dispatch, groups.length])
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }])
   const [pagination, setPagination] = useState<PaginationState>({
@@ -202,6 +213,14 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
         <h2 className="absolute left-1/2 -translate-x-1/2 text-[18px]">
           {data?.accountName ?? 'Account'}
         </h2>
+        {account && account.sourceType !== 'Manual' && (
+          <Link
+            to={`/accounts/${accountId}/sync-archive`}
+            className="btn btn-ghost ml-auto text-[13px]"
+          >
+            Sync archive
+          </Link>
+        )}
       </div>
 
       <div className="mx-auto w-full max-w-[860px] px-4 py-6">
