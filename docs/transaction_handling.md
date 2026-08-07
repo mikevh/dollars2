@@ -8,6 +8,7 @@
 - Only posted transactions are imported (pending shown in a separate tab)
 - Duplicate detection via provider's transaction ID
 - If a soft-deleted synced transaction is re-synced, the isDeleted flag is set back to false and it reappears in "New" tab
+- Every provider payload from a sync run is also archived, verbatim and append-only, to a separate DynamoDB store — see `docs/sync_archive.md`
 
 ## Manual Entry
 

@@ -5,6 +5,8 @@
 - .NET 10, ASP.NET Core Web API with controllers
 - Dapper (ORM)
 - MSSQL
+- DynamoDB (`amazon/dynamodb-local`, self-hosted — no AWS account) for the sync archive; see
+  `docs/sync_archive.md`
 - Built-in DI, built-in Microsoft logging
 
 ## Project Structure
@@ -118,6 +120,12 @@
   is the incremental-sync watermark — pruning it away would silently reset that account to a full
   180-day refetch. The prune runs in its own scope and its own try/catch, so a prune failure never
   stops syncing and a sync failure never skips the prune.
+- **Sync archive:** after each account is synced (including on a failed account, whose provider
+  errors are exactly what the archive should capture), the raw provider payload for every
+  transaction, removal, error, and the account metadata is written to a separate DynamoDB store as
+  an append-only, versioned audit trail. This is best-effort — a DynamoDB outage never fails or
+  rolls back the sync. See `docs/sync_archive.md` for the schema, versioning model, and the
+  Plaid/SimpleFIN fidelity difference.
 
 ## Provider Abstraction
 
