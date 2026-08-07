@@ -280,6 +280,187 @@ public class SyncArchiveRepository
         return entries;
     }
 
+    /// <summary>
+    /// One page of an account's whole archive — every item type, newest sync run first.
+    /// </summary>
+    /// <remarks>
+    /// The only read that can reach <c>ACCTMETA</c>, <c>REMOVED</c>, <c>ERROR</c> and <c>SKIPPED</c> items:
+    /// they have no provider transaction id to look them up by, so
+    /// <see cref="GetTransactionHistoryAsync"/> cannot see them. Throws on failure, like its sibling.
+    /// </remarks>
+    /// <param name="before">
+    /// Exclusive upper bound on <c>syncedAt</c>. Null starts from the newest run.
+    /// </param>
+    /// <param name="runLimit">Sync runs per page. Callers are expected to have clamped this already.</param>
+    public async Task<AccountSyncArchiveResponse> GetAccountArchivePageAsync(
+        int userId,
+        int accountId,
+        DateTime? before,
+        int runLimit,
+        CancellationToken cancellationToken = default)
+    {
+        // A limit of zero would mean "a page holding no runs", whose cursor would have to point at a run
+        // the page never returned. One is the smallest thing that can be paged through.
+        if (runLimit < 1)
+        {
+            runLimit = 1;
+        }
+
+        // Bounded for the same reason the write is — see GetTransactionHistoryAsync.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Timeout);
+
+        var names = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["#pk"] = SyncArchiveTableInitializer.PartitionKeyAttribute,
+        };
+        var values = new Dictionary<string, AttributeValue>(StringComparer.Ordinal)
+        {
+            [":pk"] = Text(PartitionKeyFor(userId, accountId)),
+        };
+        var keyCondition = "#pk = :pk";
+
+        // Built conditionally because DynamoDB rejects a request carrying an expression attribute name or
+        // value the expression never references.
+        if (before is not null)
+        {
+            names["#syncedAt"] = SyncArchiveTableInitializer.SyncedAtAttribute;
+            values[":before"] = Text(FormatInstant(before.Value));
+            keyCondition = "#pk = :pk AND #syncedAt < :before";
+        }
+
+        // Bucketed by the instant rather than by syncRunId. Every item one run writes for one account
+        // carries the same syncedAt, so a bucket holds whole runs and nothing else — which is what lets a
+        // page end on a run boundary. Grouping by syncRunId instead would leave two runs that happened to
+        // land on the same millisecond interleaved in the index and splittable between pages.
+        var buckets = new Dictionary<string, List<Dictionary<string, AttributeValue>>>(StringComparer.Ordinal);
+        var instantOrder = new List<string>();
+        var moreToRead = false;
+        Dictionary<string, AttributeValue>? startKey = null;
+
+        do
+        {
+            var response = await _dynamoDb.QueryAsync(
+                new QueryRequest
+                {
+                    TableName = _options.TableName,
+                    IndexName = SyncArchiveTableInitializer.SyncedAtIndexName,
+                    KeyConditionExpression = keyCondition,
+                    ExpressionAttributeNames = names,
+                    ExpressionAttributeValues = values,
+                    // Descending syncedAt: newest run first.
+                    ScanIndexForward = false,
+                    ExclusiveStartKey = startKey,
+                },
+                timeout.Token);
+
+            foreach (var item in response.Items)
+            {
+                var instant = TextOf(item, SyncArchiveTableInitializer.SyncedAtAttribute);
+                if (!buckets.TryGetValue(instant, out var bucket))
+                {
+                    // The first item of the run after the last one that fits. Stopping here rather than
+                    // after a fixed item count is what keeps a run whole; the cursor is exclusive, so the
+                    // next page picks up exactly this run.
+                    if (instantOrder.Count == runLimit)
+                    {
+                        moreToRead = true;
+                        break;
+                    }
+
+                    bucket = [];
+                    buckets[instant] = bucket;
+                    instantOrder.Add(instant);
+                }
+
+                bucket.Add(item);
+            }
+
+            if (moreToRead)
+            {
+                break;
+            }
+
+            // A run bigger than DynamoDB's 1MB page arrives in several, so the walk is driven by
+            // LastEvaluatedKey rather than by whether the page filled the run limit.
+            startKey = response.LastEvaluatedKey is { Count: > 0 } ? response.LastEvaluatedKey : null;
+        }
+        while (startKey is not null);
+
+        var runs = new List<SyncArchiveRunResponse>();
+        foreach (var instant in instantOrder)
+        {
+            // Ordered by run id only so that the same page comes back the same way twice; in practice one
+            // account's items for one instant all belong to a single run.
+            var byRun = buckets[instant]
+                .GroupBy(item => TextOf(item, SyncRunIdAttribute), StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal);
+
+            runs.AddRange(byRun.Select(group => ToRun(instant, group)));
+        }
+
+        return new AccountSyncArchiveResponse
+        {
+            Runs = runs,
+            NextBefore = moreToRead ? ParseInstant(instantOrder[^1]) : null,
+        };
+    }
+
+    /// <summary>
+    /// Assembles one run from the items it archived, ordered by sort key so a client that redraws the page
+    /// sees the same order it saw before.
+    /// </summary>
+    private static SyncArchiveRunResponse ToRun(string instant, IEnumerable<Dictionary<string, AttributeValue>> items)
+    {
+        var ordered = items
+            .OrderBy(item => TextOf(item, SyncArchiveTableInitializer.SortKeyAttribute), StringComparer.Ordinal)
+            .ToList();
+
+        var run = new SyncArchiveRunResponse
+        {
+            SyncedAt = ParseInstant(instant),
+            SyncRunId = ordered.Count > 0 ? TextOf(ordered[0], SyncRunIdAttribute) : "",
+            SourceType = ordered.Count > 0 ? TextOf(ordered[0], SourceTypeAttribute) : "",
+        };
+
+        foreach (var item in ordered)
+        {
+            var itemType = TextOf(item, ItemTypeAttribute);
+            var rawJson = item.TryGetValue(RawJsonAttribute, out var raw) ? raw.S : null;
+
+            run.Items.Add(new SyncArchiveItemResponse
+            {
+                ItemType = itemType,
+                ProviderTransactionId = item.TryGetValue(ProviderTransactionIdAttribute, out var id) ? id.S : null,
+                RawJson = rawJson,
+            });
+
+            switch (itemType)
+            {
+                case ItemTypeTransaction:
+                    run.TransactionCount++;
+                    break;
+                case ItemTypeRemoved:
+                    run.RemovedCount++;
+                    break;
+                case ItemTypeProviderError:
+                    run.ErrorCount++;
+                    break;
+                case ItemTypeSkippedTransaction:
+                    run.SkippedCount++;
+                    break;
+                // Hoisted for the client's convenience and deliberately left in Items as well: a run
+                // archives at most one of these, so the duplicated payload is cheap, and an Items array
+                // missing an item type would be a worse trade.
+                case ItemTypeAccountMetadata:
+                    run.AccountMetadataJson = rawJson;
+                    break;
+            }
+        }
+
+        return run;
+    }
+
     private static RawHistoryEntryResponse ToEntry(Dictionary<string, AttributeValue> item)
     {
         return new RawHistoryEntryResponse
