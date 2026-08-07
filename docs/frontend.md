@@ -139,6 +139,26 @@ All routes except `/login` sit behind an authenticated `Outlet` that redirects t
 
 ## Transaction Edit Dialog (Modal)
 
+### Tabs
+- Editing a transaction shows two tabs: **Details** (the form below) and **Raw History**
+- Creating one shows no tab bar — a transaction that doesn't exist yet has nothing archived
+- Edit state lives in the dialog, not in the form markup, so switching tabs never drops an
+  unsaved change
+
+### Raw History Tab
+- Every archived sighting of the transaction, newest first, from
+  `GET /api/transactions/{id}/raw-history` (see `docs/backend.md`)
+- Fetched through the `rawHistory` slice on the tab's first open, not on dialog mount — most
+  dialog opens never touch it
+- Each row is a collapsible header (synced-at instant in UTC, plus `posted`/`pending` read off
+  the payload's own flag); the newest sighting starts expanded
+- Payloads are pretty-printed client-side in a horizontally scrollable `<pre>`. A payload that
+  doesn't parse renders verbatim — a malformed payload is exactly what this view exists to reveal
+- Manual transactions get "No provider data"; a synced transaction with nothing archived gets
+  "No archived payloads". Neither is an error
+- A failed read renders inline in the tab, with no toast: a side-panel read shouldn't interrupt
+  someone mid-edit
+
 ### Money Inputs
 - Amount and split-amount fields are `type="text"` + `inputMode="decimal"`, guarded by
   `isMoneyDraft` (`utils/money.ts`): digits with at most two decimal places, no sign

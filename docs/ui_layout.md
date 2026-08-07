@@ -61,6 +61,7 @@
 
 ## Transaction Edit Dialog (Modal)
 
+- Editing shows two tabs: Details and Raw History (the archived provider payloads for that transaction); creating shows the form alone
 - Synced transactions: read-only fields (date, description, amount, account) + editable notes + line item assignment with split amounts
 - Manual transactions: all fields editable
 - Multiple line item assignments with amount inputs for splits (amounts must total to transaction amount)

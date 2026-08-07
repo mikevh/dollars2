@@ -3,6 +3,7 @@ import authReducer from '../features/auth/authSlice'
 import themeReducer from '../features/theme/themeSlice'
 import budgetReducer from '../features/budget/budgetSlice'
 import transactionReducer from '../features/transactions/transactionSlice'
+import rawHistoryReducer from '../features/transactions/rawHistorySlice'
 import accountsReducer from '../features/accounts/accountsSlice'
 import accountTransactionsReducer from '../features/accountTransactions/accountTransactionsSlice'
 
@@ -12,6 +13,7 @@ export const store = configureStore({
     theme: themeReducer,
     budget: budgetReducer,
     transactions: transactionReducer,
+    rawHistory: rawHistoryReducer,
     accounts: accountsReducer,
     accountTransactions: accountTransactionsReducer,
   },
