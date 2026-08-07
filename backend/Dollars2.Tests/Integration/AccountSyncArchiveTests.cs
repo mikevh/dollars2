@@ -235,6 +235,65 @@ public sealed class AccountSyncArchiveTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetArchivePageAsync_keeps_a_run_whole_across_dynamodb_response_pages()
+    {
+        using var db = _fixture.CreateSession();
+        db.BeginTransaction();
+        try
+        {
+            var userId = await SeedUserAsync(db, "archive-bigrun@example.com");
+            var accountId = await SeedAccountAsync(db, userId);
+
+            // DynamoDB caps a Query response at 1MB and hands back a LastEvaluatedKey for the rest, so
+            // these payloads are sized to push one run past that. Without the walk over LastEvaluatedKey
+            // the run would come back with only the items that fit in the first response — the exact
+            // failure "a run is never split" is about, and the one no other test here can produce.
+            const int itemCount = 40;
+            var padding = new string('x', 40_000);
+            var bigRunIds = Enumerable.Range(0, itemCount).Select(i => $"big{i:D3}").ToList();
+
+            var older = await ArchiveRunAsync(userId, accountId, FirstSync, transactionIds: ["small"]);
+            var big = await ArchiveRunAsync(
+                userId,
+                accountId,
+                FirstSync.AddDays(1),
+                transactionIds: bigRunIds,
+                rawJsonPadding: padding);
+
+            var service = BuildService(db);
+            var result = await service.GetArchivePageAsync(accountId, userId, before: null, limit: null, TestContext.Current.CancellationToken);
+
+            Assert.Null(result.Error);
+            Assert.Equal(2, result.Data!.Runs.Count);
+
+            // Every item of the oversized run made it back, in one run, on one page.
+            var run = result.Data.Runs[0];
+            Assert.Equal(big.ToString(), run.SyncRunId);
+            Assert.Equal(itemCount, run.TransactionCount);
+            Assert.Equal(itemCount, run.Items.Count);
+            Assert.Equal(bigRunIds, run.Items.Select(i => i.ProviderTransactionId!).ToList());
+            Assert.All(run.Items, item => Assert.Contains(padding, item.RawJson));
+
+            // And the run behind it is still there — the multi-page walk did not stop the read short.
+            Assert.Equal(older.ToString(), result.Data.Runs[1].SyncRunId);
+            Assert.Null(result.Data.NextBefore);
+
+            // The same holds when the run is the last one that fits: the page ends on its boundary with
+            // every one of its items, not on the DynamoDB response boundary in the middle of it.
+            var firstPage = await service.GetArchivePageAsync(accountId, userId, before: null, limit: 1, TestContext.Current.CancellationToken);
+
+            Assert.Null(firstPage.Error);
+            Assert.Single(firstPage.Data!.Runs);
+            Assert.Equal(itemCount, firstPage.Data.Runs[0].Items.Count);
+            Assert.Equal(FirstSync.AddDays(1), firstPage.Data.NextBefore);
+        }
+        finally
+        {
+            db.Rollback();
+        }
+    }
+
+    [Fact]
     public async Task GetArchivePageAsync_clamps_a_limit_above_the_maximum()
     {
         using var db = _fixture.CreateSession();
@@ -423,7 +482,8 @@ public sealed class AccountSyncArchiveTests : IAsyncLifetime
         IReadOnlyList<string>? removedIds = null,
         string? accountMetadataJson = null,
         IReadOnlyList<string>? errorsJson = null,
-        IReadOnlyList<string>? skippedJson = null)
+        IReadOnlyList<string>? skippedJson = null,
+        string? rawJsonPadding = null)
     {
         var account = new Account
         {
@@ -434,7 +494,7 @@ public sealed class AccountSyncArchiveTests : IAsyncLifetime
         };
 
         var upserts = (transactionIds ?? Array.Empty<string>())
-            .Select(id => new SyncedTransaction(id, TransactionDate, "Coffee", "Beans", "", -4.25m, false, RawJsonFor(id)))
+            .Select(id => new SyncedTransaction(id, TransactionDate, "Coffee", "Beans", "", -4.25m, false, RawJsonFor(id, rawJsonPadding)))
             .ToList();
 
         var syncRunId = Guid.NewGuid();
@@ -455,9 +515,15 @@ public sealed class AccountSyncArchiveTests : IAsyncLifetime
         return syncRunId;
     }
 
-    private static string RawJsonFor(string providerTransactionId)
+    /// <summary>
+    /// A stand-in provider payload. <paramref name="padding"/> inflates it so a run can be pushed past
+    /// DynamoDB's 1MB response limit without needing a thousand transactions to do it.
+    /// </summary>
+    private static string RawJsonFor(string providerTransactionId, string? padding = null)
     {
-        return $$"""{"id":"{{providerTransactionId}}","pending":false}""";
+        return padding is null
+            ? $$"""{"id":"{{providerTransactionId}}","pending":false}"""
+            : $$"""{"id":"{{providerTransactionId}}","pending":false,"padding":"{{padding}}"}""";
     }
 
     private static async Task<int> SeedUserAsync(DbSession db, string email)

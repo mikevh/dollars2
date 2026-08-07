@@ -150,6 +150,21 @@
 
 ### Accounts
 - `GET /api/accounts` — the user's accounts, grouped by connection, with per-account sync status
+- `GET /api/accounts/{id}/sync-archive?before=&limit=` — a page of this account's sync archive from the
+  sync archive store, grouped into runs, newest run first:
+  `{ runs: [{ syncRunId, syncedAt, sourceType, transactionCount, removedCount, errorCount, skippedCount,
+  accountMetadataJson, items: [{ itemType, providerTransactionId, rawJson }] }], nextBefore }`. The only
+  read path that reaches account-metadata, removal, provider-error and skipped-transaction items — they
+  have no provider transaction id, so `/api/transactions/{id}/raw-history` cannot see them. Items are
+  returned fully inline and are never truncated; `rawJson` is the provider's payload verbatim (null on
+  removals, whose whole payload is the id). `accountMetadataJson` is hoisted out of `items` for
+  convenience, not removed from it.
+  Keyset-paged on `syncedAt`, not by page number: the archive only grows at its newest end, so an offset
+  would shift under a client walking backwards. `before` is an exclusive upper bound and `nextBefore`
+  carries the next one (null on the last page). `limit` counts **sync runs**, defaults to 50 and is
+  clamped to 100 rather than rejected. A page always ends on a run boundary, so a run is never split
+  across two pages. Returns 404 for an unknown or another user's account, 400 `INVALID_CURSOR` for an
+  unparseable `before`, and 503 `ARCHIVE_UNAVAILABLE` when the archive store cannot be reached.
 
 ### Transactions
 - `GET /api/transactions/counts` — per-tab counts (New / Tracked / Deleted / Pending)
