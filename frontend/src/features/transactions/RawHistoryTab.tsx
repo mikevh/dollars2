@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
 import type { RawHistoryEntryResponse } from '../../types/transaction'
 import { fetchRawHistory } from './rawHistorySlice'
@@ -21,8 +21,9 @@ function formatSyncedAt(iso: string): string {
 }
 
 interface ParsedPayload {
-  /** What to show in the <pre>: pretty-printed when it parses, verbatim when it does not. */
-  text: string
+  /** The payload as JS. Meaningless when malformed — read rawJson instead. */
+  value: unknown
+  malformed: boolean
   /**
    * Derived from the payload's own `pending` flag, which both providers carry. Null when the
    * payload doesn't parse or doesn't have one — this view exists to show what the provider
@@ -33,18 +34,19 @@ interface ParsedPayload {
 
 function parsePayload(rawJson: string): ParsedPayload {
   try {
-    const parsed: unknown = JSON.parse(rawJson)
-    const pending = typeof parsed === 'object' && parsed !== null
-      ? (parsed as Record<string, unknown>).pending
+    const value: unknown = JSON.parse(rawJson)
+    const pending = typeof value === 'object' && value !== null
+      ? (value as Record<string, unknown>).pending
       : undefined
     return {
-      text: JSON.stringify(parsed, null, 2),
+      value,
+      malformed: false,
       status: typeof pending === 'boolean' ? (pending ? 'pending' : 'posted') : null,
     }
   } catch {
     // A malformed payload is precisely the thing this view exists to reveal, so it renders
     // as-is rather than taking the dialog down with it.
-    return { text: rawJson, status: null }
+    return { value: undefined, malformed: true, status: null }
   }
 }
 
@@ -69,6 +71,10 @@ export default function RawHistoryTab({ transactionId, isManual }: RawHistoryTab
     setExpanded(new Set([0]))
   }
 
+  // Parsed once per fetch rather than once per render: every row needs its status even while
+  // collapsed, and a long-lived transaction's history has no upper bound.
+  const parsed = useMemo(() => entries.map((entry) => parsePayload(entry.rawJson)), [entries])
+
   const toggle = (index: number) => {
     setExpanded((prev) => {
       const next = new Set(prev)
@@ -79,7 +85,10 @@ export default function RawHistoryTab({ transactionId, isManual }: RawHistoryTab
     })
   }
 
-  if (loading) {
+  // Anything on screen before the effect above has dispatched belongs to some other transaction —
+  // an in-flight fetch that resolved after its own dialog closed leaves entries behind with no id.
+  // That is "not asked yet", not "nothing archived", so it must not render as an empty archive.
+  if (loading || loadedFor !== transactionId) {
     return <p className="py-6 text-center text-sm text-muted">Loading raw history...</p>
   }
 
@@ -106,9 +115,9 @@ export default function RawHistoryTab({ transactionId, isManual }: RawHistoryTab
       <div className="max-h-[50vh] overflow-y-auto border border-divider">
         {entries.map((entry, index) => {
           const isExpanded = expanded.has(index)
-          const { text, status } = parsePayload(entry.rawJson)
+          const { value, malformed, status } = parsed[index]
           return (
-            <div key={`${entry.syncRunId}-${index}`} className="border-b border-divider last:border-b-0">
+            <div key={index} className="border-b border-divider last:border-b-0">
               <button
                 onClick={() => toggle(index)}
                 aria-expanded={isExpanded}
@@ -126,7 +135,7 @@ export default function RawHistoryTab({ transactionId, isManual }: RawHistoryTab
               </button>
               {isExpanded && (
                 <pre className="overflow-x-auto border-t border-divider bg-bg px-3 py-2 font-mono text-xs text-text">
-                  {text}
+                  {malformed ? entry.rawJson : JSON.stringify(value, null, 2)}
                 </pre>
               )}
             </div>

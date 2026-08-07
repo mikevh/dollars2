@@ -116,6 +116,14 @@ describe('RawHistoryTab', () => {
     expect(screen.queryByText('pending')).not.toBeInTheDocument()
   })
 
+  it('reports loading, not an empty archive, while the fetch is still outstanding', () => {
+    vi.mocked(api.get).mockReturnValue(new Promise(() => {}))
+    renderTab(5)
+
+    expect(screen.getByText('Loading raw history...')).toBeInTheDocument()
+    expect(screen.queryByText('No archived payloads for this transaction.')).not.toBeInTheDocument()
+  })
+
   it('shows the manual empty state for a hand-entered transaction', async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [], error: null })
     renderTab(5, true)

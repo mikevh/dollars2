@@ -286,7 +286,6 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                aria-pressed={isActive}
                 className={`border-b-2 px-3 py-2 font-heading text-xs font-extrabold uppercase tracking-[0.08em] ${
                   isActive ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text'
                 }`}
