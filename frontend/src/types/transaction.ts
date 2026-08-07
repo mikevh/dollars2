@@ -20,3 +20,12 @@ export interface TransactionAssignmentResponse {
   lineItemName: string
   amount: number
 }
+
+/** One archived sighting of a transaction, as the provider sent it during a sync run. */
+export interface RawHistoryEntryResponse {
+  syncedAt: string
+  sourceType: string
+  syncRunId: string
+  /** The provider payload verbatim — a JSON string the server never re-parses. */
+  rawJson: string
+}
