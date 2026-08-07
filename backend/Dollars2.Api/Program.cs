@@ -65,6 +65,10 @@ builder.Services.AddSingleton<IAmazonDynamoDB>(_ =>
             ServiceURL = dynamoDbOptions.ServiceUrl,
             AuthenticationRegion = "us-east-1",
         }));
+// Singleton rather than scoped like the Dapper repositories: it holds no per-request state and both of
+// its dependencies are singletons. It is also the one repository that must never touch DbSession — its
+// writes are deliberately outside the MSSQL transaction — and the lifetime says so.
+builder.Services.AddSingleton<SyncArchiveRepository>();
 // Registered ahead of BankSyncHostedService so the archive table is settled before the first sync.
 builder.Services.AddHostedService<SyncArchiveTableInitializer>();
 builder.Services.AddHttpClient("simplefin", client =>

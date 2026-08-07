@@ -12,6 +12,7 @@ public class BankSyncService
     private readonly TransactionRepository _transactionRepo;
     private readonly SyncLogRepository _syncLogRepo;
     private readonly AccountBalanceRepository _accountBalanceRepo;
+    private readonly SyncArchiveRepository _syncArchiveRepo;
     private readonly IReadOnlyDictionary<string, IBankSyncProvider> _providers;
     private readonly SyncLockService _syncLock;
     private readonly ILogger<BankSyncService> _logger;
@@ -22,6 +23,7 @@ public class BankSyncService
         TransactionRepository transactionRepo,
         SyncLogRepository syncLogRepo,
         AccountBalanceRepository accountBalanceRepo,
+        SyncArchiveRepository syncArchiveRepo,
         IEnumerable<IBankSyncProvider> providers,
         SyncLockService syncLock,
         ILogger<BankSyncService> logger)
@@ -31,6 +33,7 @@ public class BankSyncService
         _transactionRepo = transactionRepo;
         _syncLogRepo = syncLogRepo;
         _accountBalanceRepo = accountBalanceRepo;
+        _syncArchiveRepo = syncArchiveRepo;
         _providers = providers.ToDictionary(p => p.SourceType, StringComparer.OrdinalIgnoreCase);
         _syncLock = syncLock;
         _logger = logger;
@@ -217,6 +220,13 @@ public class BankSyncService
 
     private async Task<IReadOnlyList<SyncResult>> SyncConnectionAsync(int userId, IBankSyncProvider provider, IReadOnlyList<Account> accounts, CancellationToken cancel, bool fullResync = false)
     {
+        // One run id and one instant for the whole connection group: the group is what the provider's
+        // single upstream call covers, so it is what the archive should be able to reassemble as "this
+        // sync". Taken before the fetch so the stamp reflects when the run started, not when each
+        // account happened to finish persisting.
+        var syncRunId = Guid.NewGuid();
+        var syncedAt = DateTime.UtcNow;
+
         IReadOnlyDictionary<int, ProviderSyncResult> fetched;
         try
         {
@@ -257,13 +267,17 @@ public class BankSyncService
             var syncResult = fetched.TryGetValue(account.Id, out var r)
                 ? r
                 : new ProviderSyncResult(Array.Empty<SyncedTransaction>(), Array.Empty<string>(), null);
-            results.Add(await PersistAccountResultAsync(account, syncResult));
+            results.Add(await PersistAccountResultAsync(account, syncResult, syncRunId, syncedAt, cancel));
         }
         return results;
     }
 
-    private async Task<SyncResult> PersistAccountResultAsync(Account account, ProviderSyncResult syncResult)
+    private async Task<SyncResult> PersistAccountResultAsync(Account account, ProviderSyncResult syncResult, Guid syncRunId, DateTime syncedAt, CancellationToken cancel)
     {
+        // Ahead of the Error branch below so a failed account still gets its provider errors archived —
+        // that is precisely the case the archive exists to explain.
+        await ArchiveBestEffortAsync(account, syncResult, syncRunId, syncedAt, cancel);
+
         if (syncResult.Error is not null)
         {
             // The shared upstream call succeeded, but this specific account can't be synced (e.g. its
@@ -340,6 +354,27 @@ public class BankSyncService
         catch (Exception ex)
         {
             return await RecordFailureAsync(account, ex);
+        }
+    }
+
+    /// <summary>
+    /// Writes this account's provider payloads to the sync archive, swallowing anything that goes wrong.
+    /// </summary>
+    /// <remarks>
+    /// Best-effort by design and deliberately outside the DbSession transaction: DynamoDB cannot join
+    /// it, and a DynamoDB outage must never keep a transaction out of the budget or roll back an MSSQL
+    /// write that already succeeded. The catch is unfiltered — including cancellation — because there is
+    /// no failure here worth failing a sync over.
+    /// </remarks>
+    private async Task ArchiveBestEffortAsync(Account account, ProviderSyncResult syncResult, Guid syncRunId, DateTime syncedAt, CancellationToken cancel)
+    {
+        try
+        {
+            await _syncArchiveRepo.ArchiveAsync(account, syncResult, syncRunId, syncedAt, cancel);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not archive sync payloads for account {AccountId} ({AccountName}) in sync run {SyncRunId}; the sync itself is unaffected", account.Id, account.Name, syncRunId);
         }
     }
 
