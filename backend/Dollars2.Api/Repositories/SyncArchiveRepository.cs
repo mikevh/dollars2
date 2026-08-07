@@ -55,6 +55,12 @@ public class SyncArchiveRepository
 
     private static readonly TimeSpan InitialBackoff = TimeSpan.FromMilliseconds(50);
 
+    /// <summary>
+    /// ISO-8601 UTC with an explicit Z, to millisecond precision. This string is both the sort-key
+    /// suffix and the LSI range key, so it has to be fixed-width and lexicographically chronological.
+    /// </summary>
+    private const string InstantFormat = "yyyy-MM-ddTHH:mm:ss.fff'Z'";
+
     private readonly IAmazonDynamoDB _dynamoDb;
     private readonly DynamoDbOptions _options;
 
@@ -210,9 +216,107 @@ public class SyncArchiveRepository
     }
 
     /// <summary>
-    /// ISO-8601 UTC with an explicit Z, to millisecond precision. This string is both the sort-key
-    /// suffix and the LSI range key, so it has to be fixed-width and lexicographically chronological.
+    /// Every archived sighting of one provider transaction, newest first.
     /// </summary>
+    /// <remarks>
+    /// Throws on failure, like <see cref="ArchiveAsync"/> — but callers of this one are a user waiting
+    /// on a response rather than a background sync, so the policy on the other side is to surface the
+    /// outage, not to shrug it off.
+    /// </remarks>
+    public async Task<IReadOnlyList<RawHistoryEntryResponse>> GetTransactionHistoryAsync(
+        int userId,
+        int accountId,
+        string providerTransactionId,
+        CancellationToken cancellationToken = default)
+    {
+        // Bounded for the same reason the write is: the client registered in Program.cs overrides
+        // neither Timeout nor MaxErrorRetry, so a DynamoDB that accepts connections and then goes
+        // silent would hold the request open for the SDK's full retry budget.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Timeout);
+
+        var entries = new List<RawHistoryEntryResponse>();
+        Dictionary<string, AttributeValue>? startKey = null;
+
+        do
+        {
+            var response = await _dynamoDb.QueryAsync(
+                new QueryRequest
+                {
+                    TableName = _options.TableName,
+                    KeyConditionExpression = "#pk = :pk AND begins_with(#sk, :prefix)",
+                    // The provider transaction id sits in the middle of the sort key and may itself
+                    // contain '#', so the prefix alone is ambiguous: "TXN#abc#" also matches every
+                    // sighting of the id "abc#def". The filter on the attribute is the exact test the
+                    // key cannot give.
+                    FilterExpression = "#providerTransactionId = :providerTransactionId",
+                    ExpressionAttributeNames = new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["#pk"] = SyncArchiveTableInitializer.PartitionKeyAttribute,
+                        ["#sk"] = SyncArchiveTableInitializer.SortKeyAttribute,
+                        ["#providerTransactionId"] = ProviderTransactionIdAttribute,
+                    },
+                    ExpressionAttributeValues = new Dictionary<string, AttributeValue>(StringComparer.Ordinal)
+                    {
+                        [":pk"] = Text(PartitionKeyFor(userId, accountId)),
+                        [":prefix"] = Text($"TXN#{providerTransactionId}#"),
+                        [":providerTransactionId"] = Text(providerTransactionId),
+                    },
+                    // Descending sort key. Within one transaction's prefix the key ends in the instant,
+                    // so descending key order is newest sighting first.
+                    ScanIndexForward = false,
+                    ExclusiveStartKey = startKey,
+                },
+                timeout.Token);
+
+            entries.AddRange(response.Items.Select(ToEntry));
+
+            // A filtered query can return a page of zero matches and still have more to walk, so the
+            // loop has to key off LastEvaluatedKey rather than off whether anything came back.
+            startKey = response.LastEvaluatedKey is { Count: > 0 } ? response.LastEvaluatedKey : null;
+        }
+        while (startKey is not null);
+
+        return entries;
+    }
+
+    private static RawHistoryEntryResponse ToEntry(Dictionary<string, AttributeValue> item)
+    {
+        return new RawHistoryEntryResponse
+        {
+            SyncedAt = ParseInstant(TextOf(item, SyncArchiveTableInitializer.SyncedAtAttribute)),
+            SourceType = TextOf(item, SourceTypeAttribute),
+            SyncRunId = TextOf(item, SyncRunIdAttribute),
+            RawJson = TextOf(item, RawJsonAttribute),
+        };
+    }
+
+    /// <summary>
+    /// Reads a string attribute, tolerating its absence. Nothing this table writes is schema-enforced,
+    /// and an item missing an attribute is not worth failing a whole history read over.
+    /// </summary>
+    private static string TextOf(Dictionary<string, AttributeValue> item, string attribute)
+    {
+        return item.TryGetValue(attribute, out var value) ? value.S ?? "" : "";
+    }
+
+    /// <summary>
+    /// Reverses <see cref="FormatInstant"/>. Kind ends up UTC, which is what keeps the global
+    /// UtcDateTimeConverter from having to guess when it serializes this back out.
+    /// </summary>
+    private static DateTime ParseInstant(string value)
+    {
+        return DateTime.TryParseExact(
+            value,
+            InstantFormat,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal,
+            out var parsed)
+            ? parsed
+            : default;
+    }
+
+    /// <summary>Renders an instant in <see cref="InstantFormat"/>, normalizing its kind to UTC first.</summary>
     private static string FormatInstant(DateTime syncedAt)
     {
         var utc = syncedAt.Kind switch
@@ -224,7 +328,7 @@ public class SyncArchiveRepository
             _ => DateTime.SpecifyKind(syncedAt, DateTimeKind.Utc),
         };
 
-        return utc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture);
+        return utc.ToString(InstantFormat, CultureInfo.InvariantCulture);
     }
 
     private static AttributeValue Text(string value)
