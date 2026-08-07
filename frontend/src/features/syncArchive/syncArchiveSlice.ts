@@ -89,8 +89,10 @@ const syncArchiveSlice = createSlice({
         state.loading = false
         state.loadingMore = false
         // api.get resolves its envelope rather than throwing, so the rejection always carries a
-        // message — the fallback only covers a thunk aborted before it ever ran.
-        state.error = (action.payload as string) ?? 'Could not load the sync archive.'
+        // message — the fallback only covers a thunk aborted before it ever ran. `||` rather than
+        // `??` so an (unexpected) empty-string message still falls back instead of leaving the
+        // error state falsy, which would silently read as the empty "never synced" state.
+        state.error = (action.payload as string) || 'Could not load the sync archive.'
       })
   },
 })

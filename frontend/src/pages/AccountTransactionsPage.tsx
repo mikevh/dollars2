@@ -21,7 +21,8 @@ import {
   fetchAccountTransactions,
   clearAccountTransactions,
 } from '../features/accountTransactions/accountTransactionsSlice'
-import { fetchAccounts, findAccount } from '../features/accounts/accountsSlice'
+import { findAccount } from '../features/accounts/accountsSlice'
+import { useEnsureAccountsLoaded } from '../features/accounts/useEnsureAccountsLoaded'
 import { formatCurrency } from '../utils/format'
 import type { TransactionResponse } from '../types/transaction'
 
@@ -86,16 +87,10 @@ export default function AccountTransactionsPage() {
 function AccountTransactions({ accountId }: { accountId: string | undefined }) {
   const dispatch = useAppDispatch()
   const { data, loading, error } = useAppSelector((state) => state.accountTransactions)
-  const { groups } = useAppSelector((state) => state.accounts)
-  const account = findAccount(groups, Number(accountId))
-
   // Gates the sync archive link — manual accounts never sync, so it never renders for them. A
   // direct link into this page (rather than via AccountsPage) may not have the groups yet.
-  useEffect(() => {
-    if (groups.length === 0) {
-      dispatch(fetchAccounts())
-    }
-  }, [dispatch, groups.length])
+  const groups = useEnsureAccountsLoaded()
+  const account = findAccount(groups, Number(accountId))
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }])
   const [pagination, setPagination] = useState<PaginationState>({

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
 import toast from 'react-hot-toast'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
-import { fetchAccounts, findAccount } from '../features/accounts/accountsSlice'
+import { useEnsureAccountsLoaded } from '../features/accounts/useEnsureAccountsLoaded'
+import { findAccount } from '../features/accounts/accountsSlice'
 import { fetchSyncArchive, clearSyncArchive } from '../features/syncArchive/syncArchiveSlice'
 import JsonDisclosure from '../components/JsonDisclosure'
 import { formatInstant } from '../utils/format'
@@ -20,23 +21,44 @@ export default function SyncArchivePage() {
 function SyncArchive({ accountId }: { accountId: string | undefined }) {
   const dispatch = useAppDispatch()
   const id = Number(accountId)
-  const { runs, nextBefore, loading, loadingMore, error } = useAppSelector((state) => state.syncArchive)
-  const { groups } = useAppSelector((state) => state.accounts)
-  const account = findAccount(groups, id)
-
+  const {
+    accountId: loadedFor,
+    runs,
+    nextBefore,
+    loading,
+    loadingMore,
+    error,
+  } = useAppSelector((state) => state.syncArchive)
   // The archive endpoint has no account name or sourceType of its own — both come from the
   // accounts list, which a direct link into this page (rather than via AccountTransactionsPage)
   // may not have loaded yet.
-  useEffect(() => {
-    if (groups.length === 0) {
-      dispatch(fetchAccounts())
+  const groups = useEnsureAccountsLoaded()
+  const account = findAccount(groups, id)
+
+  // Anything on screen before the mount effect below has dispatched belongs to some other
+  // account (or nothing yet) — the id the slice recorded is what tells collapsed-vs-loading
+  // apart, the same guard RawHistoryTab uses via its own loadedFor. Without it, the first paint
+  // (and the transitional render right after switching accounts) would show "never synced" for
+  // an account with years of history, one frame before the real fetch has even started.
+  const notYetLoaded = loadedFor !== id
+
+  // Toasts fire imperatively at the dispatch site, matching AccountsPage's sync/resync
+  // convention, rather than reacting to the stored error — a full-page read gets a toast in
+  // addition to the inline message, unlike RawHistoryTab's side-panel one.
+  const dispatchFetch = async (args: { accountId: number; before?: string }) => {
+    const result = await dispatch(fetchSyncArchive(args))
+    if (fetchSyncArchive.rejected.match(result)) {
+      toast.error(result.payload as string)
     }
-  }, [dispatch, groups.length])
+  }
 
   useEffect(() => {
     if (!Number.isNaN(id)) {
-      dispatch(fetchSyncArchive({ accountId: id }))
+      dispatchFetch({ accountId: id })
     }
+    // dispatchFetch is a new closure every render (it captures dispatch, which is stable); adding
+    // it here would re-run the fetch on every render instead of only when the account changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, id])
 
   useEffect(() => {
@@ -45,28 +67,15 @@ function SyncArchive({ accountId }: { accountId: string | undefined }) {
     }
   }, [dispatch])
 
-  // This is a full page read rather than a side-panel one, so unlike RawHistoryTab a failure gets
-  // a toast in addition to the inline message. Tracked by message so a retry that fails the same
-  // way still re-announces, but a re-render for an unrelated reason does not repeat it.
-  const toastedFor = useRef<string | null>(null)
-  useEffect(() => {
-    if (error && error !== toastedFor.current) {
-      toastedFor.current = error
-      toast.error(error)
-    } else if (!error) {
-      toastedFor.current = null
-    }
-  }, [error])
-
   const handleLoadMore = () => {
     if (!Number.isNaN(id) && nextBefore && !loadingMore) {
-      dispatch(fetchSyncArchive({ accountId: id, before: nextBefore }))
+      dispatchFetch({ accountId: id, before: nextBefore })
     }
   }
 
   const handleRetry = () => {
     if (!Number.isNaN(id)) {
-      dispatch(fetchSyncArchive({ accountId: id }))
+      dispatchFetch({ accountId: id })
     }
   }
 
@@ -87,11 +96,11 @@ function SyncArchive({ accountId }: { accountId: string | undefined }) {
       </div>
 
       <div className="mx-auto w-full max-w-[860px] px-4 py-6">
-        {loading && runs.length === 0 && (
+        {(loading || notYetLoaded) && runs.length === 0 && (
           <div className="text-muted py-12 text-center">Loading...</div>
         )}
 
-        {!loading && error && runs.length === 0 && (
+        {!loading && !notYetLoaded && error && runs.length === 0 && (
           <div className="py-12 text-center">
             <p className="text-accent">{error}</p>
             <button onClick={handleRetry} className="btn btn-secondary mt-3">
@@ -100,7 +109,7 @@ function SyncArchive({ accountId }: { accountId: string | undefined }) {
           </div>
         )}
 
-        {!loading && !error && runs.length === 0 && (
+        {!loading && !notYetLoaded && !error && runs.length === 0 && (
           <div className="text-muted py-12 text-center">
             {account?.sourceType === 'Manual'
               ? "This account doesn't sync, so there is nothing archived for it."
@@ -133,10 +142,6 @@ function SyncArchive({ accountId }: { accountId: string | undefined }) {
 function SyncArchiveRunRow({ run }: { run: SyncArchiveRun }) {
   const [expanded, setExpanded] = useState(false)
 
-  const transactions = run.items.filter((item) => item.itemType === 'Transaction')
-  const removed = run.items.filter((item) => item.itemType === 'Removed')
-  const errors = run.items.filter((item) => item.itemType === 'ProviderError')
-
   return (
     <div className="border-b border-divider last:border-b-0">
       <button
@@ -163,62 +168,72 @@ function SyncArchiveRunRow({ run }: { run: SyncArchiveRun }) {
         </span>
       </button>
 
-      {expanded && (
-        <div className="border-t border-divider bg-bg px-3 py-2">
-          {run.accountMetadataJson && (
-            <div className="mb-2 border border-divider">
-              <JsonDisclosure header="Account metadata" rawJson={run.accountMetadataJson} />
-            </div>
-          )}
+      {expanded && <SyncArchiveRunItems run={run} />}
+    </div>
+  )
+}
 
-          {transactions.length > 0 && (
-            <div className="mb-2">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                {transactions.length} transaction{transactions.length === 1 ? '' : 's'}
-              </p>
-              <div className="border border-divider">
-                {transactions.map((item, index) => (
-                  <JsonDisclosure
-                    key={item.providerTransactionId ?? index}
-                    header={item.providerTransactionId ?? `#${index + 1}`}
-                    rawJson={item.rawJson ?? ''}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+// Split out so the item-type filtering below only ever runs while a run is actually expanded —
+// a collapsed row has no use for it.
+function SyncArchiveRunItems({ run }: { run: SyncArchiveRun }) {
+  const transactions = run.items.filter((item) => item.itemType === 'Transaction')
+  const removed = run.items.filter((item) => item.itemType === 'Removed')
+  const errors = run.items.filter((item) => item.itemType === 'ProviderError')
 
-          {removed.length > 0 && (
-            <div className="mb-2">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                {removed.length} removed
-              </p>
-              <div className="border border-divider">
-                {removed.map((item, index) => (
-                  <div
-                    key={item.providerTransactionId ?? index}
-                    className="border-b border-divider px-3 py-2 font-mono text-xs text-text last:border-b-0"
-                  >
-                    {item.providerTransactionId}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+  return (
+    <div className="border-t border-divider bg-bg px-3 py-2">
+      {run.accountMetadataJson && (
+        <div className="mb-2 border border-divider">
+          <JsonDisclosure header="Account metadata" rawJson={run.accountMetadataJson} />
+        </div>
+      )}
 
-          {errors.length > 0 && (
-            <div>
-              <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-accent-700">
-                <FontAwesomeIcon icon={faTriangleExclamation} className="h-[10px] w-[10px]" />
-                {errors.length} provider error{errors.length === 1 ? '' : 's'}
-              </p>
-              <div className="border border-divider">
-                {errors.map((item, index) => (
-                  <JsonDisclosure key={index} header={`Error #${index + 1}`} rawJson={item.rawJson ?? ''} />
-                ))}
+      {transactions.length > 0 && (
+        <div className="mb-2">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+            {transactions.length} transaction{transactions.length === 1 ? '' : 's'}
+          </p>
+          <div className="border border-divider">
+            {transactions.map((item, index) => (
+              <JsonDisclosure
+                key={item.providerTransactionId ?? index}
+                header={item.providerTransactionId ?? `#${index + 1}`}
+                rawJson={item.rawJson ?? ''}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {removed.length > 0 && (
+        <div className="mb-2">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+            {removed.length} removed
+          </p>
+          <div className="border border-divider">
+            {removed.map((item, index) => (
+              <div
+                key={item.providerTransactionId ?? index}
+                className="border-b border-divider px-3 py-2 font-mono text-xs text-text last:border-b-0"
+              >
+                {item.providerTransactionId}
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+        </div>
+      )}
+
+      {errors.length > 0 && (
+        <div>
+          <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-accent-700">
+            <FontAwesomeIcon icon={faTriangleExclamation} className="h-[10px] w-[10px]" />
+            {errors.length} provider error{errors.length === 1 ? '' : 's'}
+          </p>
+          <div className="border border-divider">
+            {errors.map((item, index) => (
+              <JsonDisclosure key={index} header={`Error #${index + 1}`} rawJson={item.rawJson ?? ''} />
+            ))}
+          </div>
         </div>
       )}
     </div>
