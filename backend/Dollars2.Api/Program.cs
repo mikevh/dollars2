@@ -46,6 +46,7 @@ builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<TransactionRawHistoryService>();
 builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<AccountSyncArchiveService>();
 builder.Services.AddScoped<SyncLogRepository>();
 builder.Services.AddScoped<AccountBalanceRepository>();
 
