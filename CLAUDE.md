@@ -7,6 +7,7 @@ Zero-based budgeting web app (EveryDollar clone). Self-hosted, multi-user with s
 - **Frontend:** React, TypeScript, Vite, Tailwind CSS v4, Redux Toolkit, dnd-kit v6, react-hot-toast
 - **Backend:** .NET 10, ASP.NET Core Web API, Dapper, raw SQL
 - **Database:** MSSQL, raw SQL migrations (numbered, tracking table)
+- **Sync archive:** DynamoDB (`amazon/dynamodb-local`, self-hosted — no AWS account)
 - **Auth:** Email-only login (v1), JWT 30-day + refresh tokens
 
 ## Project Structure
@@ -30,6 +31,8 @@ Detailed product specs live in `docs/`. Read these before building new features:
 - `docs/backend.md` — Architecture, all API endpoints, bank sync service, provider abstraction
 - `docs/frontend.md` — All UI components, interactions, theme, routing, data fetching
 - `docs/database.md` — Full schema (all tables, columns, types, constraints, relationships)
+- `docs/sync_archive.md` — Append-only DynamoDB record of raw provider payloads: key schema,
+  versioning, Plaid/SimpleFIN fidelity, endpoints, frontend views
 - `docs/out_of_scope.md` — Explicitly excluded/deferred features
 
 Operational runbooks — not feature context, read only when doing that specific job:

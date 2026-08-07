@@ -12,6 +12,8 @@ per user, and dual bank-sync providers (Plaid free tier + SimpleFIN).
 - **Backend:** .NET 10, ASP.NET Core Web API, Dapper, raw SQL
 - **Database:** MSSQL, raw SQL migrations (numbered, tracked in a migrations
   table)
+- **Sync archive:** DynamoDB (`amazon/dynamodb-local`, self-hosted — no AWS
+  account)
 - **Auth:** Email-only login (v1), JWT (30-day) + refresh tokens
 
 ## Repository Layout
@@ -48,9 +50,9 @@ cd ../Dollars2.Tests
 dotnet test              # unit + integration tests
 ```
 
-> **Note:** the integration tests spin up an ephemeral MSSQL instance via
-> [Testcontainers](https://testcontainers.com/), so a running Docker daemon is
-> required for `dotnet test`.
+> **Note:** the integration tests spin up ephemeral MSSQL and dynamodb-local
+> instances via [Testcontainers](https://testcontainers.com/), so a running
+> Docker daemon is required for `dotnet test`.
 
 ## Configuration
 
@@ -87,5 +89,6 @@ Detailed product and technical specs live in [`docs/`](docs/):
 - [`backend.md`](docs/backend.md) — architecture, API endpoints, bank-sync service, provider abstraction
 - [`frontend.md`](docs/frontend.md) — UI components, interactions, theme, routing, data fetching
 - [`database.md`](docs/database.md) — full schema
+- [`sync_archive.md`](docs/sync_archive.md) — append-only DynamoDB record of raw provider payloads
 - [`out_of_scope.md`](docs/out_of_scope.md) — explicitly excluded/deferred features
 - [`backups.md`](docs/backups.md) — MSSQL backup schedule, retention, and restore runbook

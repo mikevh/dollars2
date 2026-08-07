@@ -21,6 +21,9 @@
 - `/accounts` — accounts list, grouped by connection, with per-connection sync + re-sync actions
 - `/accounts/:accountId` — paged transactions for one account (includes accounts excluded from the
   budget via `IncludeInBudget = 0`)
+- `/accounts/:accountId/sync-archive` — that account's sync archive, browsable run by run (see
+  below); reached from a link on `/accounts/:accountId`, not from a selector — there's no global
+  nav in this app
 
 All routes except `/login` sit behind an authenticated `Outlet` that redirects to `/login`.
 
@@ -176,6 +179,29 @@ All routes except `/login` sit behind an authenticated `Outlet` that redirects t
 - All fields editable: date, description, amount, account, notes
 - Line item assignment with split support
 - Actions: unassign, delete (must unassign first)
+
+## Sync Archive Page
+
+- Route `/accounts/:accountId/sync-archive` (see Routing above); a "Sync archive" link on
+  `/accounts/:accountId` reaches it, shown only for synced accounts — manual accounts never sync,
+  so the link is never rendered for them (the route itself still resolves if typed directly, showing
+  an empty state explaining the account doesn't sync)
+- Lists that account's sync runs newest-first, from `GET /api/accounts/{id}/sync-archive?before=&limit=`
+  (see `docs/backend.md`, `docs/sync_archive.md`)
+- Each run is a collapsible row (synced-at instant, source, transaction/removed/error counts);
+  expanding it reveals the account metadata and the transaction, removed, and provider-error items,
+  each rendered through the same JSON viewer as the Raw History tab (shared component — pretty-printed
+  on click, falls back to verbatim text if the payload doesn't parse)
+- Runs with provider errors get a visible marker — errors currently only reach Serilog and scroll
+  away, so this is the one place they're visible in the UI
+- "Load more" pages backwards via the endpoint's `nextBefore` cursor, hidden once it comes back null;
+  the fetch is cancellable so a stale response from a rapid "Load more" or a mid-fetch navigation
+  can never overwrite a newer one
+- Empty states: "This account has never synced." (not an error) versus "This account doesn't sync, so
+  there is nothing archived for it." for a manual account reached by typing the URL directly
+- A fetch error (including another user's account id, which 404s) renders inline with a Retry
+  button, plus a toast — a full-page read gets both, unlike the dialog tab's inline-only handling
+- Data fetching: Redux thunk, per the project convention
 
 ## Cross-Month Warning
 
