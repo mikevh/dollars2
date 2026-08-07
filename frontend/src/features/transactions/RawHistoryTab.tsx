@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
 import JsonDisclosure from '../../components/JsonDisclosure'
 import { formatInstant } from '../../utils/format'
+import { tryParseJson } from '../../utils/jsonPayload'
 import { fetchRawHistory } from './rawHistorySlice'
 
 interface RawHistoryTabProps {
@@ -16,15 +17,14 @@ interface RawHistoryTabProps {
  * never invents a status.
  */
 function statusOf(rawJson: string): string | null {
-  try {
-    const value: unknown = JSON.parse(rawJson)
-    const pending = typeof value === 'object' && value !== null
-      ? (value as Record<string, unknown>).pending
-      : undefined
-    return typeof pending === 'boolean' ? (pending ? 'pending' : 'posted') : null
-  } catch {
+  const { value, malformed } = tryParseJson(rawJson)
+  if (malformed) {
     return null
   }
+  const pending = typeof value === 'object' && value !== null
+    ? (value as Record<string, unknown>).pending
+    : undefined
+  return typeof pending === 'boolean' ? (pending ? 'pending' : 'posted') : null
 }
 
 export default function RawHistoryTab({ transactionId, isManual }: RawHistoryTabProps) {

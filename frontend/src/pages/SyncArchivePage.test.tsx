@@ -244,6 +244,16 @@ describe('SyncArchivePage', () => {
     expect(screen.getByText('Loading...')).toBeInTheDocument()
   })
 
+  it('reports loading, not an empty archive, before the fetch has been dispatched', () => {
+    // The mount effect that dispatches fetchSyncArchive runs after the first paint, so the very
+    // first render — before any request has even gone out — must not read as "never synced".
+    getMock.mockReturnValue(new Promise(() => {}))
+    renderPage()
+
+    expect(screen.getByText('Loading...')).toBeInTheDocument()
+    expect(screen.queryByText('This account has never synced.')).not.toBeInTheDocument()
+  })
+
   it('shows an empty state, not an error, when the account has never synced', async () => {
     getMock.mockResolvedValue({ data: archivePage([]), error: null })
     renderPage()

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { parseJsonPayload } from '../utils/jsonPayload'
 
 interface JsonDisclosureProps {
@@ -11,6 +11,9 @@ interface JsonDisclosureProps {
 /** A collapsible row that reveals a pretty-printed (or malformed-fallback) JSON payload on click. */
 export default function JsonDisclosure({ header, trailing, rawJson, defaultExpanded = false }: JsonDisclosureProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
+  // Re-parsed only when the payload itself changes, not on every unrelated re-render of an
+  // already-expanded row (a sibling row toggling, a parent list appending a page, ...).
+  const { text } = useMemo(() => parseJsonPayload(rawJson), [rawJson])
 
   return (
     <div className="border-b border-divider last:border-b-0">
@@ -25,7 +28,7 @@ export default function JsonDisclosure({ header, trailing, rawJson, defaultExpan
       </button>
       {expanded && (
         <pre className="overflow-x-auto border-t border-divider bg-bg px-3 py-2 font-mono text-xs text-text">
-          {parseJsonPayload(rawJson).text}
+          {text}
         </pre>
       )}
     </div>
