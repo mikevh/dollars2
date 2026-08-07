@@ -53,39 +53,46 @@ public sealed class BankSyncArchiveFailureTests : IDisposable
     {
         using var db = _fixture.CreateSession();
         var (userId, accountId) = await SeedAsync(db, "archive-outage@example.com");
+        try
+        {
+            var logger = new CapturingLogger<BankSyncService>();
+            var provider = new StubProvider(new ProviderSyncResult(
+                [Synced("abc123"), Synced("def456")],
+                [],
+                UpdatedConnectionDetailsJson: null));
+            var service = BuildService(db, provider, logger);
 
-        var logger = new CapturingLogger<BankSyncService>();
-        var provider = new StubProvider(new ProviderSyncResult(
-            [Synced("abc123"), Synced("def456")],
-            [],
-            UpdatedConnectionDetailsJson: null));
-        var service = BuildService(db, provider, logger);
+            var elapsed = Stopwatch.StartNew();
+            var results = await service.SyncForUserAsync(userId, cancellationToken: TestContext.Current.CancellationToken);
+            elapsed.Stop();
 
-        var elapsed = Stopwatch.StartNew();
-        var results = await service.SyncForUserAsync(userId, cancellationToken: TestContext.Current.CancellationToken);
-        elapsed.Stop();
+            // The sync reports success — a failed archive is not a failed sync.
+            var result = Assert.Single(results);
+            Assert.Equal(SyncConstants.StatusSuccess, result.Status);
+            Assert.Equal(2, result.TransactionCount);
+            Assert.Null(result.ErrorMessage);
 
-        // The sync reports success — a failed archive is not a failed sync.
-        var result = Assert.Single(results);
-        Assert.Equal(SyncConstants.StatusSuccess, result.Status);
-        Assert.Equal(2, result.TransactionCount);
-        Assert.Null(result.ErrorMessage);
+            // And the transactions are actually in the database.
+            var imported = await db.Connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM Transactions WHERE AccountId = @accountId",
+                new { accountId });
+            Assert.Equal(2, imported);
 
-        // And the transactions are actually in the database.
-        var imported = await db.Connection.QuerySingleAsync<int>(
-            "SELECT COUNT(*) FROM Transactions WHERE AccountId = @accountId",
-            new { accountId });
-        Assert.Equal(2, imported);
+            var warning = Assert.Single(logger.Entries, e => e.Level == LogLevel.Warning);
+            Assert.Contains("Could not archive sync payloads", warning.Message);
+            Assert.Contains(accountId.ToString(), warning.Message);
 
-        var warning = Assert.Single(logger.Entries, e => e.Level == LogLevel.Warning);
-        Assert.Contains("Could not archive sync payloads", warning.Message);
-        Assert.Contains(accountId.ToString(), warning.Message);
-
-        // Bounded by the repository's own Timeout rather than the SDK's retry budget. Generous headroom
-        // over the 2s budget set below — the point is that it is bounded at all, not that it is punctual.
-        Assert.True(
-            elapsed.Elapsed < TimeSpan.FromSeconds(30),
-            $"The sync took {elapsed.Elapsed.TotalSeconds:0.0}s against an unreachable archive; it is not honoring SyncArchiveRepository.Timeout.");
+            // Bounded by the repository's own Timeout rather than the SDK's retry budget. Generous
+            // headroom over the 2s budget set below — the point is that it is bounded at all, not that
+            // it is punctual.
+            Assert.True(
+                elapsed.Elapsed < TimeSpan.FromSeconds(30),
+                $"The sync took {elapsed.Elapsed.TotalSeconds:0.0}s against an unreachable archive; it is not honoring SyncArchiveRepository.Timeout.");
+        }
+        finally
+        {
+            await CleanupAsync(db, userId);
+        }
     }
 
     [Fact]
@@ -93,23 +100,40 @@ public sealed class BankSyncArchiveFailureTests : IDisposable
     {
         using var db = _fixture.CreateSession();
         var (userId, accountId) = await SeedAsync(db, "archive-outage-error@example.com");
+        try
+        {
+            // ErrorsJson has to be non-empty for this test to mean anything: ArchiveAsync short-circuits
+            // on an empty result, so an all-empty ProviderSyncResult would never reach DynamoDB and this
+            // would pass without exercising the error path at all. Provider errors are also exactly what
+            // the archive is for here — they are the record of why the account failed.
+            var logger = new CapturingLogger<BankSyncService>();
+            var provider = new StubProvider(new ProviderSyncResult(
+                [],
+                [],
+                null,
+                Error: "connection details are misconfigured",
+                ErrorsJson: ["""{"code":"ITEM_LOGIN_REQUIRED"}"""]));
+            var service = BuildService(db, provider, logger);
 
-        // The archive is attempted on the error path too, so this is the case where an archive failure
-        // could plausibly mask the real one.
-        var logger = new CapturingLogger<BankSyncService>();
-        var provider = new StubProvider(new ProviderSyncResult([], [], null, Error: "connection details are misconfigured"));
-        var service = BuildService(db, provider, logger);
+            var results = await service.SyncForUserAsync(userId, cancellationToken: TestContext.Current.CancellationToken);
 
-        var results = await service.SyncForUserAsync(userId, cancellationToken: TestContext.Current.CancellationToken);
+            var result = Assert.Single(results);
+            Assert.Equal(SyncConstants.StatusFailure, result.Status);
+            Assert.Equal("connection details are misconfigured", result.ErrorMessage);
 
-        var result = Assert.Single(results);
-        Assert.Equal(SyncConstants.StatusFailure, result.Status);
-        Assert.Equal("connection details are misconfigured", result.ErrorMessage);
+            // The archive was genuinely attempted, and its failure did not mask or replace the real one.
+            var warning = Assert.Single(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("Could not archive"));
+            Assert.Contains(accountId.ToString(), warning.Message);
 
-        var logged = await db.Connection.QuerySingleAsync<string>(
-            "SELECT TOP 1 ErrorMessage FROM SyncLog WHERE AccountId = @accountId ORDER BY Id DESC",
-            new { accountId });
-        Assert.Equal("connection details are misconfigured", logged);
+            var logged = await db.Connection.QuerySingleAsync<string>(
+                "SELECT TOP 1 ErrorMessage FROM SyncLog WHERE AccountId = @accountId ORDER BY Id DESC",
+                new { accountId });
+            Assert.Equal("connection details are misconfigured", logged);
+        }
+        finally
+        {
+            await CleanupAsync(db, userId);
+        }
     }
 
     private BankSyncService BuildService(DbSession db, IBankSyncProvider provider, ILogger<BankSyncService> logger)
@@ -146,6 +170,35 @@ public sealed class BankSyncArchiveFailureTests : IDisposable
             -4.25m,
             IsPending: false,
             RawJson: $$"""{"id":"{{providerTransactionId}}"}""");
+    }
+
+    /// <summary>
+    /// Removes everything the test seeded or synced. These tests cannot use the fixture's usual
+    /// wrap-in-a-transaction-and-roll-back approach — BankSyncService opens and commits a transaction of
+    /// its own, which is precisely the behaviour under test — so they clean up explicitly instead, the
+    /// same way the other tests that commit do.
+    /// </summary>
+    private static async Task CleanupAsync(DbSession db, int userId)
+    {
+        if (userId == 0)
+        {
+            return;
+        }
+
+        await db.Connection.ExecuteAsync(
+            @"DELETE ta FROM TransactionAssignments ta
+              INNER JOIN Transactions t ON t.Id = ta.TransactionId
+              WHERE t.UserId = @userId;
+              DELETE FROM Transactions WHERE UserId = @userId;
+              DELETE sl FROM SyncLog sl
+              INNER JOIN Accounts a ON a.Id = sl.AccountId
+              WHERE a.UserId = @userId;
+              DELETE ab FROM AccountBalances ab
+              INNER JOIN Accounts a ON a.Id = ab.AccountId
+              WHERE a.UserId = @userId;
+              DELETE FROM Accounts WHERE UserId = @userId;
+              DELETE FROM Users WHERE Id = @userId;",
+            new { userId });
     }
 
     private static async Task<(int UserId, int AccountId)> SeedAsync(DbSession db, string email)
