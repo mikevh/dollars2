@@ -12,11 +12,7 @@ public sealed class MigrationScriptStructureTests
 {
     public static IEnumerable<object[]> MigrationScripts()
     {
-        var migrationsDir = Path.Combine(AppContext.BaseDirectory, "Migrations");
-        Assert.True(Directory.Exists(migrationsDir), $"Migrations directory not found at '{migrationsDir}'.");
-
-        foreach (var path in Directory.GetFiles(migrationsDir, "*.sql")
-            .OrderBy(p => Path.GetFileName(p), StringComparer.Ordinal))
+        foreach (var path in MigrationRunner.ScriptPaths())
         {
             yield return new object[] { path };
         }

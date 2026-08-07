@@ -6,36 +6,11 @@ namespace Dollars2.Tests;
 
 public class AccountServiceTests
 {
-    // Groups accounts by the raw ConnectionDetailsJson, standing in for a real provider whose connection
-    // key is derived from an access token / URL shared across a set of accounts.
-    private sealed class FakeProvider : IBankSyncProvider
-    {
-        public FakeProvider(string sourceType) => SourceType = sourceType;
-
-        public string SourceType { get; }
-        public bool Enabled => true;
-        public TimeSpan MinSyncInterval => TimeSpan.FromHours(6);
-        public string GetConnectionKey(Account account) => account.ConnectionDetailsJson ?? "";
-
-        public Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
-            IReadOnlyList<Account> accounts, DateTime? since, bool fullResync = false, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-    }
-
     private static readonly IReadOnlyDictionary<string, IBankSyncProvider> Providers =
-        new Dictionary<string, IBankSyncProvider>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["SimpleFIN"] = new FakeProvider("SimpleFIN"),
-        };
+        FakeBankSyncProvider.Registered;
 
-    private static Account Account(int id, string sourceType, string? connection, string name = "acct") => new()
-    {
-        Id = id,
-        UserId = 1,
-        Name = $"{name}{id}",
-        SourceType = sourceType,
-        ConnectionDetailsJson = connection,
-    };
+    private static Account Account(int id, string sourceType, string? connection, string name = "acct") =>
+        FakeBankSyncProvider.Account(id, sourceType, connection, name);
 
     private static SyncLog Log(int accountId, DateTime syncedAt, string status) => new()
     {

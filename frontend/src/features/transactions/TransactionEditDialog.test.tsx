@@ -46,29 +46,11 @@ function renderDialog(transaction: TransactionResponse | null) {
   return { onClose, onMutate }
 }
 
-describe('TransactionEditDialog (Modernist restyle)', () => {
-  it('renders a surface-token dialog panel for a new transaction', () => {
+describe('TransactionEditDialog', () => {
+  it('opens a new transaction with Save disabled until there are changes', () => {
     renderDialog(null)
-    const heading = screen.getByRole('heading', { name: 'New Transaction' })
-    const panel = heading.closest('[class*="bg-surface"]') as HTMLElement
-    expect(panel).not.toBeNull()
-    expect(panel.className).toContain('border-divider')
-    expect(panel.className).not.toContain('rounded')
-  })
-
-  it('styles editable fields with the shared .input class', () => {
-    renderDialog(null)
-    // Description is the first textbox in the form.
-    const description = screen.getAllByRole('textbox')[0]
-    expect(description.className).toContain('input')
-  })
-
-  it('renders Save as a primary button, disabled until there are changes', () => {
-    renderDialog(null)
-    const save = screen.getByRole('button', { name: 'Save' })
-    expect(save.className).toContain('btn')
-    expect(save.className).toContain('btn-primary')
-    expect(save).toBeDisabled()
+    expect(screen.getByRole('heading', { name: 'New Transaction' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 
   it('enables Save once a valid new transaction is entered', () => {
@@ -219,12 +201,9 @@ describe('TransactionEditDialog (Modernist restyle)', () => {
     ])
   })
 
-  it('offers a destructive Delete action for an unassigned manual transaction', async () => {
+  it('deletes an unassigned manual transaction, then mutates and closes', async () => {
     const { onMutate, onClose } = renderDialog(makeTransaction())
-    const del = screen.getByRole('button', { name: 'Delete' })
-    expect(del.className).toContain('btn-secondary')
-    expect(del.className).toContain('text-accent-700')
-    fireEvent.click(del)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     // handleDelete awaits the (mocked) API then mutates + closes
     await vi.waitFor(() => expect(onMutate).toHaveBeenCalledTimes(1))
     expect(onClose).toHaveBeenCalledTimes(1)

@@ -93,27 +93,21 @@ describe('ActivityPane (Modernist restyle)', () => {
   })
 })
 
-describe('ActivityPane Spent/Received flow coloring (issue #80)', () => {
-  it('shows a credit-heavy expense (Spent < 0) as +$ in green', () => {
-    // income 690.89 + expense 16.35 assigned → spentAmount -674.54
+// The tone rules themselves (green +$ credit, red -$ adverse income, neutral otherwise) belong to
+// FlowAmount and are covered exhaustively in FlowAmount.test.tsx. All ActivityPane can get wrong is
+// the wiring: which amount it hands over, and whether it declares the item as income — so one case
+// per prop path is enough, and re-asserting the tone matrix here would only duplicate that file.
+describe('ActivityPane Spent/Received flow wiring (issue #80)', () => {
+  it('feeds spentAmount through as an expense flow', () => {
+    // income 690.89 + expense 16.35 assigned → spentAmount -674.54, rendered as a green credit
     renderPane(makeLineItem({ spentAmount: -674.54 }))
-    const spent = screen.getByText('+$674.54')
-    expect(spent.className).toContain('text-positive')
-    expect(spent.className).not.toContain('text-accent-700')
+    expect(screen.getByText('+$674.54').className).toContain('text-positive')
   })
 
-  it('shows a normal expense Spent as a neutral, unsigned figure', () => {
-    renderPane(makeLineItem({ spentAmount: 50 }))
-    const spent = screen.getByText('$50.00')
-    expect(spent.className).toContain('text-text')
-    expect(spent.className).not.toContain('text-positive')
-  })
-
-  it('shows an adverse income (Received < 0) as -$ in red, not green', () => {
+  it('feeds receivedAmount through as an income flow', () => {
+    // An adverse income reads red, which is only correct if isIncome reached FlowAmount.
     renderPane(makeLineItem({ receivedAmount: -25 }), { isIncome: true })
-    const received = screen.getByText('-$25.00')
-    expect(received.className).toContain('text-accent-700')
-    expect(received.className).not.toContain('text-positive')
+    expect(screen.getByText('-$25.00').className).toContain('text-accent-700')
   })
 })
 

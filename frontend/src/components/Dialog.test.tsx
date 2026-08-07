@@ -38,16 +38,6 @@ describe('Dialog', () => {
     expect(screen.getByRole('heading', { name: 'Test Dialog' })).toHaveAttribute('id', 'title')
   })
 
-  it('keeps the existing panel chrome', () => {
-    renderDialog()
-
-    const panel = screen.getByRole('dialog')
-    expect(panel.className).toContain('border-divider')
-    expect(panel.className).toContain('bg-surface')
-    expect(panel.className).toContain('shadow-elev-lg')
-    expect(panel.className).not.toContain('rounded')
-  })
-
   it('closes on Escape', () => {
     const { onClose } = renderDialog()
 

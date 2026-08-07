@@ -10,10 +10,13 @@ namespace Dollars2.Tests.Integration;
 /// </summary>
 public static class MigrationRunner
 {
-    public static async Task ApplyAsync(string connectionString)
+    /// <summary>
+    /// Every migration script copied next to the test assembly, in the order they are applied.
+    /// The single source of truth for "which migrations exist" — tests derive their expectations
+    /// from this rather than restating the list, so adding a migration needs no test edit.
+    /// </summary>
+    public static IReadOnlyList<string> ScriptPaths()
     {
-        GuardAgainstNonLocalTarget(connectionString);
-
         var migrationsDir = Path.Combine(AppContext.BaseDirectory, "Migrations");
         if (!Directory.Exists(migrationsDir))
         {
@@ -30,6 +33,21 @@ public static class MigrationRunner
         {
             throw new InvalidOperationException($"No migration scripts found in '{migrationsDir}'.");
         }
+
+        return scripts;
+    }
+
+    /// <summary>Each migration's ScriptName, i.e. its basename without the .sql extension.</summary>
+    public static IReadOnlyList<string> ScriptNames()
+    {
+        return ScriptPaths().Select(Path.GetFileNameWithoutExtension).ToArray()!;
+    }
+
+    public static async Task ApplyAsync(string connectionString)
+    {
+        GuardAgainstNonLocalTarget(connectionString);
+
+        var scripts = ScriptPaths();
 
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync();
