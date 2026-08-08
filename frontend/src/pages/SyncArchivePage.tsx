@@ -165,6 +165,7 @@ function SyncArchiveRunRow({ run }: { run: SyncArchiveRun }) {
             {run.transactionCount} transaction{run.transactionCount === 1 ? '' : 's'}
           </span>
           {run.removedCount > 0 && <span>{run.removedCount} removed</span>}
+          {run.skippedCount > 0 && <span>{run.skippedCount} skipped</span>}
         </span>
       </button>
 
@@ -179,6 +180,7 @@ function SyncArchiveRunItems({ run }: { run: SyncArchiveRun }) {
   const transactions = run.items.filter((item) => item.itemType === 'Transaction')
   const removed = run.items.filter((item) => item.itemType === 'Removed')
   const errors = run.items.filter((item) => item.itemType === 'ProviderError')
+  const skipped = run.items.filter((item) => item.itemType === 'SkippedTransaction')
 
   return (
     <div className="border-t border-divider bg-bg px-3 py-2">
@@ -224,7 +226,7 @@ function SyncArchiveRunItems({ run }: { run: SyncArchiveRun }) {
       )}
 
       {errors.length > 0 && (
-        <div>
+        <div className="mb-2">
           <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-accent-700">
             <FontAwesomeIcon icon={faTriangleExclamation} className="h-[10px] w-[10px]" />
             {errors.length} provider error{errors.length === 1 ? '' : 's'}
@@ -232,6 +234,19 @@ function SyncArchiveRunItems({ run }: { run: SyncArchiveRun }) {
           <div className="border border-divider">
             {errors.map((item, index) => (
               <JsonDisclosure key={index} header={`Error #${index + 1}`} rawJson={item.rawJson ?? ''} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {skipped.length > 0 && (
+        <div>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+            {skipped.length} skipped
+          </p>
+          <div className="border border-divider">
+            {skipped.map((item, index) => (
+              <JsonDisclosure key={index} header={`Skipped #${index + 1}`} rawJson={item.rawJson ?? ''} />
             ))}
           </div>
         </div>
