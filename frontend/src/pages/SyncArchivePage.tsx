@@ -226,7 +226,7 @@ function SyncArchiveRunItems({ run }: { run: SyncArchiveRun }) {
       )}
 
       {errors.length > 0 && (
-        <div className="mb-2">
+        <div className={skipped.length > 0 ? 'mb-2' : ''}>
           <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-accent-700">
             <FontAwesomeIcon icon={faTriangleExclamation} className="h-[10px] w-[10px]" />
             {errors.length} provider error{errors.length === 1 ? '' : 's'}
