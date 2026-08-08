@@ -133,18 +133,32 @@ describe('SyncArchivePage', () => {
     await screen.findByText('1 error')
   })
 
-  it('expands a run to show its metadata, transaction, removed, and error items with readable JSON', async () => {
+  it('marks a run with skipped transactions', async () => {
+    getMock.mockResolvedValue({
+      data: archivePage([
+        run({ skippedCount: 1, items: [{ itemType: 'SkippedTransaction', providerTransactionId: null, rawJson: '{"reason":"unparseable"}' }] }),
+      ]),
+      error: null,
+    })
+    renderPage()
+
+    await screen.findByText('1 skipped')
+  })
+
+  it('expands a run to show its metadata, transaction, removed, error, and skipped items with readable JSON', async () => {
     getMock.mockResolvedValue({
       data: archivePage([
         run({
           transactionCount: 1,
           removedCount: 1,
           errorCount: 1,
+          skippedCount: 1,
           accountMetadataJson: '{"balance":"1204.55"}',
           items: [
             { itemType: 'Transaction', providerTransactionId: 'txn-1', rawJson: '{"amount":"-42.10"}' },
             { itemType: 'Removed', providerTransactionId: 'txn-old', rawJson: null },
             { itemType: 'ProviderError', providerTransactionId: null, rawJson: '{"message":"boom"}' },
+            { itemType: 'SkippedTransaction', providerTransactionId: null, rawJson: '{"reason":"unparseable"}' },
           ],
         }),
       ]),
@@ -169,6 +183,10 @@ describe('SyncArchivePage', () => {
     // Error item, expandable to its own JSON.
     fireEvent.click(screen.getByText('Error #1'))
     expect(screen.getByText(/"message": "boom"/)).toBeInTheDocument()
+
+    // Skipped item, expandable to its own JSON.
+    fireEvent.click(screen.getByText('Skipped #1'))
+    expect(screen.getByText(/"reason": "unparseable"/)).toBeInTheDocument()
   })
 
   it('pages backwards with the previous nextBefore and appends without replacing', async () => {
