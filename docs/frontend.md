@@ -188,10 +188,11 @@ All routes except `/login` sit behind an authenticated `Outlet` that redirects t
   an empty state explaining the account doesn't sync)
 - Lists that account's sync runs newest-first, from `GET /api/accounts/{id}/sync-archive?before=&limit=`
   (see `docs/backend.md`, `docs/sync_archive.md`)
-- Each run is a collapsible row (synced-at instant, source, transaction/removed/error counts);
-  expanding it reveals the account metadata and the transaction, removed, and provider-error items,
-  each rendered through the same JSON viewer as the Raw History tab (shared component — pretty-printed
-  on click, falls back to verbatim text if the payload doesn't parse)
+- Each run is a collapsible row (synced-at instant, source, transaction/removed/skipped/error counts);
+  expanding it reveals the account metadata and the transaction, removed, provider-error, and
+  skipped-transaction items, each rendered through the same JSON viewer as the Raw History tab
+  (shared component — pretty-printed on click, falls back to verbatim text if the payload doesn't
+  parse). Skipped items are provider transactions the parser rejected (see `docs/sync_archive.md`)
 - Runs with provider errors get a visible marker — errors currently only reach Serilog and scroll
   away, so this is the one place they're visible in the UI
 - "Load more" pages backwards via the endpoint's `nextBefore` cursor, hidden once it comes back null;
