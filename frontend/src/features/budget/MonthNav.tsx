@@ -15,13 +15,21 @@ export default function MonthNav()
   // span still anchors here. `bg-bg` is load-bearing rather than inherited decoration:
   // without its own background the budget rows would show through the bar.
   return (
-    <div className="sticky top-0 z-20 flex items-center justify-center gap-4 border-b-2 border-divider bg-bg px-4 py-3">
-      <span className="absolute left-4 font-heading text-[16px] font-extrabold">Dollars2</span>
-      <button onClick={() => dispatch(prevMonth())} className="btn btn-icon btn-secondary" aria-label="Previous month">
+    <div className="sticky top-0 z-20 flex items-center justify-center gap-4 border-b border-divider bg-[var(--app-bg)] px-7 py-3.5">
+      <span className="absolute left-7 font-heading text-[19px] font-extrabold">Dollars2</span>
+      <button
+        onClick={() => dispatch(prevMonth())}
+        className="btn btn-secondary h-10 w-10 bg-[var(--app-card)] p-0"
+        aria-label="Previous month"
+      >
         <FontAwesomeIcon icon={faChevronLeft} />
       </button>
-      <h2 className="w-50 text-center text-[18px]">{MONTH_NAMES[currentMonth - 1]} {currentYear}</h2>
-      <button onClick={() => dispatch(nextMonth())} className="btn btn-icon btn-secondary" aria-label="Next month">
+      <h2 className="w-[250px] text-center text-[21px] font-semibold">{MONTH_NAMES[currentMonth - 1]} {currentYear}</h2>
+      <button
+        onClick={() => dispatch(nextMonth())}
+        className="btn btn-secondary h-10 w-10 bg-[var(--app-card)] p-0"
+        aria-label="Next month"
+      >
         <FontAwesomeIcon icon={faChevronRight} />
       </button>
     </div>

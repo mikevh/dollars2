@@ -61,73 +61,73 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
   }
 
   return (
-    <div>
-      <div className="mb-6 border-b-2 border-divider pb-4">
-        <div className="flex items-baseline justify-between">
-          <span className="font-heading text-[13px] font-extrabold uppercase tracking-[0.08em] text-muted">
-            Left to budget
-          </span>
-          <span
-            className={`font-heading text-[22px] font-extrabold tabular-nums ${
-              leftToBudget === 0 ? 'text-text' : 'text-accent-700'
-            }`}
-          >
-            {formatCurrency(leftToBudget)}
-          </span>
-        </div>
+    <>
+      <div className="card mb-6 flex items-baseline px-6 py-3">
+        <span className="font-heading text-[14px] font-bold uppercase tracking-[0.09em] text-neutral-700">
+          Left
+        </span>
+        <span
+          className={`ml-2 font-heading text-[24px] font-bold tabular-nums ${
+            leftToBudget === 0 ? 'text-text' : 'text-accent-700'
+          }`}
+        >
+          {formatCurrency(leftToBudget)}
+        </span>
         {isCurrentMonth && (
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="font-heading text-[13px] font-extrabold uppercase tracking-[0.08em] text-muted">
-              Budget vs. accounts
+          <>
+            <span className="ml-auto font-heading text-[14px] font-bold uppercase tracking-[0.09em] text-neutral-700">
+              Delta
             </span>
             <span
-              className={`font-heading text-[15px] font-extrabold tabular-nums ${
+              className={`ml-2 font-heading text-[24px] font-bold tabular-nums ${
                 budgetVsAccounts === 0 ? 'text-text' : 'text-accent-700'
               }`}
             >
               {formatCurrency(budgetVsAccounts)}
             </span>
-          </div>
+          </>
         )}
       </div>
 
-      {budget.groups.map((group) => (
-        <BudgetGroupCard key={group.id} group={group} onSelectLineItem={onSelectLineItem} />
-      ))}
+      <div>
+        {budget.groups.map((group) => (
+          <BudgetGroupCard key={group.id} group={group} onSelectLineItem={onSelectLineItem} />
+        ))}
 
-      {addingGroup ? (
-        <div className="mb-4 flex items-center gap-2">
-          <input
-            type="text"
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleAddGroup()
-              } else if (e.key === 'Escape') {
-                setAddingGroup(false)
-                setNewGroupName('')
-              }
-            }}
-            placeholder="Group name"
-            autoFocus
-            className="input max-w-[240px]"
-          />
-          <button onClick={handleAddGroup} className="btn btn-primary">
-            Add
+        {addingGroup ? (
+          <div className="mb-4 flex items-center gap-2">
+            <input
+              type="text"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAddGroup()
+                } else if (e.key === 'Escape') {
+                  setAddingGroup(false)
+                  setNewGroupName('')
+                }
+              }}
+              placeholder="Group name"
+              autoFocus
+              className="input max-w-[240px]"
+            />
+            <button onClick={handleAddGroup} className="btn btn-primary">
+              Add
+            </button>
+            <button
+              onClick={() => { setAddingGroup(false); setNewGroupName('') }}
+              className="btn btn-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setAddingGroup(true)} className="btn btn-ghost">
+            + Add Group
           </button>
-          <button
-            onClick={() => { setAddingGroup(false); setNewGroupName('') }}
-            className="btn btn-secondary"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <button onClick={() => setAddingGroup(true)} className="btn btn-ghost">
-          + Add Group
-        </button>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   )
 }
