@@ -252,6 +252,9 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
     if (!transaction) {
       return
     }
+    if (!window.confirm('Delete this transaction? It can be restored from the Deleted tab.')) {
+      return
+    }
     const result = await api.delete<boolean>(`/api/transactions/${transaction.id}`)
     if (result.error) {
       toast.error(result.error.message)

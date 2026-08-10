@@ -32,6 +32,9 @@ vi.mock('react-hot-toast', () => ({
 beforeEach(() => {
   getResponses.clear()
   vi.clearAllMocks()
+  // Delete actions confirm before acting; default to accepting so tests that aren't
+  // exercising the cancel path don't have to know that.
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
   // The app store is a singleton shared by every test in this file. Without an explicit
   // reset, rows fetched by the previous test are still in state when the next one mounts,
   // and a tab's assertions could pass on those leftovers rather than on the rows it seeded.
@@ -122,5 +125,34 @@ describe('TransactionPane row actions', () => {
 
     expect(await screen.findByRole('button', { name: 'Restore' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+  })
+
+  it('hard-deletes a Deleted-tab row after confirming', async () => {
+    getResponses.set('/api/transactions/deleted', [
+      makeTransaction({ isDeleted: true, isManual: true }),
+    ])
+    renderPane()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Deleted' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+
+    expect(window.confirm).toHaveBeenCalledTimes(1)
+    await waitFor(() =>
+      expect(vi.mocked(api.delete)).toHaveBeenCalledWith('/api/transactions/5/permanent'),
+    )
+  })
+
+  it('does not hard-delete when the confirmation is cancelled', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    getResponses.set('/api/transactions/deleted', [
+      makeTransaction({ isDeleted: true, isManual: true }),
+    ])
+    renderPane()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Deleted' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+
+    expect(window.confirm).toHaveBeenCalledTimes(1)
+    expect(api.delete).not.toHaveBeenCalled()
   })
 })
