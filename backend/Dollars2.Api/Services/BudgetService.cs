@@ -323,7 +323,6 @@ public class BudgetService
         return DollarsApiResponse<bool>.Success(true);
     }
 
-    // TODO: N+1 queries — consider a single JOIN query when performance matters
     private async Task<BudgetResponse> BuildBudgetResponseAsync(Budget budget)
     {
         var groups = (await _groupRepo.GetByBudgetIdAsync(budget.Id)).ToList();
