@@ -68,6 +68,20 @@
   --shadow-elev-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
   --shadow-elev-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
   --shadow-elev-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+
+  /* Redesign pass 2 (#204) tokens — additive. --color-bg/--color-surface
+     stay live until each screen's own slice repoints it to --app-bg/--app-card. */
+  --app-bg: #f8f7f7;
+  --app-card: #ffffff;
+  --app-hover: color-mix(in srgb, var(--color-text) 5%, transparent);
+  --app-shadow: 0 1px 2px rgba(32, 30, 29, 0.06), 0 4px 12px rgba(32, 30, 29, 0.07);
+  --app-shadow-lg: 0 8px 24px rgba(32, 30, 29, 0.18), 0 24px 60px rgba(32, 30, 29, 0.2);
+  --app-overlay: rgba(32, 30, 29, 0.35);
+  --app-blue: oklch(0.48 0.17 255);
+  --app-blue-hover: oklch(0.58 0.19 255);
+
+  --radius-card: 10px;
+  --radius-control: 8px;
 }
 
 /* Dark ground: the same ramps read back-to-front (a systematic OKLCH
@@ -104,6 +118,22 @@
   --shadow-elev-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-elev-md: 0 4px 16px rgba(0, 0, 0, 0.55);
   --shadow-elev-lg: 0 20px 48px rgba(0, 0, 0, 0.65);
+
+  /* Redesign pass 2 (#204) tokens, dark values. Note: #204's transcribed .dark
+     block also re-tunes --color-text/--color-divider/--color-neutral-500-700/
+     --color-accent-700 — deliberately not carried here. Those are live,
+     shared tokens every existing dark-mode screen already renders with; taking
+     the retune now would recolor screens ahead of their own redesign slice,
+     which conflicts with this slice being additive-only. Only the net-new
+     --app-* namespace (+ radius) lands here. */
+  --app-bg: #131315;
+  --app-card: #1d1d20;
+  --app-hover: color-mix(in srgb, #ffffff 7%, transparent);
+  --app-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 14px rgba(0, 0, 0, 0.45);
+  --app-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.6), 0 30px 70px rgba(0, 0, 0, 0.55);
+  --app-overlay: rgba(0, 0, 0, 0.6);
+  --app-blue: oklch(0.72 0.15 250);
+  --app-blue-hover: oklch(0.82 0.13 250);
 }
 
 @layer base {
@@ -170,7 +200,7 @@
     caret-color: var(--color-accent);
     background: var(--color-surface);
     border: 1px solid var(--color-divider);
-    border-radius: 0;
+    border-radius: var(--radius-control);
   }
   .input::placeholder {
     color: color-mix(in srgb, var(--color-text) 45%, transparent);
@@ -198,7 +228,7 @@
     color: var(--color-text);
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 0;
+    border-radius: var(--radius-control);
     padding: 8px 14px;
   }
   .btn:disabled {
@@ -206,14 +236,14 @@
     cursor: not-allowed;
   }
   .btn-primary {
-    background: var(--color-accent);
+    background: var(--app-blue);
     color: var(--color-bg);
   }
   .btn-primary:not(:disabled):hover {
-    background: var(--color-accent-600);
+    background: var(--app-blue-hover);
   }
   .btn-primary:not(:disabled):active {
-    background: var(--color-accent-700);
+    background: var(--app-blue-hover);
   }
   .btn-block {
     width: 100%;
@@ -243,5 +273,15 @@
     width: 36px;
     height: 36px;
     padding: 0;
+  }
+
+  /* Redesign pass 2 (#204) — shared card surface, replacing the ad hoc
+     `border border-divider bg-surface shadow-elev-*` pattern one screen at a
+     time as each screen's slice lands. */
+  .card {
+    background: var(--app-card);
+    border-radius: var(--radius-card);
+    box-shadow: var(--app-shadow);
+    overflow: hidden;
   }
 }
