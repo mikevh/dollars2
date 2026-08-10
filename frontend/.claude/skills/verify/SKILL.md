@@ -1,34 +1,24 @@
 ---
 name: verify
-description: Exercise the Dollars2 frontend in a real browser (Playwright) to confirm a UI change works — drive the affected screen, screenshot light + dark, and check for console errors. Use for any change to frontend/src that has a visible/interactive surface.
+description: Hand off a Dollars2 frontend UI change for the user to check in a real browser — confirm the affected screen and behavior, light + dark. Use for any change to frontend/src that has a visible/interactive surface.
 ---
 
 # Verify (frontend)
 
-Runtime observation for the React app: build isn't enough — run the app, drive
-the changed screen in a real browser, and capture what renders.
+Runtime observation for the React app: build isn't enough — the change needs to be seen rendering.
+There is no automated browser-verification agent for this; it's a manual handoff to the user.
 
-**Delegate this to the `ui-verify` subagent.** That agent runs on a cheaper
-model and, critically, reads the screenshots in its own context — so the heavy
-image tokens never hit this session. You get back a short PASS/FAIL verdict, not
-the raw PNGs.
+## What to do
 
-Spawn it with the Agent tool (`subagent_type: ui-verify`). In the prompt, tell
-it:
+- Say **what changed** — the component/screen and the behavior it should now have.
+- Give **clear, concrete instructions**: which route(s) to open (e.g.
+  `http://localhost:5173/login`), whether the route needs auth, and any interaction to try
+  (typing, clicking, a validation case).
+- Name what "correct" looks like — both themes if the change touches anything themed, specific
+  states if the change is conditional (error, empty, loading).
+- **Stop and wait for the user to confirm** before continuing (committing, opening the PR, moving
+  to the next step). Don't screenshot or drive the browser yourself as a substitute.
+- If the user reports a problem, fix it and hand off again for the same check.
 
-- **What changed** — the component/screen and what behavior to confirm.
-- **Which route(s)** to drive (e.g. `http://localhost:5173/login`), and whether
-  the route needs auth (seed a token + run the backend) or is a pure visual check.
-- **Any interaction flow** to exercise (typing, clicking, validation) beyond the
-  light/dark screenshots.
-- Whether to `SendUserFile` the screenshots back (remote surface) or just report
-  the verdict.
-
-The subagent starts the dev server, screenshots light + dark via
-`npm run ui:shot`, drives any flow with a throwaway Playwright script, reads the
-PNGs itself, and returns a verdict naming any token/layout/console-error
-problems (plus screenshot paths if you want to look).
-
-Relay the subagent's verdict to the user. If it reports a FAIL, fix it and
-re-dispatch. Don't substitute `npm test` / `tsc` for this — run those too, but
-the evidence here is the rendered app.
+Don't substitute `npm test` / `tsc` for this — run those too, but the evidence here is the
+rendered app, and only the user can supply that now.

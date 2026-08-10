@@ -83,16 +83,23 @@ cd backend/Dollars2.Api && dotnet build
 
 ### Subagents (keep heavy output off the main session)
 
-Both are pinned to `model: sonnet` and report back as condensed text.
+Pinned to `model: sonnet` and reports back as condensed text.
 
-- **`ui-verify`** (`.claude/agents/ui-verify.md`) — browser verification. Starts the
-  dev server, screenshots light/dark via `npm run ui:shot`, drives interaction
-  flows, reads the PNGs itself, returns a render/console-error verdict. Spawn it
-  instead of screenshotting from the main session.
 - **`test-runner`** (`.claude/agents/test-runner.md`) — runs `dotnet build`,
   `dotnet test`, `npm test`, `npx tsc --noEmit`, and `npm run lint` in the current
   worktree and returns pass/fail per check with trimmed failure detail (test name, assertion,
   `file:line`), keeping MSBuild/vitest/Testcontainers output out of context.
+
+### Visual verification (manual handoff)
+
+There is no automated browser-verification agent — visual checks are handed off to the user.
+When a change alters what renders (frontend components, styles/tokens, or an API response shape
+the UI displays):
+
+- Say what changed and give clear, concrete instructions for what to check: the route/screen to
+  open, the interaction to try, and what "correct" looks like (light + dark, specific states).
+- **Stop and wait for the user to confirm** before continuing (moving on to commit/PR/next step).
+- Don't screenshot or drive the browser yourself as a substitute for this handoff.
 
 ## Sprint Approach
 

@@ -14,8 +14,8 @@ scoped override of the standing "never commit/push without instruction" gate
 (`[[feedback-commit-push]]`), valid only inside this workflow. The one stop along the way is the
 code-review handoff in step 9, which happens **after** the PR is open — the PR is what gets reviewed.
 
-Delegate the token-heavy phases to the cheaper subagents noted below (`Explore`, `test-runner`,
-`ui-verify`) and keep this session on understanding, implementing, and judging.
+Delegate the token-heavy phases to the cheaper subagents noted below (`Explore`, `test-runner`)
+and keep this session on understanding, implementing, and judging.
 
 ## Steps
 
@@ -85,9 +85,11 @@ Follow `CLAUDE.md`'s conventions and match the surrounding style.
   a fresh one.
 
 ### 7. Verify
-- **Spawn `ui-verify` only when the change alters what renders** — frontend components,
-  styles/tokens, or an API response shape the UI displays. Point it at the specific changed screen
-  (`--url`), not a general sweep.
+- **Hand visual verification to the user when the change alters what renders** — frontend
+  components, styles/tokens, or an API response shape the UI displays. There is no browser
+  subagent for this: tell the user what changed, give clear instructions on what to check (route,
+  interaction, expected result in light + dark), and **stop and wait for their confirmation**
+  before moving on to step 8.
 - **Skip it** for work with no visible change — migrations, SQL, sync internals, backend-only
   refactors, tests, docs. Say in the PR that you skipped it and why.
 
