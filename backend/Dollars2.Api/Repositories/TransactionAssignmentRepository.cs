@@ -4,6 +4,8 @@ using Dollars2.Api.Models;
 
 namespace Dollars2.Api.Repositories;
 
+public sealed record LineItemNetAmount(int LineItemId, decimal Amount);
+
 public class TransactionAssignmentRepository
 {
     private readonly DbSession _db;
@@ -66,6 +68,21 @@ public class TransactionAssignmentRepository
               INNER JOIN Transactions t ON t.Id = ta.TransactionId
               WHERE ta.LineItemId = @lineItemId AND t.IsDeleted = 0",
             new { lineItemId },
+            _db.CurrentTransaction);
+    }
+
+    /// <summary>Net assigned total for every id in <paramref name="lineItemIds"/> in one round trip.
+    /// An id with no assignments has no row in the result — callers should treat a missing id as 0,
+    /// same as <see cref="GetNetAssignedByLineItemIdAsync"/>'s COALESCE. Callers must not pass an
+    /// empty collection (produces an invalid "IN ()").</summary>
+    public async Task<IEnumerable<LineItemNetAmount>> GetNetAssignedByLineItemIdsAsync(IEnumerable<int> lineItemIds)
+    {
+        return await _db.Connection.QueryAsync<LineItemNetAmount>(
+            @"SELECT ta.LineItemId AS LineItemId, SUM(ta.Amount) AS Amount FROM TransactionAssignments ta
+              INNER JOIN Transactions t ON t.Id = ta.TransactionId
+              WHERE ta.LineItemId IN @lineItemIds AND t.IsDeleted = 0
+              GROUP BY ta.LineItemId",
+            new { lineItemIds },
             _db.CurrentTransaction);
     }
 }

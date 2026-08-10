@@ -4,6 +4,8 @@ using Dollars2.Api.Models;
 
 namespace Dollars2.Api.Repositories;
 
+public sealed record LineItemRolloverAmount(int LineItemId, decimal Amount);
+
 public class LineItemRepository
 {
     private readonly DbSession _db;
@@ -18,6 +20,20 @@ public class LineItemRepository
         return await _db.Connection.QueryAsync<LineItem>(
             "SELECT Id, GroupId, Name, PlannedAmount, SortOrder, Notes, PreviousLineItemId, CreatedAt, UpdatedAt FROM LineItems WHERE GroupId = @groupId ORDER BY SortOrder",
             new { groupId },
+            _db.CurrentTransaction);
+    }
+
+    /// <summary>All line items across every group in a budget, in one query. Ordered by group then
+    /// sort order so callers can bucket by GroupId and keep each group's items in display order.</summary>
+    public async Task<IEnumerable<LineItem>> GetByBudgetIdAsync(int budgetId)
+    {
+        return await _db.Connection.QueryAsync<LineItem>(
+            @"SELECT li.Id, li.GroupId, li.Name, li.PlannedAmount, li.SortOrder, li.Notes, li.PreviousLineItemId, li.CreatedAt, li.UpdatedAt
+              FROM LineItems li
+              INNER JOIN BudgetGroups bg ON bg.Id = li.GroupId
+              WHERE bg.BudgetId = @budgetId
+              ORDER BY li.GroupId, li.SortOrder",
+            new { budgetId },
             _db.CurrentTransaction);
     }
 
@@ -56,6 +72,34 @@ public class LineItemRepository
                 WHERE t.IsDeleted = 0 GROUP BY ta.LineItemId
             ) asn ON asn.LineItemId = li.Id",
             new { lineItemId },
+            _db.CurrentTransaction);
+    }
+
+    /// <summary>Rollover for every id in <paramref name="lineItemIds"/> in one round trip: each
+    /// item's PreviousLineItemId chain is walked and summed independently, grouped back by the
+    /// requesting id. An id whose chain is empty (no PreviousLineItemId) has no row in the result
+    /// — callers should treat a missing id as 0, same as <see cref="GetRolloverAsync"/>'s COALESCE.
+    /// Callers must not pass an empty collection (produces an invalid "IN ()").</summary>
+    public async Task<IEnumerable<LineItemRolloverAmount>> GetRolloverBatchAsync(IEnumerable<int> lineItemIds)
+    {
+        return await _db.Connection.QueryAsync<LineItemRolloverAmount>(
+            @"WITH Chain AS (
+                SELECT li.Id AS RootId, li.PreviousLineItemId AS AncestorId FROM LineItems li WHERE li.Id IN @lineItemIds
+                UNION ALL
+                SELECT c.RootId, li.PreviousLineItemId FROM LineItems li
+                INNER JOIN Chain c ON li.Id = c.AncestorId WHERE c.AncestorId IS NOT NULL
+            )
+            SELECT c.RootId AS LineItemId, COALESCE(SUM(li.PlannedAmount + COALESCE(asn.Total, 0)), 0) AS Amount
+            FROM Chain c
+            INNER JOIN LineItems li ON li.Id = c.AncestorId
+            LEFT JOIN (
+                SELECT ta.LineItemId, SUM(ta.Amount) AS Total
+                FROM TransactionAssignments ta
+                INNER JOIN Transactions t ON t.Id = ta.TransactionId
+                WHERE t.IsDeleted = 0 GROUP BY ta.LineItemId
+            ) asn ON asn.LineItemId = li.Id
+            GROUP BY c.RootId",
+            new { lineItemIds },
             _db.CurrentTransaction);
     }
 
