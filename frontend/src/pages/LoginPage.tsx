@@ -29,11 +29,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg p-4 text-text">
-      <div className="flex w-90 flex-col gap-4 border border-divider bg-surface px-6 py-8 shadow-elev-md">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] p-4 text-text">
+      <div className="card flex w-90 flex-col gap-4 pt-9 px-8 pb-8">
         <div>
-          <h1 className="mb-1 text-[28px] leading-tight">Dollars2</h1>
-          <p className="text-muted text-[13px]">Zero-based budgeting, self-hosted.</p>
+          <h1 className="mb-1 text-[34px] font-bold leading-tight">Dollars2</h1>
+          <p className="text-neutral-700 text-[13px]">Zero-based budgeting, self-hosted.</p>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="field">
