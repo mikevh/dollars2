@@ -53,6 +53,10 @@ public class LineItemRepository
             _db.CurrentTransaction);
     }
 
+    /// <summary>Single-item rollover, used by the per-item call sites (CreateLineItemAsync,
+    /// UpdateLineItemAsync, UpdateGroupAsync). <see cref="GetRolloverBatchAsync"/> is the same chain
+    /// walk restated to seed from many ids at once — keep the two in sync if this query's semantics
+    /// change (chain-termination condition, which assignments count, etc).</summary>
     public async Task<decimal> GetRolloverAsync(int lineItemId)
     {
         return await _db.Connection.QuerySingleAsync<decimal>(
@@ -79,7 +83,9 @@ public class LineItemRepository
     /// item's PreviousLineItemId chain is walked and summed independently, grouped back by the
     /// requesting id. An id whose chain is empty (no PreviousLineItemId) has no row in the result
     /// — callers should treat a missing id as 0, same as <see cref="GetRolloverAsync"/>'s COALESCE.
-    /// Callers must not pass an empty collection (produces an invalid "IN ()").</summary>
+    /// Callers must not pass an empty collection (produces an invalid "IN ()"). Same chain-walk
+    /// semantics as <see cref="GetRolloverAsync"/> restated to seed from many ids — keep both in
+    /// sync if the rollover rule changes.</summary>
     public async Task<IEnumerable<LineItemRolloverAmount>> GetRolloverBatchAsync(IEnumerable<int> lineItemIds)
     {
         return await _db.Connection.QueryAsync<LineItemRolloverAmount>(
