@@ -326,26 +326,31 @@ public class BudgetService
     // TODO: N+1 queries — consider a single JOIN query when performance matters
     private async Task<BudgetResponse> BuildBudgetResponseAsync(Budget budget)
     {
-        var groups = await _groupRepo.GetByBudgetIdAsync(budget.Id);
-        var groupResponses = new List<BudgetGroupResponse>();
+        var groups = (await _groupRepo.GetByBudgetIdAsync(budget.Id)).ToList();
+        var lineItems = (await _lineItemRepo.GetByBudgetIdAsync(budget.Id)).ToList();
 
-        foreach (var group in groups)
+        var lineItemIds = lineItems.Select(i => i.Id).ToList();
+        var netByLineItemId = lineItemIds.Count > 0
+            ? (await _assignmentRepo.GetNetAssignedByLineItemIdsAsync(lineItemIds)).ToDictionary(n => n.LineItemId, n => n.Amount)
+            : new Dictionary<int, decimal>();
+
+        var incomeGroupIds = groups.Where(g => g.IsIncome).Select(g => g.Id).ToHashSet();
+        var rolloverLineItemIds = lineItems.Where(i => !incomeGroupIds.Contains(i.GroupId)).Select(i => i.Id).ToList();
+        var rolloverByLineItemId = rolloverLineItemIds.Count > 0
+            ? (await _lineItemRepo.GetRolloverBatchAsync(rolloverLineItemIds)).ToDictionary(r => r.LineItemId, r => r.Amount)
+            : new Dictionary<int, decimal>();
+
+        var lineItemsByGroupId = lineItems.ToLookup(i => i.GroupId);
+        var groupResponses = groups.Select(group => new BudgetGroupResponse
         {
-            var lineItems = await _lineItemRepo.GetByGroupIdAsync(group.Id);
-            var lineItemResponses = new List<LineItemResponse>();
-            foreach (var item in lineItems)
-            {
-                lineItemResponses.Add(await MapLineItemAsync(item, group.IsIncome));
-            }
-            groupResponses.Add(new BudgetGroupResponse
-            {
-                Id = group.Id,
-                Name = group.Name,
-                IsIncome = group.IsIncome,
-                SortOrder = group.SortOrder,
-                LineItems = lineItemResponses
-            });
-        }
+            Id = group.Id,
+            Name = group.Name,
+            IsIncome = group.IsIncome,
+            SortOrder = group.SortOrder,
+            LineItems = lineItemsByGroupId[group.Id]
+                .Select(item => MapLineItem(item, netByLineItemId.GetValueOrDefault(item.Id), rolloverByLineItemId.GetValueOrDefault(item.Id)))
+                .ToList()
+        }).ToList();
 
         var accounts = (await _accountRepo.GetByUserIdAsync(budget.UserId)).ToList();
         var includedIds = accounts.Where(a => a.IncludeInBudget).Select(a => a.Id).ToList();
@@ -430,8 +435,6 @@ public class BudgetService
 
     private async Task<LineItemResponse> MapLineItemAsync(LineItem item, bool isIncome)
     {
-        // One net figure drives both columns: spending is the negation (debits read positive), and
-        // received is the net itself. No Math.Abs — that is what erased credits on expense items.
         var net = await _assignmentRepo.GetNetAssignedByLineItemIdAsync(item.Id);
 
         decimal rollover = 0;
@@ -440,6 +443,13 @@ public class BudgetService
             rollover = await _lineItemRepo.GetRolloverAsync(item.Id);
         }
 
+        return MapLineItem(item, net, rollover);
+    }
+
+    // One net figure drives both columns: spending is the negation (debits read positive), and
+    // received is the net itself. No Math.Abs — that is what erased credits on expense items.
+    private static LineItemResponse MapLineItem(LineItem item, decimal net, decimal rollover)
+    {
         return new LineItemResponse
         {
             Id = item.Id,
