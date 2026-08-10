@@ -10,13 +10,13 @@ import FlowAmount from './FlowAmount'
 interface LineItemRowProps {
   lineItem: LineItemResponse
   groupId: number
-  isIncome: boolean
   startEditing?: boolean
   onEditComplete?: () => void
   onSelect?: () => void
 }
 
-export default function LineItemRow({ lineItem, groupId, isIncome, startEditing, onEditComplete, onSelect }: LineItemRowProps) {
+export default function LineItemRow({ lineItem, groupId, startEditing, onEditComplete, onSelect }: LineItemRowProps) {
+  const isIncome = lineItem.isIncome
   const dispatch = useAppDispatch()
   const { isOver, setNodeRef } = useDroppable({
     id: `lineitem-${lineItem.id}`,

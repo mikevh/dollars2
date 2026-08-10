@@ -27,7 +27,8 @@ export default function BudgetGroupCard({ group, onSelectLineItem }: BudgetGroup
     setNameValue(group.name)
   }
 
-  const columnLabels = group.isIncome
+  const isAllIncome = group.lineItems.length > 0 && group.lineItems.every((item) => item.isIncome)
+  const columnLabels = isAllIncome
     ? { col1: 'Planned', col2: 'Received', col3: 'Remaining' }
     : { col1: 'Planned', col2: 'Spent', col3: 'Remaining' }
 
@@ -54,7 +55,8 @@ export default function BudgetGroupCard({ group, onSelectLineItem }: BudgetGroup
   }
 
   const handleAddItem = async () => {
-    const result = await dispatch(createLineItem({ groupId: group.id, name: 'New Item', plannedAmount: 0 }))
+    const isIncome = group.lineItems[0]?.isIncome ?? false
+    const result = await dispatch(createLineItem({ groupId: group.id, name: 'New Item', plannedAmount: 0, isIncome }))
     if (createLineItem.rejected.match(result)) {
       toast.error(result.payload as string)
     } else {
@@ -86,19 +88,13 @@ export default function BudgetGroupCard({ group, onSelectLineItem }: BudgetGroup
               />
             ) : (
               <h3
-                onClick={() => {
-                  if (!group.isIncome) {
-                    setEditingName(true)
-                  }
-                }}
-                className={`font-heading text-sm font-extrabold uppercase tracking-wide text-text ${
-                  !group.isIncome ? 'cursor-pointer hover:text-accent-700' : ''
-                }`}
+                onClick={() => setEditingName(true)}
+                className="cursor-pointer font-heading text-sm font-extrabold uppercase tracking-wide text-text hover:text-accent-700"
               >
                 {group.name}
               </h3>
             )}
-            {!group.isIncome && editingName && (
+            {editingName && (
               <button
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={handleDelete}
@@ -128,7 +124,6 @@ export default function BudgetGroupCard({ group, onSelectLineItem }: BudgetGroup
               key={item.id}
               lineItem={item}
               groupId={group.id}
-              isIncome={group.isIncome}
               startEditing={item.id === editingNewItemId}
               onEditComplete={() => setEditingNewItemId(null)}
               onSelect={() => onSelectLineItem?.(item.id)}

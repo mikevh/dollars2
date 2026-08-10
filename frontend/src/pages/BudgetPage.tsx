@@ -68,7 +68,7 @@ export default function BudgetPage()
     for (const group of currentMonthBudget.groups) {
       const lineItem = group.lineItems.find(li => li.id === selectedLineItemId);
       if (lineItem) {
-        return { lineItem, isIncome: group.isIncome };
+        return { lineItem, isIncome: lineItem.isIncome };
       }
     }
 

@@ -3,7 +3,7 @@ import { Provider } from 'react-redux'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../api/client'
 import { store } from '../../app/store'
-import type { BudgetGroupResponse } from '../../types/budget'
+import type { BudgetGroupResponse, LineItemResponse } from '../../types/budget'
 import BudgetGroupCard from './BudgetGroupCard'
 
 vi.mock('../../api/client', () => ({
@@ -24,17 +24,31 @@ function makeGroup(overrides: Partial<BudgetGroupResponse> = {}): BudgetGroupRes
   return {
     id: 20,
     name: 'Housing',
-    isIncome: false,
     sortOrder: 1,
     lineItems: [],
     ...overrides,
   }
 }
 
-function renderCard() {
+function makeLineItem(overrides: Partial<LineItemResponse> = {}): LineItemResponse {
+  return {
+    id: 1,
+    name: 'Item',
+    plannedAmount: 0,
+    isIncome: false,
+    spentAmount: 0,
+    receivedAmount: 0,
+    rolloverAmount: 0,
+    sortOrder: 0,
+    notes: null,
+    ...overrides,
+  }
+}
+
+function renderCard(group: BudgetGroupResponse = makeGroup()) {
   const { rerender } = render(
     <Provider store={store}>
-      <BudgetGroupCard group={makeGroup()} />
+      <BudgetGroupCard group={group} />
     </Provider>,
   )
   return {
@@ -50,6 +64,7 @@ function renderCard() {
 
 beforeEach(() => {
   vi.mocked(api.put).mockClear()
+  vi.mocked(api.post).mockClear()
 })
 
 describe('BudgetGroupCard draft re-sync', () => {
@@ -89,6 +104,7 @@ describe('BudgetGroupCard add item', () => {
       id: 99,
       name: 'New Item',
       plannedAmount: 0,
+      isIncome: false,
       spentAmount: 0,
       receivedAmount: 0,
       rolloverAmount: 0,
@@ -104,11 +120,35 @@ describe('BudgetGroupCard add item', () => {
     const { setGroup } = renderCard()
     fireEvent.click(screen.getByRole('button', { name: '+ Add Item' }))
 
-    expect(vi.mocked(api.post)).toHaveBeenCalledWith('/api/groups/20/line-items', { name: 'New Item', plannedAmount: 0 })
+    // The group starts with no line items, so isIncome inherits the "empty group → expense" default.
+    expect(vi.mocked(api.post)).toHaveBeenCalledWith('/api/groups/20/line-items', { name: 'New Item', plannedAmount: 0, isIncome: false })
 
     await waitFor(() => {
       setGroup(makeGroup({ lineItems: [newItem] }))
       expect(screen.getByRole('textbox')).toHaveValue('')
     })
+  })
+})
+
+describe('BudgetGroupCard income inference', () => {
+  it('renders "Received" only when every item in the group is income', () => {
+    renderCard(makeGroup({ lineItems: [makeLineItem({ isIncome: true })] }))
+    expect(screen.getByText('Received')).toBeInTheDocument()
+  })
+
+  it('renders "Spent" for an empty group', () => {
+    renderCard(makeGroup({ lineItems: [] }))
+    expect(screen.getByText('Spent')).toBeInTheDocument()
+  })
+
+  it('renders "Spent" when the group mixes income and expense items', () => {
+    renderCard(makeGroup({ lineItems: [makeLineItem({ id: 1, isIncome: true }), makeLineItem({ id: 2, isIncome: false })] }))
+    expect(screen.getByText('Spent')).toBeInTheDocument()
+  })
+
+  it('"+ Add Item" in an all-income group posts isIncome: true', () => {
+    renderCard(makeGroup({ lineItems: [makeLineItem({ isIncome: true })] }))
+    fireEvent.click(screen.getByRole('button', { name: '+ Add Item' }))
+    expect(vi.mocked(api.post)).toHaveBeenCalledWith('/api/groups/20/line-items', { name: 'New Item', plannedAmount: 0, isIncome: true })
   })
 })

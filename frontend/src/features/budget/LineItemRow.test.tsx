@@ -23,6 +23,7 @@ function makeLineItem(overrides: Partial<LineItemResponse> = {}): LineItemRespon
     id: 100,
     name: 'Rent',
     plannedAmount: 200,
+    isIncome: false,
     spentAmount: 50,
     receivedAmount: 0,
     rolloverAmount: 0,
@@ -35,7 +36,7 @@ function makeLineItem(overrides: Partial<LineItemResponse> = {}): LineItemRespon
 function renderRow(props: Partial<Parameters<typeof LineItemRow>[0]> = {}) {
   const { rerender } = render(
     <Provider store={store}>
-      <LineItemRow lineItem={makeLineItem()} groupId={1} isIncome={false} {...props} />
+      <LineItemRow lineItem={makeLineItem()} groupId={1} {...props} />
     </Provider>,
   )
   return {
@@ -43,7 +44,7 @@ function renderRow(props: Partial<Parameters<typeof LineItemRow>[0]> = {}) {
     setLineItem: (lineItem: LineItemResponse) =>
       rerender(
         <Provider store={store}>
-          <LineItemRow lineItem={lineItem} groupId={1} isIncome={false} {...props} />
+          <LineItemRow lineItem={lineItem} groupId={1} {...props} />
         </Provider>,
       ),
   }

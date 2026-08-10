@@ -128,7 +128,7 @@ public sealed class MoneyPrecisionTests
             var seed = await SeedAsync(db, "money-lineitem@example.com");
             var service = BudgetServiceFor(db);
 
-            var created = await service.CreateLineItemAsync(seed.GroupId, "Gas", 300.001m, seed.UserId);
+            var created = await service.CreateLineItemAsync(seed.GroupId, "Gas", 300.001m, false, seed.UserId);
             var updated = await service.UpdateLineItemAsync(seed.LineItemId, "Item", 300.001m, null, seed.UserId);
 
             Assert.Equal(Money.SubCentCode, created.Error?.Code);

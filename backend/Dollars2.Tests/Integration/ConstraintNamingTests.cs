@@ -30,10 +30,15 @@ public sealed class ConstraintNamingTests
         UNION ALL SELECT name FROM sys.check_constraints
         """;
 
-    /// <summary>One constraint of each kind the sweep renames, by its post-sweep name.</summary>
+    /// <summary>
+    /// One constraint of each kind the naming convention produces, by its final name. Most of these
+    /// are renamed by the 017 sweep; DF_LineItems_IsIncome is explicitly named at creation by
+    /// migration 019 (issue #75), which replaced DF_BudgetGroups_IsIncome as this suite's spot-check
+    /// for the DEFAULT kind once that column — and its constraint — was dropped.
+    /// </summary>
     private static readonly string[] ExpectedConstraintNames =
     {
-        "DF_BudgetGroups_IsIncome",
+        "DF_LineItems_IsIncome",
         "PK_LineItems",
         "FK_TransactionAssignments_Transactions",
         "UQ_Migrations_ScriptName",

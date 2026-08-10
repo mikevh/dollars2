@@ -26,6 +26,7 @@ function makeLineItem(overrides: Partial<LineItemResponse> = {}): LineItemRespon
     id: 100,
     name: 'Rent',
     plannedAmount: 200,
+    isIncome: false,
     spentAmount: 50,
     receivedAmount: 0,
     rolloverAmount: 0,

@@ -69,7 +69,8 @@ public class BudgetService
             }
             else
             {
-                await _groupRepo.CreateAsync(budgetId, "Income", true, 0);
+                var groupId = await _groupRepo.CreateAsync(budgetId, "Income", 0);
+                await _lineItemRepo.CreateAsync(groupId, "Paycheck", 0, 0, isIncome: true);
             }
 
             _dbSession.Commit();
@@ -93,14 +94,13 @@ public class BudgetService
         }
 
         var maxSort = await _groupRepo.GetMaxSortOrderAsync(budgetId);
-        var groupId = await _groupRepo.CreateAsync(budgetId, name, false, maxSort + 1);
+        var groupId = await _groupRepo.CreateAsync(budgetId, name, maxSort + 1);
         var group = (await _groupRepo.GetByIdAsync(groupId))!;
 
         return DollarsApiResponse<BudgetGroupResponse>.Success(new BudgetGroupResponse
         {
             Id = group.Id,
             Name = group.Name,
-            IsIncome = group.IsIncome,
             SortOrder = group.SortOrder,
             LineItems = new List<LineItemResponse>()
         });
@@ -119,11 +119,6 @@ public class BudgetService
             return DollarsApiResponse<BudgetGroupResponse>.Fail("Group not found.", "GROUP_NOT_FOUND");
         }
 
-        if (group.IsIncome)
-        {
-            return DollarsApiResponse<BudgetGroupResponse>.Fail("Cannot rename the income group.", "CANNOT_MODIFY_INCOME");
-        }
-
         await _groupRepo.UpdateAsync(id, name);
         group.Name = name;
 
@@ -131,13 +126,12 @@ public class BudgetService
         var lineItemResponses = new List<LineItemResponse>();
         foreach (var item in lineItems)
         {
-            lineItemResponses.Add(await MapLineItemAsync(item, group.IsIncome));
+            lineItemResponses.Add(await MapLineItemAsync(item));
         }
         return DollarsApiResponse<BudgetGroupResponse>.Success(new BudgetGroupResponse
         {
             Id = group.Id,
             Name = group.Name,
-            IsIncome = group.IsIncome,
             SortOrder = group.SortOrder,
             LineItems = lineItemResponses
         });
@@ -154,11 +148,6 @@ public class BudgetService
         if (!await VerifyGroupOwnershipAsync(group, userId))
         {
             return DollarsApiResponse<bool>.Fail("Group not found.", "GROUP_NOT_FOUND");
-        }
-
-        if (group.IsIncome)
-        {
-            return DollarsApiResponse<bool>.Fail("Cannot delete the income group.", "CANNOT_DELETE_INCOME");
         }
 
         if (await _groupRepo.HasLineItemsAsync(id))
@@ -203,7 +192,7 @@ public class BudgetService
         return DollarsApiResponse<bool>.Success(true);
     }
 
-    public async Task<DollarsApiResponse<LineItemResponse>> CreateLineItemAsync(int groupId, string name, decimal plannedAmount, int userId)
+    public async Task<DollarsApiResponse<LineItemResponse>> CreateLineItemAsync(int groupId, string name, decimal plannedAmount, bool isIncome, int userId)
     {
         if (!Money.IsWholeCents(plannedAmount))
         {
@@ -222,10 +211,10 @@ public class BudgetService
         }
 
         var maxSort = await _lineItemRepo.GetMaxSortOrderAsync(groupId);
-        var itemId = await _lineItemRepo.CreateAsync(groupId, name, plannedAmount, maxSort + 1);
+        var itemId = await _lineItemRepo.CreateAsync(groupId, name, plannedAmount, maxSort + 1, isIncome);
         var item = (await _lineItemRepo.GetByIdAsync(itemId))!;
 
-        return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item, group.IsIncome));
+        return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item));
     }
 
     public async Task<DollarsApiResponse<LineItemResponse>> UpdateLineItemAsync(int id, string name, decimal plannedAmount, string? notes, int userId)
@@ -251,8 +240,7 @@ public class BudgetService
         item.PlannedAmount = plannedAmount;
         item.Notes = notes ?? "";
 
-        var group = (await _groupRepo.GetByIdAsync(item.GroupId))!;
-        return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item, group.IsIncome));
+        return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item));
     }
 
     public async Task<DollarsApiResponse<bool>> DeleteLineItemAsync(int id, int userId)
@@ -263,9 +251,19 @@ public class BudgetService
             return DollarsApiResponse<bool>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
         }
 
-        if (!await VerifyLineItemOwnershipAsync(item, userId))
+        var group = await _groupRepo.GetByIdAsync(item.GroupId);
+        if (group is null || !await VerifyGroupOwnershipAsync(group, userId))
         {
             return DollarsApiResponse<bool>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
+        }
+
+        if (item.IsIncome)
+        {
+            var incomeCount = await _lineItemRepo.CountIncomeInBudgetAsync(group.BudgetId);
+            if (incomeCount <= 1)
+            {
+                return DollarsApiResponse<bool>.Fail("Cannot delete the last income line item.", "CANNOT_DELETE_LAST_INCOME");
+            }
         }
 
         _dbSession.BeginTransaction();
@@ -333,8 +331,7 @@ public class BudgetService
             ? (await _assignmentRepo.GetNetAssignedByLineItemIdsAsync(lineItemIds)).ToDictionary(n => n.LineItemId, n => n.Amount)
             : new Dictionary<int, decimal>();
 
-        var incomeGroupIds = groups.Where(g => g.IsIncome).Select(g => g.Id).ToHashSet();
-        var rolloverLineItemIds = lineItems.Where(i => !incomeGroupIds.Contains(i.GroupId)).Select(i => i.Id).ToList();
+        var rolloverLineItemIds = lineItems.Where(i => !i.IsIncome).Select(i => i.Id).ToList();
         var rolloverByLineItemId = rolloverLineItemIds.Count > 0
             ? (await _lineItemRepo.GetRolloverBatchAsync(rolloverLineItemIds)).ToDictionary(r => r.LineItemId, r => r.Amount)
             : new Dictionary<int, decimal>();
@@ -344,7 +341,6 @@ public class BudgetService
         {
             Id = group.Id,
             Name = group.Name,
-            IsIncome = group.IsIncome,
             SortOrder = group.SortOrder,
             LineItems = lineItemsByGroupId[group.Id]
                 .Select(item => MapLineItem(item, netByLineItemId.GetValueOrDefault(item.Id), rolloverByLineItemId.GetValueOrDefault(item.Id)))
@@ -396,12 +392,12 @@ public class BudgetService
 
         foreach (var sourceGroup in sourceGroups)
         {
-            var newGroupId = await _groupRepo.CreateAsync(targetBudgetId, sourceGroup.Name, sourceGroup.IsIncome, sourceGroup.SortOrder);
+            var newGroupId = await _groupRepo.CreateAsync(targetBudgetId, sourceGroup.Name, sourceGroup.SortOrder);
             var sourceItems = await _lineItemRepo.GetByGroupIdAsync(sourceGroup.Id);
 
             foreach (var sourceItem in sourceItems)
             {
-                await _lineItemRepo.CreateAsync(newGroupId, sourceItem.Name, sourceItem.PlannedAmount, sourceItem.SortOrder, sourceItem.Id, sourceItem.Notes);
+                await _lineItemRepo.CreateAsync(newGroupId, sourceItem.Name, sourceItem.PlannedAmount, sourceItem.SortOrder, sourceItem.IsIncome, sourceItem.Id, sourceItem.Notes);
             }
         }
     }
@@ -432,12 +428,12 @@ public class BudgetService
         return await VerifyGroupOwnershipAsync(group, userId);
     }
 
-    private async Task<LineItemResponse> MapLineItemAsync(LineItem item, bool isIncome)
+    private async Task<LineItemResponse> MapLineItemAsync(LineItem item)
     {
         var net = await _assignmentRepo.GetNetAssignedByLineItemIdAsync(item.Id);
 
         decimal rollover = 0;
-        if (!isIncome)
+        if (!item.IsIncome)
         {
             rollover = await _lineItemRepo.GetRolloverAsync(item.Id);
         }
@@ -454,6 +450,7 @@ public class BudgetService
             Id = item.Id,
             Name = item.Name,
             PlannedAmount = item.PlannedAmount,
+            IsIncome = item.IsIncome,
             SpentAmount = -net,
             ReceivedAmount = net,
             RolloverAmount = rollover,
