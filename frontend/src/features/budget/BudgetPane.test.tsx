@@ -17,13 +17,13 @@ function makeBudget(): BudgetResponse {
       {
         id: 10,
         name: 'Income',
-        isIncome: true,
         sortOrder: 0,
         lineItems: [
           {
             id: 100,
             name: 'Paycheck',
             plannedAmount: 4000,
+            isIncome: true,
             // spentAmount is the negated net of a line item's assignments, so on an income item it
             // mirrors receivedAmount. "Budget vs. accounts" must not pick this up (issue #71).
             spentAmount: -4000,
@@ -37,13 +37,13 @@ function makeBudget(): BudgetResponse {
       {
         id: 20,
         name: 'Housing',
-        isIncome: false,
         sortOrder: 1,
         lineItems: [
           {
             id: 200,
             name: 'Rent',
             plannedAmount: 1500,
+            isIncome: false,
             spentAmount: 1600,
             receivedAmount: 0,
             rolloverAmount: 0,
@@ -99,7 +99,7 @@ describe('BudgetPane (Modernist restyle)', () => {
   it('renders each group as a block with its three column labels', () => {
     renderPane(makeBudget())
     expect(screen.getByText('Housing')).toBeInTheDocument()
-    // Income group uses "Received"; expense group uses "Spent"; both share "Planned"/"Remaining"
+    // A group whose items are all income uses "Received"; otherwise "Spent". Both share "Planned"/"Remaining"
     expect(screen.getAllByText('Planned')).toHaveLength(2)
     expect(screen.getByText('Received')).toBeInTheDocument()
     expect(screen.getByText('Spent')).toBeInTheDocument()

@@ -19,7 +19,7 @@
 | Foreign key | `FK_<Table>_<ReferencedTable>` | `FK_LineItems_BudgetGroups` |
 | Foreign key (2+ to the same table) | `FK_<Table>_<Column>` | `FK_LineItems_PreviousLineItem` |
 | Unique constraint | `UQ_<Table>_<Columns>` | `UQ_Budgets_UserId_Year_Month` |
-| Default | `DF_<Table>_<Column>` | `DF_BudgetGroups_IsIncome` |
+| Default | `DF_<Table>_<Column>` | `DF_LineItems_IsIncome` |
 | Check | `CK_<Table>_<Rule>` | `CK_Budgets_MonthRange` |
 | Index / unique index | `IX_`/`UX_<Table>_<Columns>` | `IX_SyncLog_AccountId_SyncedAt` |
 
@@ -81,7 +81,6 @@ Unique constraint: (UserId, Year, Month)
 | Id | int | PK, identity |
 | BudgetId | int | FK → Budgets |
 | Name | nvarchar(256) | |
-| IsIncome | bit | true for the income group |
 | SortOrder | int | starts at 0 |
 | CreatedAt | datetime2 | |
 | UpdatedAt | datetime2 | |
@@ -94,6 +93,7 @@ Unique constraint: (UserId, Year, Month)
 | GroupId | int | FK → BudgetGroups |
 | Name | nvarchar(256) | |
 | PlannedAmount | decimal(18,2) | |
+| IsIncome | bit | moved from BudgetGroups (migration 019) — income-ness is a line item property; a budget always keeps at least one |
 | SortOrder | int | starts at 0 |
 | Notes | nvarchar(max) | NOT NULL, default `''` (migration 018) |
 | PreviousLineItemId | int | FK → LineItems (self), null. Links this month's line item to its prior-month counterpart — this chain is what rollover walks |

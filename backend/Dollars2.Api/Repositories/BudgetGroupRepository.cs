@@ -16,7 +16,7 @@ public class BudgetGroupRepository
     public async Task<IEnumerable<BudgetGroup>> GetByBudgetIdAsync(int budgetId)
     {
         return await _db.Connection.QueryAsync<BudgetGroup>(
-            "SELECT Id, BudgetId, Name, IsIncome, SortOrder, CreatedAt, UpdatedAt FROM BudgetGroups WHERE BudgetId = @budgetId ORDER BY SortOrder",
+            "SELECT Id, BudgetId, Name, SortOrder, CreatedAt, UpdatedAt FROM BudgetGroups WHERE BudgetId = @budgetId ORDER BY SortOrder",
             new { budgetId },
             _db.CurrentTransaction);
     }
@@ -24,16 +24,16 @@ public class BudgetGroupRepository
     public async Task<BudgetGroup?> GetByIdAsync(int id)
     {
         return await _db.Connection.QuerySingleOrDefaultAsync<BudgetGroup>(
-            "SELECT Id, BudgetId, Name, IsIncome, SortOrder, CreatedAt, UpdatedAt FROM BudgetGroups WHERE Id = @id",
+            "SELECT Id, BudgetId, Name, SortOrder, CreatedAt, UpdatedAt FROM BudgetGroups WHERE Id = @id",
             new { id },
             _db.CurrentTransaction);
     }
 
-    public async Task<int> CreateAsync(int budgetId, string name, bool isIncome, int sortOrder)
+    public async Task<int> CreateAsync(int budgetId, string name, int sortOrder)
     {
         return await _db.Connection.QuerySingleAsync<int>(
-            "INSERT INTO BudgetGroups (BudgetId, Name, IsIncome, SortOrder, CreatedAt, UpdatedAt) VALUES (@budgetId, @name, @isIncome, @sortOrder, SYSUTCDATETIME(), SYSUTCDATETIME()); SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { budgetId, name, isIncome, sortOrder },
+            "INSERT INTO BudgetGroups (BudgetId, Name, SortOrder, CreatedAt, UpdatedAt) VALUES (@budgetId, @name, @sortOrder, SYSUTCDATETIME(), SYSUTCDATETIME()); SELECT CAST(SCOPE_IDENTITY() AS INT)",
+            new { budgetId, name, sortOrder },
             _db.CurrentTransaction);
     }
 

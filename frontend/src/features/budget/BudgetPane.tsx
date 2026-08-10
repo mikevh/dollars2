@@ -16,17 +16,15 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
   const [addingGroup, setAddingGroup] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
 
-  const incomeGroup = budget.groups.find((g) => g.isIncome)
-  const expenseGroups = budget.groups.filter((g) => !g.isIncome)
+  const allLineItems = budget.groups.flatMap((group) => group.lineItems)
 
-  const totalIncomePlanned = incomeGroup
-    ? incomeGroup.lineItems.reduce((sum, item) => sum + item.plannedAmount, 0)
-    : 0
+  const totalIncomePlanned = allLineItems
+    .filter((item) => item.isIncome)
+    .reduce((sum, item) => sum + item.plannedAmount, 0)
 
-  const totalExpensesPlanned = expenseGroups.reduce(
-    (sum, group) => sum + group.lineItems.reduce((s, item) => s + item.plannedAmount, 0),
-    0
-  )
+  const totalExpensesPlanned = allLineItems
+    .filter((item) => !item.isIncome)
+    .reduce((sum, item) => sum + item.plannedAmount, 0)
 
   const leftToBudget = totalIncomePlanned - totalExpensesPlanned
 
@@ -34,17 +32,12 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
   // The income branch is load-bearing: spentAmount is the negated net of a line item's assignments,
   // so on an income item it equals -receivedAmount, and a sign-blind loop would add already-received
   // income on top of planned. See issue #73 for whether this total should net out received income.
-  const budgetTotal = budget.groups.reduce(
-    (sum, group) =>
+  const budgetTotal = allLineItems.reduce(
+    (sum, item) =>
       sum +
-      group.lineItems.reduce(
-        (s, item) =>
-          s +
-          (group.isIncome
-            ? item.plannedAmount
-            : item.plannedAmount + item.rolloverAmount - item.spentAmount),
-        0
-      ),
+      (item.isIncome
+        ? item.plannedAmount
+        : item.plannedAmount + item.rolloverAmount - item.spentAmount),
     0
   )
   const budgetVsAccounts = budget.accountBalanceTotal - budgetTotal
@@ -98,8 +91,7 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
         )}
       </div>
 
-      {incomeGroup && <BudgetGroupCard group={incomeGroup} onSelectLineItem={onSelectLineItem} />}
-      {expenseGroups.map((group) => (
+      {budget.groups.map((group) => (
         <BudgetGroupCard key={group.id} group={group} onSelectLineItem={onSelectLineItem} />
       ))}
 

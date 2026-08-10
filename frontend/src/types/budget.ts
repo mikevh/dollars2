@@ -9,7 +9,6 @@ export interface BudgetResponse {
 export interface BudgetGroupResponse {
   id: number
   name: string
-  isIncome: boolean
   sortOrder: number
   lineItems: LineItemResponse[]
 }
@@ -18,6 +17,7 @@ export interface LineItemResponse {
   id: number
   name: string
   plannedAmount: number
+  isIncome: boolean
   spentAmount: number
   receivedAmount: number
   rolloverAmount: number

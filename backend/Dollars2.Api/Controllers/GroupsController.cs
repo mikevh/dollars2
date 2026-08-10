@@ -52,7 +52,7 @@ public class GroupsController : DollarsControllerBase
     [HttpPost("{groupId}/line-items")]
     public async Task<IActionResult> CreateLineItem(int groupId, [FromBody] CreateLineItemRequest request)
     {
-        var result = await _budgetService.CreateLineItemAsync(groupId, request.Name, request.PlannedAmount, GetUserId());
+        var result = await _budgetService.CreateLineItemAsync(groupId, request.Name, request.PlannedAmount, request.IsIncome, GetUserId());
         if (result.Error is not null)
         {
             return BadRequest(result);

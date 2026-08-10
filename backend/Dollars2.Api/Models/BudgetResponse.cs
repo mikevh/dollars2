@@ -13,7 +13,6 @@ public class BudgetGroupResponse
 {
     public int Id { get; set; }
     public required string Name { get; set; }
-    public bool IsIncome { get; set; }
     public int SortOrder { get; set; }
     public required List<LineItemResponse> LineItems { get; set; }
 }
@@ -23,6 +22,7 @@ public class LineItemResponse
     public int Id { get; set; }
     public required string Name { get; set; }
     public decimal PlannedAmount { get; set; }
+    public bool IsIncome { get; set; }
     public decimal SpentAmount { get; set; }
     public decimal ReceivedAmount { get; set; }
     public decimal RolloverAmount { get; set; }

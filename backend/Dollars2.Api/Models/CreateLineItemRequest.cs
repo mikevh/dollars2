@@ -10,4 +10,6 @@ public class CreateLineItemRequest
 
     [Range(0, double.MaxValue)]
     public decimal PlannedAmount { get; set; }
+
+    public bool IsIncome { get; set; }
 }

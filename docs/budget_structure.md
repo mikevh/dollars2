@@ -10,16 +10,25 @@
 - Past months are fully editable (planned amounts, transaction assignments)
 - Data is requeried each time the user navigates to a month (rollover recalculated on the fly)
 
-## Income Group
+## Income Line Items
 
-- Fixed group pinned at the top, cannot be deleted or reordered
-- User adds income line items (Paycheck 1, Paycheck 2, Side Hustle, etc.)
+- Income-ness is a property of a line item, not a group — a group is nothing but a UI grouping/sorting
+  container, and any group can hold a mix of income and expense line items
+- A new budget seeds an "Income" group containing one income line item ("Paycheck", planned $0) so
+  there's always something for the next rule to hold onto
+- A budget must always keep at least one income line item — deleting the last one is blocked
+- `+ Add Item` infers whether the new line item is income from the group's existing items: an
+  all-income group produces another income item, an empty group or one with any expense item
+  produces an expense item (no manual income/expense toggle in the UI)
 - Income line items show: planned, received, remaining
 - Income does NOT roll over — fresh each month
 
-## Expense Groups
+## Groups
 
-- User creates their own groups (no pre-populated defaults)
+- User creates their own groups; the seeded "Income" group is ordinary in every respect —
+  renameable, reorderable, deletable like any other
+- A group's column header reads "Received" when every line item in it is income, "Spent" otherwise
+  (an empty group reads "Spent")
 - Groups can be reordered via drag-and-drop
 - A group can only be deleted if it contains no line items
 
@@ -31,7 +40,8 @@
 - Each line item shows: planned (this month), spent (sum of assigned transactions), remaining (planned + rollover - spent)
 - Planned amount can be $0
 - Negative remaining is displayed with red text
-- A line item can only be deleted if it has zero balance and no synced transactions assigned to it
+- A line item can only be deleted if it has zero balance and no synced transactions assigned to it,
+  and — for an income line item — only if it is not the last income line item in the budget
 
 ## Zero-Based Equation
 

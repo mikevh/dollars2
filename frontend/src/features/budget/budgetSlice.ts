@@ -82,8 +82,8 @@ export const deleteGroup = createAsyncThunk(
 
 export const createLineItem = createAsyncThunk(
   'budget/createLineItem',
-  async ({ groupId, name, plannedAmount }: { groupId: number; name: string; plannedAmount: number }, { rejectWithValue }) => {
-    const result = await api.post<LineItemResponse>(`/api/groups/${groupId}/line-items`, { name, plannedAmount })
+  async ({ groupId, name, plannedAmount, isIncome }: { groupId: number; name: string; plannedAmount: number; isIncome: boolean }, { rejectWithValue }) => {
+    const result = await api.post<LineItemResponse>(`/api/groups/${groupId}/line-items`, { name, plannedAmount, isIncome })
     if (result.error) {
       return rejectWithValue(result.error.message)
     }

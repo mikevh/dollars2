@@ -6,6 +6,7 @@ public class LineItem
     public int GroupId { get; set; }
     public required string Name { get; set; }
     public decimal PlannedAmount { get; set; }
+    public bool IsIncome { get; set; }
     public int SortOrder { get; set; }
     public string Notes { get; set; } = "";
     public int? PreviousLineItemId { get; set; }

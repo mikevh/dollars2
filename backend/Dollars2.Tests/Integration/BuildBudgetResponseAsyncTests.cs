@@ -32,21 +32,21 @@ public sealed class BuildBudgetResponseAsyncTests
             var userId = await SeedUserAsync(db, "rollover-chain@example.com");
 
             var mayBudgetId = await SeedBudgetAsync(db, userId, 2026, 5);
-            var mayGroupId = await SeedGroupAsync(db, mayBudgetId, "Bills", isIncome: false, sortOrder: 0);
+            var mayGroupId = await SeedGroupAsync(db, mayBudgetId, "Bills", sortOrder: 0);
             var mayWaterId = await SeedLineItemAsync(db, mayGroupId, "Water", plannedAmount: 40m, sortOrder: 0);
             await AssignAsync(db, userId, mayWaterId, -10m); // May leftover: 40 + (-10) = 30
 
             var juneBudgetId = await SeedBudgetAsync(db, userId, 2026, 6);
-            var juneGroupId = await SeedGroupAsync(db, juneBudgetId, "Bills", isIncome: false, sortOrder: 0);
+            var juneGroupId = await SeedGroupAsync(db, juneBudgetId, "Bills", sortOrder: 0);
             var juneWaterId = await SeedLineItemAsync(db, juneGroupId, "Water", plannedAmount: 50m, sortOrder: 0, previousLineItemId: mayWaterId);
             await AssignAsync(db, userId, juneWaterId, -20m); // June leftover: 50 + (-20) = 30
 
             var julyBudgetId = await SeedBudgetAsync(db, userId, 2026, 7);
-            var incomeGroupId = await SeedGroupAsync(db, julyBudgetId, "Income", isIncome: true, sortOrder: 0);
-            var paycheckId = await SeedLineItemAsync(db, incomeGroupId, "Paycheck", plannedAmount: 1000m, sortOrder: 0);
+            var incomeGroupId = await SeedGroupAsync(db, julyBudgetId, "Income", sortOrder: 0);
+            var paycheckId = await SeedLineItemAsync(db, incomeGroupId, "Paycheck", plannedAmount: 1000m, sortOrder: 0, isIncome: true);
             await AssignAsync(db, userId, paycheckId, 900m);
 
-            var billsGroupId = await SeedGroupAsync(db, julyBudgetId, "Bills", isIncome: false, sortOrder: 1);
+            var billsGroupId = await SeedGroupAsync(db, julyBudgetId, "Bills", sortOrder: 1);
             // Seed Rent before Water but give it a higher SortOrder, so a correctness check on
             // ordering actually exercises the ORDER BY rather than matching insertion order by luck.
             var rentId = await SeedLineItemAsync(db, billsGroupId, "Rent", plannedAmount: 800m, sortOrder: 1);
@@ -108,7 +108,7 @@ public sealed class BuildBudgetResponseAsyncTests
 
             for (var g = 0; g < groupCount; g++)
             {
-                var groupId = await SeedGroupAsync(db, budgetId, $"Group {g}", isIncome: false, sortOrder: g);
+                var groupId = await SeedGroupAsync(db, budgetId, $"Group {g}", sortOrder: g);
                 for (var i = 0; i < itemsPerGroup; i++)
                 {
                     var itemId = await SeedLineItemAsync(db, groupId, $"Item {g}-{i}", plannedAmount: 100m, sortOrder: i);
@@ -173,23 +173,23 @@ public sealed class BuildBudgetResponseAsyncTests
             db.CurrentTransaction);
     }
 
-    private static async Task<int> SeedGroupAsync(DbSession db, int budgetId, string name, bool isIncome, int sortOrder)
+    private static async Task<int> SeedGroupAsync(DbSession db, int budgetId, string name, int sortOrder)
     {
         return await db.Connection.QuerySingleAsync<int>(
-            @"INSERT INTO BudgetGroups (BudgetId, Name, IsIncome, SortOrder, CreatedAt, UpdatedAt)
-              VALUES (@budgetId, @name, @isIncome, @sortOrder, SYSUTCDATETIME(), SYSUTCDATETIME());
+            @"INSERT INTO BudgetGroups (BudgetId, Name, SortOrder, CreatedAt, UpdatedAt)
+              VALUES (@budgetId, @name, @sortOrder, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { budgetId, name, isIncome, sortOrder },
+            new { budgetId, name, sortOrder },
             db.CurrentTransaction);
     }
 
-    private static async Task<int> SeedLineItemAsync(DbSession db, int groupId, string name, decimal plannedAmount, int sortOrder, int? previousLineItemId = null)
+    private static async Task<int> SeedLineItemAsync(DbSession db, int groupId, string name, decimal plannedAmount, int sortOrder, int? previousLineItemId = null, bool isIncome = false)
     {
         return await db.Connection.QuerySingleAsync<int>(
-            @"INSERT INTO LineItems (GroupId, Name, PlannedAmount, SortOrder, PreviousLineItemId, CreatedAt, UpdatedAt)
-              VALUES (@groupId, @name, @plannedAmount, @sortOrder, @previousLineItemId, SYSUTCDATETIME(), SYSUTCDATETIME());
+            @"INSERT INTO LineItems (GroupId, Name, PlannedAmount, IsIncome, SortOrder, PreviousLineItemId, CreatedAt, UpdatedAt)
+              VALUES (@groupId, @name, @plannedAmount, @isIncome, @sortOrder, @previousLineItemId, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { groupId, name, plannedAmount, sortOrder, previousLineItemId },
+            new { groupId, name, plannedAmount, isIncome, sortOrder, previousLineItemId },
             db.CurrentTransaction);
     }
 }
