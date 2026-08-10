@@ -166,7 +166,7 @@ public class PlaidProvider : IBankSyncProvider
                 throw new InvalidOperationException(
                     $"Plaid /transactions/sync failed: {error?.ErrorCode} - {error?.ErrorMessage}");
             }
-
+            _logger.LogTrace("Plaid raw response {response}", response.RawJson);
             var rawPage = ReadRawPage(response.RawJson, response.Added.Count, response.Modified.Count, _logger);
 
             // Zip rather than a lookup by transaction_id: a transaction can appear in `added` on one page
