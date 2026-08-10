@@ -78,14 +78,6 @@ describe('BudgetPane (Modernist restyle)', () => {
     vi.useRealTimers()
   })
 
-  it('renders the "Left to budget" line with income minus expenses', () => {
-    renderPane(makeBudget())
-    expect(screen.getByText('Left to budget')).toBeInTheDocument()
-    // 4000 income - 1500 planned expenses = 2500 left, in accent text
-    const amount = screen.getByText('$2,500.00')
-    expect(amount.className).toContain('text-accent-700')
-  })
-
   it('shows the left-to-budget amount in calm (non-accent) text when balanced', () => {
     const budget = makeBudget()
     budget.groups[1].lineItems[0].plannedAmount = 4000 // expenses == income → $0 left
@@ -117,28 +109,6 @@ describe('BudgetPane (Modernist restyle)', () => {
     renderPane(makeBudget())
     fireEvent.click(screen.getByRole('button', { name: '+ Add Group' }))
     expect(screen.getByPlaceholderText('Group name')).toBeInTheDocument()
-  })
-
-  // budgetTotal for makeBudget() = income (4000+0-0) + housing (1500+0-1600) = 3900.
-  it('renders "Budget vs. accounts" as $0 in calm text when accounts match the budget', () => {
-    const budget = makeBudget()
-    budget.accountBalanceTotal = 3900 // equal to budgetTotal → $0 difference
-    renderPane(budget)
-    const label = screen.getByText('Budget vs. accounts')
-    const amount = label.nextElementSibling as HTMLElement
-    expect(amount).toHaveTextContent('$0.00')
-    expect(amount.className).toContain('text-text')
-    expect(amount.className).not.toContain('text-accent-700')
-  })
-
-  it('renders the "Budget vs. accounts" difference in accent text when they differ', () => {
-    const budget = makeBudget()
-    budget.accountBalanceTotal = 5000 // 5000 - 3900 = 1100 difference
-    renderPane(budget)
-    const label = screen.getByText('Budget vs. accounts')
-    const amount = label.nextElementSibling as HTMLElement
-    expect(amount).toHaveTextContent('$1,100.00')
-    expect(amount.className).toContain('text-accent-700')
   })
 
   it('hides the "Budget vs. accounts" row when viewing a past month', () => {

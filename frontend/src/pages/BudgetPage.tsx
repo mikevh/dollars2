@@ -125,7 +125,7 @@ export default function BudgetPage()
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex min-h-screen flex-col bg-bg pb-14 text-text" onClick={() => setSelectedLineItemId(null)}>
+      <div className="flex min-h-screen flex-col bg-[var(--app-bg)] pb-14 text-text" onClick={() => setSelectedLineItemId(null)}>
         <MonthNav />
 
         <div className="mx-auto flex w-full max-w-295 items-start gap-6 px-4 py-6">

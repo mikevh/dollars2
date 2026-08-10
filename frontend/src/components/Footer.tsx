@@ -40,7 +40,7 @@ export default function Footer() {
   }
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 flex items-center justify-between border-t-2 border-divider bg-surface px-4 py-2 text-[12px] text-text">
+    <footer className="fixed bottom-0 left-0 right-0 flex items-center justify-between border-t border-divider bg-[var(--app-card)] px-5 py-2 text-[14px] text-text">
       <div className="flex items-center gap-2">
         <button
           onClick={cycleTheme}
@@ -57,7 +57,7 @@ export default function Footer() {
             href={kibanaUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn btn-ghost text-[12px]"
+            className="btn btn-ghost text-[14px]"
             title="Logs"
           >
             <FontAwesomeIcon icon={faChartLine} className="h-[15px] w-[15px]" />
@@ -74,7 +74,7 @@ export default function Footer() {
       <div className="flex items-center gap-1">
         <Link
           to={onAccounts ? '/' : '/accounts'}
-          className="btn btn-ghost text-[12px]"
+          className="btn btn-ghost text-[14px]"
           title={onAccounts ? 'Budget' : 'Accounts'}
         >
           <FontAwesomeIcon icon={onAccounts ? faList : faBuildingColumns} className="h-[15px] w-[15px]" />
