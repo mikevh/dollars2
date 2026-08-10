@@ -201,12 +201,27 @@ describe('TransactionEditDialog', () => {
     ])
   })
 
-  it('deletes an unassigned manual transaction, then mutates and closes', async () => {
+  it('deletes an unassigned manual transaction after confirming, then mutates and closes', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const { onMutate, onClose } = renderDialog(makeTransaction())
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
     // handleDelete awaits the (mocked) API then mutates + closes
     await vi.waitFor(() => expect(onMutate).toHaveBeenCalledTimes(1))
     expect(onClose).toHaveBeenCalledTimes(1)
+    confirmSpy.mockRestore()
+  })
+
+  it('does not delete when the confirmation is cancelled', () => {
+    vi.mocked(api.delete).mockClear()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const { onMutate, onClose } = renderDialog(makeTransaction())
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
+    expect(api.delete).not.toHaveBeenCalled()
+    expect(onMutate).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+    confirmSpy.mockRestore()
   })
 })
 

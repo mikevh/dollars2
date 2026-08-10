@@ -87,6 +87,9 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
   };
 
   const handleHardDelete = async (id: number) => {
+    if (!window.confirm('Permanently delete this transaction? This cannot be undone.')) {
+      return;
+    }
     const result = await dispatch(hardDeleteTransaction({ id }));
 
     if (hardDeleteTransaction.rejected.match(result)) {
