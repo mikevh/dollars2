@@ -190,6 +190,48 @@ public sealed class LineItemIsIncomeTests
         }
     }
 
+    /// <summary>
+    /// Regression: the last-income-item count originally ran before BeginTransaction, so two
+    /// concurrent deletes of two different income items could both read "2 remain" before either
+    /// delete committed and both proceed, leaving zero. CountIncomeInBudgetAsync now takes an
+    /// UPDLOCK+HOLDLOCK held for the transaction's lifetime, so the second delete blocks until the
+    /// first commits and then correctly sees the post-delete count. Regardless of which of the two
+    /// wins the race, exactly one must succeed and the other must be blocked — never both.
+    /// </summary>
+    [Fact]
+    public async Task DeleteLineItemAsync_serializes_concurrent_deletes_of_the_last_two_income_line_items_so_only_one_succeeds()
+    {
+        const string email = "delete-concurrent-income@example.com";
+        using var seedDb = _fixture.CreateSession();
+        var userId = 0;
+        try
+        {
+            userId = await SeedUserAsync(seedDb, email);
+            var budgetId = await SeedBudgetAsync(seedDb, userId, 2026, 7);
+            var groupId = await SeedGroupAsync(seedDb, budgetId, "Income");
+            var firstIncomeId = await SeedLineItemAsync(seedDb, groupId, "Paycheck 1", 0, isIncome: true);
+            var secondIncomeId = await SeedLineItemAsync(seedDb, groupId, "Paycheck 2", 0, isIncome: true);
+
+            using var dbA = _fixture.CreateSession();
+            using var dbB = _fixture.CreateSession();
+            var serviceA = BudgetServiceFor(dbA);
+            var serviceB = BudgetServiceFor(dbB);
+
+            var taskA = serviceA.DeleteLineItemAsync(firstIncomeId, userId);
+            var taskB = serviceB.DeleteLineItemAsync(secondIncomeId, userId);
+            var resultA = await taskA;
+            var resultB = await taskB;
+
+            var results = new[] { resultA, resultB };
+            Assert.Single(results, r => r.Error is null);
+            Assert.Single(results, r => r.Error?.Code == "CANNOT_DELETE_LAST_INCOME");
+        }
+        finally
+        {
+            await CleanupUserAsync(seedDb, userId);
+        }
+    }
+
     [Fact]
     public async Task DeleteLineItemAsync_does_not_block_deleting_expense_items_regardless_of_income_count()
     {

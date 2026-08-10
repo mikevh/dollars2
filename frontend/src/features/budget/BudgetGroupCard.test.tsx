@@ -151,4 +151,13 @@ describe('BudgetGroupCard income inference', () => {
     fireEvent.click(screen.getByRole('button', { name: '+ Add Item' }))
     expect(vi.mocked(api.post)).toHaveBeenCalledWith('/api/groups/20/line-items', { name: 'New Item', plannedAmount: 0, isIncome: true })
   })
+
+  // Regression: handleAddItem previously inherited from lineItems[0] directly instead of the
+  // isAllIncome check used for the column label, so a mixed group whose first item happened to be
+  // income silently diverged from the "any expense item → expense" rule and posted isIncome: true.
+  it('"+ Add Item" in a mixed group whose first item is income still posts isIncome: false', () => {
+    renderCard(makeGroup({ lineItems: [makeLineItem({ id: 1, isIncome: true }), makeLineItem({ id: 2, isIncome: false })] }))
+    fireEvent.click(screen.getByRole('button', { name: '+ Add Item' }))
+    expect(vi.mocked(api.post)).toHaveBeenCalledWith('/api/groups/20/line-items', { name: 'New Item', plannedAmount: 0, isIncome: false })
+  })
 })
