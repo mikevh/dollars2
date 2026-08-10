@@ -55,8 +55,7 @@ export default function BudgetGroupCard({ group, onSelectLineItem }: BudgetGroup
   }
 
   const handleAddItem = async () => {
-    const isIncome = group.lineItems[0]?.isIncome ?? false
-    const result = await dispatch(createLineItem({ groupId: group.id, name: 'New Item', plannedAmount: 0, isIncome }))
+    const result = await dispatch(createLineItem({ groupId: group.id, name: 'New Item', plannedAmount: 0, isIncome: isAllIncome }))
     if (createLineItem.rejected.match(result)) {
       toast.error(result.payload as string)
     } else {

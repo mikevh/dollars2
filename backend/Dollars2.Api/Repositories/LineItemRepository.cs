@@ -53,10 +53,14 @@ public class LineItemRepository
             _db.CurrentTransaction);
     }
 
+    // UPDLOCK+HOLDLOCK, held until the caller's transaction commits or rolls back, so a second
+    // concurrent call for the same budget blocks here rather than reading a stale pre-delete count
+    // — the caller (BudgetService.DeleteLineItemAsync) relies on that to keep the last-income-item
+    // check atomic with the delete.
     public async Task<int> CountIncomeInBudgetAsync(int budgetId)
     {
         return await _db.Connection.ExecuteScalarAsync<int>(
-            @"SELECT COUNT(*) FROM LineItems li
+            @"SELECT COUNT(*) FROM LineItems li WITH (UPDLOCK, HOLDLOCK)
               INNER JOIN BudgetGroups bg ON bg.Id = li.GroupId
               WHERE bg.BudgetId = @budgetId AND li.IsIncome = 1",
             new { budgetId },

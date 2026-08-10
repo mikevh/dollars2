@@ -257,18 +257,24 @@ public class BudgetService
             return DollarsApiResponse<bool>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
         }
 
-        if (item.IsIncome)
-        {
-            var incomeCount = await _lineItemRepo.CountIncomeInBudgetAsync(group.BudgetId);
-            if (incomeCount <= 1)
-            {
-                return DollarsApiResponse<bool>.Fail("Cannot delete the last income line item.", "CANNOT_DELETE_LAST_INCOME");
-            }
-        }
-
         _dbSession.BeginTransaction();
         try
         {
+            // The count and the delete must share this transaction: CountIncomeInBudgetAsync takes
+            // an update lock held until commit, so a second concurrent delete of a different income
+            // item blocks here instead of also reading the pre-delete count — without that, two
+            // near-simultaneous deletes of separate income items could both see "2 remain" and both
+            // proceed, leaving zero.
+            if (item.IsIncome)
+            {
+                var incomeCount = await _lineItemRepo.CountIncomeInBudgetAsync(group.BudgetId);
+                if (incomeCount <= 1)
+                {
+                    _dbSession.Rollback();
+                    return DollarsApiResponse<bool>.Fail("Cannot delete the last income line item.", "CANNOT_DELETE_LAST_INCOME");
+                }
+            }
+
             await _lineItemRepo.ClearPreviousLinkAsync(id);
             await _assignmentRepo.DeleteByLineItemIdAsync(id);
             await _lineItemRepo.DeleteAsync(id);
