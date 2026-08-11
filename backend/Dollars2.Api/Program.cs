@@ -141,6 +141,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 builder.Services.AddExceptionHandler<DollarsExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
