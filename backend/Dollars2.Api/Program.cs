@@ -89,9 +89,14 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins(frontendUrl)
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+        if(frontendUrl.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase))
+        {
+            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        }
+        else
+        {   
+            policy.WithOrigins(frontendUrl).AllowAnyHeader().AllowAnyMethod();
+        }
     });
 });
 
