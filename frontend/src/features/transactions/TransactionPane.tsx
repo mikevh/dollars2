@@ -129,6 +129,7 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
             >
               {tabs.map((tab) => {
                 const count = counts[tab.key]
+                const isActive = tab.key === activeTab
                 return (
                   <button
                     key={tab.key}
@@ -136,7 +137,10 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
                     onClick={() => { dispatch(setActiveTab(tab.key)); setListMenuOpen(false) }}
                     className="flex h-11 w-full items-center justify-between px-3 text-sm normal-case tracking-normal text-text hover:bg-[var(--app-hover)]"
                   >
-                    <span>{tab.label}</span>
+                    <span className="flex items-center gap-1.5">
+                      {tab.label}
+                      {isActive && <CheckIcon />}
+                    </span>
                     {count > 0 && (
                       <span className="rounded-full bg-[var(--color-neutral-200)] px-1.5 py-0.5 text-[11px] font-bold leading-none tabular-nums text-[var(--color-neutral-700)]">
                         {count}
@@ -148,7 +152,9 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
             </div>
           )}
         </div>
-        <span className="text-xs font-medium tabular-nums text-muted">{filteredTransactions.length}</span>
+        {!loading && (
+          <span className="text-xs font-medium tabular-nums text-muted">{filteredTransactions.length}</span>
+        )}
       </div>
       {/* SEARCH BOX */}
       <div className="border-b border-divider px-4 py-3">
@@ -231,6 +237,14 @@ function ChevronIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
       <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 011.06 0L10 11.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 9.28a.75.75 0 010-1.06z" clipRule="evenodd" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-[var(--color-accent)]">
+      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
     </svg>
   )
 }
