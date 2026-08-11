@@ -199,7 +199,7 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
   const rangeEnd = Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalCount)
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg pb-14 text-text">
+    <div className="flex min-h-screen flex-col bg-[var(--app-bg)] pb-14 text-text">
       <div className="relative flex items-center border-b-2 border-divider px-4 py-3">
         <Link to="/accounts" className="btn btn-ghost text-[13px]" title="Back to accounts">
           <FontAwesomeIcon icon={faArrowLeft} className="h-[13px] w-[13px]" />
@@ -218,7 +218,7 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
         )}
       </div>
 
-      <div className="mx-auto w-full max-w-[860px] px-4 py-6">
+      <div className="mx-auto w-full max-w-[900px] px-4 py-6">
         {loading && !data && <div className="text-muted py-12 text-center">Loading...</div>}
 
         {!data && error && <div className="py-12 text-center text-accent">{error}</div>}
@@ -249,11 +249,21 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto border border-divider bg-surface shadow-elev-sm">
+              <div className="card overflow-x-auto">
                 <table
-                  className={`w-full text-[14px] ${loading ? 'opacity-60' : ''}`}
+                  className={`w-full [table-layout:fixed] text-[14px] ${loading ? 'opacity-60' : ''}`}
                   aria-busy={loading}
                 >
+                  {/* Approximates the handoff's minmax() grid (110-130 / 160-1fr / 110-140 /
+                      120-190, 16px gap) on a real <table>: HTML column sizing has no minmax or
+                      gap primitive, so the three constrained columns get a fixed midpoint width
+                      and Description — the only 1fr track — is left unset to absorb the rest. */}
+                  <colgroup>
+                    <col style={{ width: '120px' }} />
+                    <col />
+                    <col style={{ width: '125px' }} />
+                    <col style={{ width: '155px' }} />
+                  </colgroup>
                   <thead>
                     {table.getHeaderGroups().map((headerGroup) => (
                       <tr
@@ -288,7 +298,7 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
                                           ? faSortDown
                                           : faSort
                                     }
-                                    className={`h-[11px] w-[11px] ${sorted ? '' : 'opacity-40'}`}
+                                    className={`h-[11px] w-[11px] ${sorted ? '' : 'opacity-[0.35]'}`}
                                   />
                                 </button>
                               ) : (
@@ -314,17 +324,17 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
                           <td className="px-4 py-2">
                             <span className="align-middle">{t.payee || t.description}</span>
                             {t.isManual && (
-                              <span className="text-muted ml-2 border border-divider px-1 text-[11px] uppercase tracking-wide no-underline">
+                              <span className="text-muted ml-2 rounded-[4px] border border-divider px-1 text-[11px] uppercase tracking-wide no-underline">
                                 manual
                               </span>
                             )}
                             {t.isPending && (
-                              <span className="text-muted ml-2 border border-divider px-1 text-[11px] uppercase tracking-wide no-underline">
+                              <span className="text-muted ml-2 rounded-[4px] border border-divider px-1 text-[11px] uppercase tracking-wide no-underline">
                                 pending
                               </span>
                             )}
                             {t.isDeleted && (
-                              <span className="text-accent ml-2 border border-divider px-1 text-[11px] uppercase tracking-wide no-underline">
+                              <span className="ml-2 rounded-[4px] border border-[var(--app-blue)] px-1 text-[11px] uppercase tracking-wide text-[var(--app-blue)] no-underline">
                                 deleted
                               </span>
                             )}
@@ -370,7 +380,7 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
                     type="checkbox"
                     checked={showDeleted}
                     onChange={handleShowDeletedChange}
-                    className="accent-accent h-[13px] w-[13px] cursor-pointer"
+                    className="accent-[var(--app-blue)] h-[13px] w-[13px] cursor-pointer"
                   />
                   <span>Show deleted</span>
                 </label>
