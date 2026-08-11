@@ -27,13 +27,16 @@ public class LineItemRepository
     /// sort order so callers can bucket by GroupId and keep each group's items in display order.</summary>
     public async Task<IEnumerable<LineItem>> GetByBudgetIdAsync(int budgetId)
     {
-        return await _db.Connection.QueryAsync<LineItem>(
-            @"SELECT li.Id, li.GroupId, li.BudgetId, li.Name, li.PlannedAmount, li.IsIncome, li.SortOrder, li.Notes, li.PreviousLineItemId, li.CreatedAt, li.UpdatedAt
+        var rv = await _db.Connection.QueryAsync<LineItem>(
+            @"SELECT li.Id, li.GroupId, bg.BudgetId, li.Name, li.PlannedAmount, li.IsIncome, li.SortOrder, li.Notes, li.PreviousLineItemId, li.CreatedAt, li.UpdatedAt
               FROM LineItems li
-              WHERE li.BudgetId = @budgetId
+                LEFT JOIN BudgetGroups bg ON bg.Id = li.GroupId                
+              WHERE bg.BudgetId = @budgetId
               ORDER BY li.GroupId, li.SortOrder",
             new { budgetId },
             _db.CurrentTransaction);
+
+        return rv;
     }
 
     public async Task<LineItem?> GetByIdAsync(int id)
