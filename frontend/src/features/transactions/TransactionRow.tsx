@@ -17,7 +17,7 @@ export default function TransactionRow({ transaction, actions, draggable, onClic
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `transaction-${transaction.id}`,
-    data: { transaction },
+    data: { type: 'transaction', transaction },
     disabled: !draggable,
   })
 

@@ -113,6 +113,28 @@ export const deleteLineItem = createAsyncThunk(
   }
 )
 
+export const reorderGroups = createAsyncThunk(
+  'budget/reorderGroups',
+  async ({ budgetId, ids }: { budgetId: number; ids: number[] }, { rejectWithValue }) => {
+    const result = await api.put<boolean>(`/api/groups/reorder?budgetId=${budgetId}`, { ids })
+    if (result.error) {
+      return rejectWithValue(result.error.message)
+    }
+    return true
+  }
+)
+
+export const reorderLineItems = createAsyncThunk(
+  'budget/reorderLineItems',
+  async ({ groupId, ids }: { groupId: number; ids: number[] }, { rejectWithValue }) => {
+    const result = await api.put<boolean>(`/api/groups/${groupId}/line-items/reorder`, { ids })
+    if (result.error) {
+      return rejectWithValue(result.error.message)
+    }
+    return true
+  }
+)
+
 const budgetSlice = createSlice({
   name: 'budget',
   initialState,
@@ -147,6 +169,34 @@ const budgetSlice = createSlice({
           break
         }
       }
+    },
+    reorderGroupsLocally(state, action: { payload: { ids: number[] } }) {
+      if (!state.budget) {
+        return
+      }
+      const byId = new Map(state.budget.groups.map((g) => [g.id, g]))
+      const reordered = action.payload.ids.map((id) => byId.get(id)).filter((g) => g !== undefined)
+      // A concurrent fetchBudget landing between the drag ending and this dispatch could
+      // replace state.budget with a different set of groups — skip rather than drop groups.
+      if (reordered.length !== state.budget.groups.length) {
+        return
+      }
+      state.budget.groups = reordered
+    },
+    reorderLineItemsLocally(state, action: { payload: { groupId: number; ids: number[] } }) {
+      if (!state.budget) {
+        return
+      }
+      const group = state.budget.groups.find((g) => g.id === action.payload.groupId)
+      if (!group) {
+        return
+      }
+      const byId = new Map(group.lineItems.map((li) => [li.id, li]))
+      const reordered = action.payload.ids.map((id) => byId.get(id)).filter((li) => li !== undefined)
+      if (reordered.length !== group.lineItems.length) {
+        return
+      }
+      group.lineItems = reordered
     },
   },
   extraReducers: (builder) => {
@@ -223,5 +273,5 @@ const budgetSlice = createSlice({
   },
 })
 
-export const { nextMonth, prevMonth, applyTransactionAssignment } = budgetSlice.actions
+export const { nextMonth, prevMonth, applyTransactionAssignment, reorderGroupsLocally, reorderLineItemsLocally } = budgetSlice.actions
 export default budgetSlice.reducer

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { BudgetResponse } from '../../types/budget'
 import { formatCurrency } from '../../utils/format'
 import { useAppDispatch } from '../../app/hooks'
@@ -91,14 +92,16 @@ export default function BudgetPane({ budget, selectedLineItemId, onSelectLineIte
       </div>
 
       <div>
-        {budget.groups.map((group) => (
-          <BudgetGroupCard
-            key={group.id}
-            group={group}
-            selectedLineItemId={selectedLineItemId}
-            onSelectLineItem={onSelectLineItem}
-          />
-        ))}
+        <SortableContext items={budget.groups.map((group) => group.id)} strategy={verticalListSortingStrategy}>
+          {budget.groups.map((group) => (
+            <BudgetGroupCard
+              key={group.id}
+              group={group}
+              selectedLineItemId={selectedLineItemId}
+              onSelectLineItem={onSelectLineItem}
+            />
+          ))}
+        </SortableContext>
 
         {addingGroup ? (
           <div className="mb-4 flex items-center gap-2">
