@@ -73,7 +73,8 @@ public class SimplefinProvider : IBankSyncProvider
         if (!fullResync && since.HasValue)
         {
             var startDate = ((DateTimeOffset)DateTime.SpecifyKind(since.Value, DateTimeKind.Utc)).ToUnixTimeSeconds();
-            url += $"?start-date={startDate}";
+            var separator = url.Contains('?') ? '&' : '?';
+            url += $"{separator}start-date={startDate}";
         }
         else
         {
