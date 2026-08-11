@@ -1,7 +1,7 @@
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faSun, faMoon, faDesktop, faSync, faSignOutAlt, faBuildingColumns, faList, faChartLine } from '@fortawesome/free-solid-svg-icons'
+import { faSun, faMoon, faDesktop, faSignOutAlt, faBuildingColumns, faList, faChartLine } from '@fortawesome/free-solid-svg-icons'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { setTheme, type ThemeMode } from '../features/theme/themeSlice'
 import { logout } from '../features/auth/authSlice'
@@ -64,11 +64,6 @@ export default function Footer() {
             <span>Logs</span>
           </a>
         ) : null}
-      </div>
-
-      <div className="flex items-center gap-1.5 opacity-50">
-        <FontAwesomeIcon icon={faSync} className="h-3 w-3" />
-        <span>Last synced: —</span>
       </div>
 
       <div className="flex items-center gap-1">
