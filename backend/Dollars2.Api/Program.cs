@@ -9,7 +9,6 @@ using Dollars2.Api.Models;
 using Dollars2.Api.Providers;
 using Dollars2.Api.Repositories;
 using Dollars2.Api.Services;
-using Going.Plaid;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -90,7 +89,6 @@ builder.Services.AddHostedService<SyncArchiveTableInitializer>();
 builder.Services.AddHttpClient("simplefin", client =>
     client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddScoped<IBankSyncProvider, SimplefinProvider>();
-builder.Services.AddPlaid(builder.Configuration);
 builder.Services.AddScoped<IBankSyncProvider, PlaidProvider>();
 builder.Services.AddScoped<BankSyncService>();
 builder.Services.AddSingleton<SyncLockService>();

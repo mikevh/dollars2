@@ -151,6 +151,9 @@ public class PlaidProvider : IBankSyncProvider
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            // Going.Plaid's generated client exposes no CancellationToken overload on TransactionsSyncAsync
+            // (or anywhere else in its surface), so an in-flight page can't be aborted mid-call — only
+            // between pages, via the check above.
             var response = await client.TransactionsSyncAsync(new TransactionsSyncRequest
             {
                 Cursor = string.IsNullOrEmpty(cursor) ? null : cursor,
@@ -259,6 +262,14 @@ public class PlaidProvider : IBankSyncProvider
             : null;
 
     /// <summary>
+    /// Chooses the cursor to start /transactions/sync from. A user-initiated full resync forces a null
+    /// cursor so the whole Item re-streams from scratch (Plaid has no date-window parameter); otherwise
+    /// the stored cursor is reused only when the group has converged (<see cref="ResolveGroupCursor"/>).
+    /// </summary>
+    internal static string? SelectGroupCursor(bool fullResync, IReadOnlyList<(string? AccountId, string? Cursor)> group) =>
+        fullResync ? null : ResolveGroupCursor(group);
+
+    /// <summary>
     /// Chooses the cursor to sync the Plaid Item from, or null to force a full resync. The cursor is
     /// per-Item, mirrored onto each account, so a run reuses it only when every account it can actually
     /// sync already agrees on the same non-empty value. Accounts that will be skipped this run (a blank
@@ -267,14 +278,6 @@ public class PlaidProvider : IBankSyncProvider
     /// healthy siblings on every sync. A syncable account with an empty or divergent cursor (a new
     /// account, or one recovering from a failed persist) still forces the full resync it needs.
     /// </summary>
-    /// <summary>
-    /// Chooses the cursor to start /transactions/sync from. A user-initiated full resync forces a null
-    /// cursor so the whole Item re-streams from scratch (Plaid has no date-window parameter); otherwise
-    /// the stored cursor is reused only when the group has converged (<see cref="ResolveGroupCursor"/>).
-    /// </summary>
-    internal static string? SelectGroupCursor(bool fullResync, IReadOnlyList<(string? AccountId, string? Cursor)> group) =>
-        fullResync ? null : ResolveGroupCursor(group);
-
     internal static string? ResolveGroupCursor(IReadOnlyList<(string? AccountId, string? Cursor)> group)
     {
         var syncableCursors = group

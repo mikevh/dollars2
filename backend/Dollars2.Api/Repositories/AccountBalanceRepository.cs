@@ -22,17 +22,6 @@ public class AccountBalanceRepository
             _db.CurrentTransaction);
     }
 
-    public async Task<AccountBalance?> GetLatestForAccountAsync(int accountId)
-    {
-        return await _db.Connection.QuerySingleOrDefaultAsync<AccountBalance>(
-            @"SELECT TOP 1 Id, AccountId, Balance, CreatedOn, UpdatedOn
-              FROM AccountBalances
-              WHERE AccountId = @accountId
-              ORDER BY CreatedOn DESC, Id DESC",
-            new { accountId },
-            _db.CurrentTransaction);
-    }
-
     public async Task<IEnumerable<AccountBalance>> GetLatestPerAccountAsync(IEnumerable<int> accountIds)
     {
         return await _db.Connection.QueryAsync<AccountBalance>(
