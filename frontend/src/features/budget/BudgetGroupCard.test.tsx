@@ -98,6 +98,18 @@ describe('BudgetGroupCard draft re-sync', () => {
   })
 })
 
+describe('BudgetGroupCard name editor focus', () => {
+  it('focuses and selects the name editor text once it opens', async () => {
+    renderCard()
+    fireEvent.click(screen.getByRole('heading', { name: 'Housing' }))
+
+    const input = screen.getByRole('textbox') as HTMLInputElement
+    await waitFor(() => expect(input).toHaveFocus())
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(input.value.length)
+  })
+})
+
 describe('BudgetGroupCard add item', () => {
   it('creates a line item and opens it in edit mode on click', async () => {
     const newItem = {
@@ -118,7 +130,7 @@ describe('BudgetGroupCard add item', () => {
     // same as the rename tests above; the assertion retries via waitFor until the component's
     // internal editingNewItemId state (set after the dispatch resolves) has caught up.
     const { setGroup } = renderCard()
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Item' }))
+    fireEvent.click(screen.getByRole('button', { name: '+ Add item' }))
 
     // The group starts with no line items, so isIncome inherits the "empty group → expense" default.
     expect(vi.mocked(api.post)).toHaveBeenCalledWith('/api/groups/20/line-items', { name: 'New Item', plannedAmount: 0, isIncome: false })
@@ -131,33 +143,69 @@ describe('BudgetGroupCard add item', () => {
 })
 
 describe('BudgetGroupCard income inference', () => {
-  it('renders "Received" only when every item in the group is income', () => {
+  it('offers "Received" as the metric alternative when every item in the group is income', () => {
     renderCard(makeGroup({ lineItems: [makeLineItem({ isIncome: true })] }))
+    fireEvent.click(screen.getByRole('button', { name: /Remaining/ }))
     expect(screen.getByText('Received')).toBeInTheDocument()
   })
 
-  it('renders "Spent" for an empty group', () => {
+  it('offers "Spent" as the metric alternative for an empty group', () => {
     renderCard(makeGroup({ lineItems: [] }))
+    fireEvent.click(screen.getByRole('button', { name: /Remaining/ }))
     expect(screen.getByText('Spent')).toBeInTheDocument()
   })
 
-  it('renders "Spent" when the group mixes income and expense items', () => {
+  it('offers "Spent" as the metric alternative when the group mixes income and expense items', () => {
     renderCard(makeGroup({ lineItems: [makeLineItem({ id: 1, isIncome: true }), makeLineItem({ id: 2, isIncome: false })] }))
+    fireEvent.click(screen.getByRole('button', { name: /Remaining/ }))
     expect(screen.getByText('Spent')).toBeInTheDocument()
   })
 
-  it('"+ Add Item" in an all-income group posts isIncome: true', () => {
+  it('"+ Add income" in an all-income group posts isIncome: true', () => {
     renderCard(makeGroup({ lineItems: [makeLineItem({ isIncome: true })] }))
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Item' }))
+    fireEvent.click(screen.getByRole('button', { name: '+ Add income' }))
     expect(vi.mocked(api.post)).toHaveBeenCalledWith('/api/groups/20/line-items', { name: 'New Item', plannedAmount: 0, isIncome: true })
   })
 
   // Regression: handleAddItem previously inherited from lineItems[0] directly instead of the
-  // isAllIncome check used for the column label, so a mixed group whose first item happened to be
-  // income silently diverged from the "any expense item → expense" rule and posted isIncome: true.
-  it('"+ Add Item" in a mixed group whose first item is income still posts isIncome: false', () => {
+  // isAllIncome check used for the dropdown label, so a mixed group whose first item happened to
+  // be income silently diverged from the "any expense item → expense" rule and posted isIncome: true.
+  it('"+ Add item" in a mixed group whose first item is income still posts isIncome: false', () => {
     renderCard(makeGroup({ lineItems: [makeLineItem({ id: 1, isIncome: true }), makeLineItem({ id: 2, isIncome: false })] }))
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Item' }))
+    fireEvent.click(screen.getByRole('button', { name: '+ Add item' }))
     expect(vi.mocked(api.post)).toHaveBeenCalledWith('/api/groups/20/line-items', { name: 'New Item', plannedAmount: 0, isIncome: false })
+  })
+})
+
+describe('BudgetGroupCard metric dropdown', () => {
+  it('switches the line item and footer figures when a menu option is selected', () => {
+    renderCard(makeGroup({ lineItems: [makeLineItem({ id: 1, plannedAmount: 200, spentAmount: 50 })] }))
+    // Remaining = planned + rollover - spent = 150, shown once in the row and once in the footer total.
+    expect(screen.getAllByText('$150.00')).toHaveLength(2)
+
+    fireEvent.click(screen.getByRole('button', { name: /Remaining/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Spent' }))
+
+    expect(screen.queryByText('$150.00')).not.toBeInTheDocument()
+    expect(screen.getAllByText('$50.00')).toHaveLength(2)
+  })
+
+  it('closes the menu on an outside mousedown', () => {
+    renderCard(makeGroup({ lineItems: [] }))
+    fireEvent.click(screen.getByRole('button', { name: /Remaining/ }))
+    expect(screen.getByRole('button', { name: 'Spent' })).toBeInTheDocument()
+
+    fireEvent.mouseDown(document.body)
+    expect(screen.queryByRole('button', { name: 'Spent' })).not.toBeInTheDocument()
+  })
+})
+
+describe('BudgetGroupCard collapse', () => {
+  it('replaces the line item rows with an item-count + totals summary when collapsed', () => {
+    renderCard(makeGroup({ lineItems: [makeLineItem({ id: 1, name: 'Rent', plannedAmount: 200, spentAmount: 50 })] }))
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse group' }))
+
+    expect(screen.queryByText('Rent')).not.toBeInTheDocument()
+    expect(screen.getByText('1 items')).toBeInTheDocument()
   })
 })

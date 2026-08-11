@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { DndContext } from '@dnd-kit/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -88,21 +88,30 @@ describe('BudgetPane (Modernist restyle)', () => {
     expect(amount.className).not.toContain('text-accent-700')
   })
 
-  it('renders each group as a block with its three column labels', () => {
+  it('renders each group as a block with its column labels and metric dropdown', () => {
     renderPane(makeBudget())
     expect(screen.getByText('Housing')).toBeInTheDocument()
-    // A group whose items are all income uses "Received"; otherwise "Spent". Both share "Planned"/"Remaining"
+    // Both groups share "Planned"/"Remaining"; "Remaining" is the dropdown's default selection.
     expect(screen.getAllByText('Planned')).toHaveLength(2)
-    expect(screen.getByText('Received')).toBeInTheDocument()
-    expect(screen.getByText('Spent')).toBeInTheDocument()
     expect(screen.getAllByText('Remaining')).toHaveLength(2)
+
+    // A group whose items are all income offers "Received" as the dropdown alternative; otherwise "Spent".
+    const incomeCard = screen.getByText('Income').closest('.card') as HTMLElement
+    fireEvent.click(within(incomeCard).getByRole('button', { name: /Remaining/ }))
+    expect(within(incomeCard).getByText('Received')).toBeInTheDocument()
+
+    const housingCard = screen.getByText('Housing').closest('.card') as HTMLElement
+    fireEvent.click(within(housingCard).getByRole('button', { name: /Remaining/ }))
+    expect(within(housingCard).getByText('Spent')).toBeInTheDocument()
   })
 
   it('renders a negative remaining amount in accent-red', () => {
     renderPane(makeBudget())
-    // Rent: planned 1500 + rollover 0 - spent 1600 = -100 remaining
-    const remaining = screen.getByText('-$100.00')
-    expect(remaining.className).toContain('text-accent-700')
+    // Rent: planned 1500 + rollover 0 - spent 1600 = -100 remaining, shown in the row (accent-red)
+    // and again in the group footer total (plain — the footer isn't status-colored).
+    const matches = screen.getAllByText('-$100.00')
+    const remaining = matches.find((el) => el.className.includes('text-accent-700'))
+    expect(remaining).toBeDefined()
   })
 
   it('reveals the group-name input when "+ Add Group" is clicked', () => {
@@ -135,8 +144,14 @@ describe('BudgetPane (Modernist restyle)', () => {
     gifts.plannedAmount = 300
     gifts.spentAmount = -690.89 // one +$690.89 assignment
     renderPane(budget)
-    // 300 + 0 - (-690.89) = 990.89
-    expect(screen.getByText('$990.89')).toBeInTheDocument()
+    // 300 + 0 - (-690.89) = 990.89, shown by default (Remaining is the dropdown's default metric).
+    expect(screen.getAllByText('$990.89')[0]).toBeInTheDocument()
+
+    // Switch Housing's metric to Spent to see the signed credit.
+    const housingCard = screen.getByText('Gifts').closest('.card') as HTMLElement
+    fireEvent.click(within(housingCard).getByRole('button', { name: /Remaining/ }))
+    fireEvent.click(within(housingCard).getByRole('button', { name: 'Spent' }))
+
     const spent = screen.getByText('+$690.89')
     expect(spent.className).toContain('text-positive')
     expect(spent.className).not.toContain('text-accent-700')
@@ -157,7 +172,7 @@ describe('BudgetPane (Modernist restyle)', () => {
     expect(item.receivedAmount).toBe(690.89)
 
     renderPane(next.budget!)
-    expect(screen.getByText('$990.89')).toBeInTheDocument()
+    expect(screen.getAllByText('$990.89')[0]).toBeInTheDocument()
   })
 
   it('raises an expense item Spent optimistically when a negative amount is assigned', () => {
