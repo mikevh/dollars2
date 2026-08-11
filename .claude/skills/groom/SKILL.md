@@ -22,7 +22,9 @@ exception: **never auto-close** issues — close candidates are only flagged for
 An issue is groomed when its body stands alone as the spec, containing:
 - **Single-concern restatement** — one concern, in plain terms. If it's really two, it must be split first.
 - **Plan** — files/areas to change, the approach, what's explicitly out of scope.
-- **Acceptance check** — the concrete, observable behavior that proves it's done (what tests / `verify` target).
+- **Acceptance check** — the concrete, observable behavior that proves it's done (what tests /
+  `verify` target — or, while the no-tests directive in Notes is active, what manual/browser
+  verification targets instead).
 - Any **interview decisions** that resolved ambiguity, folded in so they aren't lost.
 
 Only then apply the `groomed` label.
@@ -81,6 +83,10 @@ For a single issue, or each one the user picks from triage:
   close candidates flagged (with reasons), and the suggested priority order.
 
 ## Notes
+- **No-tests directive (temporary, in effect as of 2026-08-11 — until the user says otherwise):**
+  `next-item` is currently skipping all test creation and repair. While active, write acceptance
+  checks as observable/manual behavior to verify, not as test coverage to add. Revert this note and
+  the Ready-bar wording above when the user lifts the directive.
 - Step 2 of the loop: **new-issue → groom → next-item → /review → merge**. `new-issue` captures raw
   ideas as one-concern issues; this skill takes them from captured to ready-to-work.
 - User-invoked only; never triggered automatically.

@@ -1,6 +1,6 @@
 ---
 name: next-item
-description: Work one small single-concern item end-to-end in an isolated worktree — pick the GitHub issue, make sure it's fully understood (interview if underspecified), plan it, define how it will be verified, implement it, write tests, open a PR, then pause for the user's code review and fix what it finds. Use when the user says "next item", "work issue #N", "grab the next item", "do the next thing", or points at an issue and says work it.
+description: Work one small single-concern item end-to-end in an isolated worktree — pick the GitHub issue, make sure it's fully understood (interview if underspecified), plan it, define how it will be verified, implement it, run tests, open a PR, then pause for the user's code review and fix what it finds. Use when the user says "next item", "work issue #N", "grab the next item", "do the next thing", or points at an issue and says work it.
 ---
 
 # Next Item
@@ -64,8 +64,9 @@ claim is stale — report it and ask before reclaiming. Don't silently steal it.
 - Restate the item as a **single concern**. If it's really two, propose splitting and do only the first.
 - Short plan: files to change, the approach, what's out of scope. Smallest independently shippable
   increment.
-- State concretely how "done" will be proven — the observable behavior tests and browser
-  verification will target. If it can't be verified, narrow the scope until it can.
+- State concretely how "done" will be proven — the observable behavior manual/browser verification
+  will target (tests only if the no-tests directive below isn't active). If it can't be verified,
+  narrow the scope until it can.
 - Fold all of that into the issue before coding (`gh issue edit <N> --body ...`): interview
   decisions, single-concern restatement, plan, acceptance check. The body must stand on its own.
 
@@ -78,11 +79,18 @@ claim is stale — report it and ask before reclaiming. Don't silently steal it.
 ### 5. Implement
 Follow `CLAUDE.md`'s conventions and match the surrounding style.
 
-### 6. Write and run tests
-- Cover the step-3 acceptance check and the core logic paths.
+### 6. Run tests
+
+> **Standing directive (temporary, in effect as of 2026-08-11 — until the user says otherwise):**
+> skip all test creation and repair. Don't write new tests. If a test breaks because of this change,
+> delete it rather than fixing it — unless the failure reveals the *implementation* is wrong, in
+> which case fix the implementation and delete the test if it still fails afterward. Non-test
+> build/type/lint failures are unaffected — fix those normally. Revert this block to "Cover the
+> step-3 acceptance check and the core logic paths" when the directive lifts.
+
 - **Spawn `test-runner`** for every build/test run — that output doesn't belong in this session. Fix
-  what it reports, then continue the *same* agent (`SendMessage`) for the re-run rather than spawning
-  a fresh one.
+  what it reports (per the directive above), then continue the *same* agent (`SendMessage`) for the
+  re-run rather than spawning a fresh one.
 
 ### 7. Verify
 - **Hand visual verification to the user when the change alters what renders** — frontend
