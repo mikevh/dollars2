@@ -48,13 +48,12 @@ public class BankSyncService
         var results = new List<SyncResult>();
 
         var providerGroups = accounts
-            .Where(a => a.SourceType != SyncConstants.SourceTypeManual)
-            .GroupBy(a => a.SourceType);
+            .Where(a => !SyncConstants.IsManual(a.SourceType))
+            .GroupBy(a => a.SourceType, StringComparer.OrdinalIgnoreCase);
 
         foreach (var group in providerGroups)
         {
-            var sourceType = group.Key;
-            var provider = GetProvider(sourceType);
+            var provider = GetProvider(group.Key);
 
             if (provider is null)
             {
@@ -65,7 +64,9 @@ public class BankSyncService
                 }
                 continue;
             }
-            
+
+            var sourceType = provider.SourceType;
+
             if (enforceMinInterval && await IsWithinMinIntervalAsync(userId, sourceType, provider.MinSyncInterval))
             {
                 _logger.LogInformation("Skipping scheduled {SourceType} sync for user {UserId} — last successful sync is within the {MinInterval} minimum interval", sourceType, userId, provider.MinSyncInterval);
@@ -162,10 +163,11 @@ public class BankSyncService
     /// </summary>
     public static IReadOnlyList<Account> ResolveConnectionAccounts(IReadOnlyList<Account> accounts, string connectionId, IReadOnlyDictionary<string, IBankSyncProvider> providers)
     {
-        var syncable = accounts.Where(a => a.SourceType != SyncConstants.SourceTypeManual);
-        foreach (var bySource in syncable.GroupBy(a => a.SourceType))
+        var syncable = accounts.Where(a => !SyncConstants.IsManual(a.SourceType));
+        foreach (var bySource in syncable.GroupBy(a => a.SourceType, StringComparer.OrdinalIgnoreCase))
         {
             providers.TryGetValue(bySource.Key, out var provider);
+            var canonicalSourceType = provider?.SourceType ?? bySource.Key;
 
             // Fall back to a per-account key when the provider is unknown, mirroring how the grouping in
             // AccountService and the sync isolate such accounts.
@@ -174,7 +176,7 @@ public class BankSyncService
 
             foreach (var connection in byConnection)
             {
-                if (ConnectionKeyHasher.Hash(bySource.Key, connection.Key) == connectionId)
+                if (ConnectionKeyHasher.Hash(canonicalSourceType, connection.Key) == connectionId)
                 {
                     return connection.ToList();
                 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Dollars2.Api.Models;
+using Dollars2.Api.Services;
 using Going.Plaid;
 using Going.Plaid.Transactions;
 using PlaidTransaction = Going.Plaid.Entity.Transaction;
@@ -37,7 +38,7 @@ public class PlaidProvider : IBankSyncProvider
         MinSyncInterval = TimeSpan.FromHours(hours);
     }
 
-    public string SourceType => "Plaid";
+    public string SourceType => SyncConstants.SourceTypePlaid;
 
     public bool Enabled { get; }
 

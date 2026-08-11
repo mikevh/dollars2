@@ -8,4 +8,7 @@ internal static class SyncConstants
     public const string StatusSuccess = "Success";
     public const string StatusFailure = "Failure";
     public const string StatusSkipped = "Skipped";
+
+    public static bool IsManual(string sourceType) =>
+        string.Equals(sourceType, SourceTypeManual, StringComparison.OrdinalIgnoreCase);
 }
