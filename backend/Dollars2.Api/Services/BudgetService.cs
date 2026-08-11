@@ -194,11 +194,6 @@ public class BudgetService
 
     public async Task<DollarsApiResponse<LineItemResponse>> CreateLineItemAsync(int groupId, string name, decimal plannedAmount, bool isIncome, int userId)
     {
-        if (!Money.IsWholeCents(plannedAmount))
-        {
-            return DollarsApiResponse<LineItemResponse>.Fail(Money.SubCentMessage, Money.SubCentCode);
-        }
-
         var group = await _groupRepo.GetByIdAsync(groupId);
         if (group is null)
         {
@@ -219,11 +214,6 @@ public class BudgetService
 
     public async Task<DollarsApiResponse<LineItemResponse>> UpdateLineItemAsync(int id, string name, decimal plannedAmount, string? notes, int userId)
     {
-        if (!Money.IsWholeCents(plannedAmount))
-        {
-            return DollarsApiResponse<LineItemResponse>.Fail(Money.SubCentMessage, Money.SubCentCode);
-        }
-
         var item = await _lineItemRepo.GetByIdAsync(id);
         if (item is null)
         {

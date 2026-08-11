@@ -1,5 +1,6 @@
 using Dollars2.Api.Models;
 using Dollars2.Api.Services;
+using Going.Plaid.Entity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -112,6 +113,8 @@ public class TransactionsController : DollarsControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateTransactionRequest request)
     {
+        request.Amount = decimal.Round(request.Amount, 2);
+
         var result = await _transactionService.CreateAsync(GetUserId(), request.Date, request.Description, request.Amount, request.Notes, request.Payee, request.Memo);
         return Ok(result);
     }
@@ -119,6 +122,8 @@ public class TransactionsController : DollarsControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateTransactionRequest request)
     {
+        request.Amount = decimal.Round(request.Amount, 2);
+
         var result = await _transactionService.UpdateAsync(id, GetUserId(), request.Date, request.Description, request.Amount, request.Notes);
         if (result.Error is not null)
         {
@@ -186,8 +191,9 @@ public class TransactionsController : DollarsControllerBase
     public async Task<IActionResult> SetAssignments(int id, [FromBody] SetAssignmentsRequest request)
     {
         var assignments = request.Assignments
-            .Select(a => (a.LineItemId, a.Amount))
+            .Select(a => (a.LineItemId, decimal.Round(a.Amount, 2)))
             .ToList();
+        
         var result = await _transactionService.SetAssignmentsAsync(id, assignments, GetUserId());
         if (result.Error is not null)
         {

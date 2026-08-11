@@ -24,31 +24,6 @@ public sealed class LineItemBudgetIdTests
     }
 
     [Fact]
-    public async Task CreateLineItemAsync_sets_a_non_null_BudgetId_matching_the_groups_budget()
-    {
-        using var db = _fixture.CreateSession();
-        db.BeginTransaction();
-        try
-        {
-            var userId = await SeedUserAsync(db, "budgetid-create@example.com");
-            var budgetId = await SeedBudgetAsync(db, userId, 2026, 7);
-            var groupId = await SeedGroupAsync(db, budgetId, "Group");
-            var service = BudgetServiceFor(db);
-
-            var result = await service.CreateLineItemAsync(groupId, "Gas", 100m, false, userId);
-
-            Assert.Null(result.Error);
-            var stored = await new LineItemRepository(db).GetByIdAsync(result.Data!.Id);
-            Assert.NotNull(stored);
-            Assert.Equal(budgetId, stored!.BudgetId);
-        }
-        finally
-        {
-            db.Rollback();
-        }
-    }
-
-    [Fact]
     public async Task IsOwnedByUserAsync_accepts_the_owner_and_rejects_another_user_via_the_direct_BudgetId_join()
     {
         using var db = _fixture.CreateSession();

@@ -92,11 +92,6 @@ public class TransactionService
 
     public async Task<DollarsApiResponse<TransactionResponse>> CreateAsync(int userId, DateOnly date, string description, decimal amount, string? notes, string? payee, string? memo)
     {
-        if (!Money.IsWholeCents(amount))
-        {
-            return DollarsApiResponse<TransactionResponse>.Fail(Money.SubCentMessage, Money.SubCentCode);
-        }
-
         if (amount == 0)
         {
             return DollarsApiResponse<TransactionResponse>.Fail("Amount cannot be zero.", "INVALID_AMOUNT");
@@ -109,13 +104,6 @@ public class TransactionService
 
     public async Task<DollarsApiResponse<TransactionResponse>> UpdateAsync(int id, int userId, DateOnly date, string description, decimal amount, string? notes)
     {
-        // Checked before the lookup, and before the non-manual branch that ignores the amount: an
-        // amount the column cannot hold makes the request malformed regardless of what it updates.
-        if (!Money.IsWholeCents(amount))
-        {
-            return DollarsApiResponse<TransactionResponse>.Fail(Money.SubCentMessage, Money.SubCentCode);
-        }
-
         var transaction = await _transactionRepo.GetByIdAsync(id);
         if (transaction is null || transaction.UserId != userId)
         {
@@ -281,13 +269,6 @@ public class TransactionService
         if (transaction.IsDeleted)
         {
             return DollarsApiResponse<TransactionResponse>.Fail("Cannot assign a deleted transaction.", "TRANSACTION_DELETED");
-        }
-
-        // Sub-cent parts can offset each other (50.005 + 49.995 = 100.00), so the sum check below
-        // would pass while each stored part rounds away from what was entered.
-        if (assignments.Any(a => !Money.IsWholeCents(a.amount)))
-        {
-            return DollarsApiResponse<TransactionResponse>.Fail(Money.SubCentMessage, Money.SubCentCode);
         }
 
         var lineItemIds = assignments.Select(a => a.lineItemId).ToList();

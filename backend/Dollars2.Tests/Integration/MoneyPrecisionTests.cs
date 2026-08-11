@@ -23,27 +23,6 @@ public sealed class MoneyPrecisionTests
         _fixture = fixture;
     }
 
-    [Fact]
-    public async Task Creating_a_transaction_with_a_sub_cent_amount_is_rejected_and_stores_nothing()
-    {
-        using var db = _fixture.CreateSession();
-        db.BeginTransaction();
-        try
-        {
-            var seed = await SeedAsync(db, "money-create@example.com");
-            var service = TransactionServiceFor(db);
-
-            var result = await service.CreateAsync(seed.UserId, Date, "Coffee", 10.999m, null, null, null);
-
-            Assert.Equal(Money.SubCentCode, result.Error?.Code);
-            Assert.Null(result.Data);
-            Assert.Equal(0, await CountTransactionsAsync(db, seed.UserId));
-        }
-        finally
-        {
-            db.Rollback();
-        }
-    }
 
     [Fact]
     public async Task A_cent_amount_is_stored_exactly_as_entered()
@@ -59,82 +38,6 @@ public sealed class MoneyPrecisionTests
 
             Assert.Null(result.Error);
             Assert.Equal(-10.99m, result.Data!.Amount);
-        }
-        finally
-        {
-            db.Rollback();
-        }
-    }
-
-    [Fact]
-    public async Task Updating_a_transaction_to_a_sub_cent_amount_is_rejected_and_leaves_it_alone()
-    {
-        using var db = _fixture.CreateSession();
-        db.BeginTransaction();
-        try
-        {
-            var seed = await SeedAsync(db, "money-update@example.com");
-            var service = TransactionServiceFor(db);
-            var created = await service.CreateAsync(seed.UserId, Date, "Coffee", -10.99m, null, null, null);
-
-            var result = await service.UpdateAsync(created.Data!.Id, seed.UserId, Date, "Coffee", -10.999m, null);
-
-            Assert.Equal(Money.SubCentCode, result.Error?.Code);
-            var stored = await new TransactionRepository(db).GetByIdAsync(created.Data.Id);
-            Assert.Equal(-10.99m, stored!.Amount);
-        }
-        finally
-        {
-            db.Rollback();
-        }
-    }
-
-    [Fact]
-    public async Task Sub_cent_split_parts_are_rejected_even_when_they_sum_to_the_transaction_amount()
-    {
-        using var db = _fixture.CreateSession();
-        db.BeginTransaction();
-        try
-        {
-            // The case the sum check cannot catch: 50.005 + 49.995 is exactly 100.00, but each part
-            // would round on write and neither line item would hold the entered amount.
-            var seed = await SeedAsync(db, "money-split@example.com");
-            var service = TransactionServiceFor(db);
-            var created = await service.CreateAsync(seed.UserId, Date, "Groceries", -100.00m, null, null, null);
-
-            var result = await service.SetAssignmentsAsync(
-                created.Data!.Id,
-                [(seed.LineItemId, -50.005m), (seed.OtherLineItemId, -49.995m)],
-                seed.UserId);
-
-            Assert.Equal(Money.SubCentCode, result.Error?.Code);
-            var assignments = await new TransactionAssignmentRepository(db)
-                .GetByTransactionIdAsync(created.Data.Id);
-            Assert.Empty(assignments);
-        }
-        finally
-        {
-            db.Rollback();
-        }
-    }
-
-    [Fact]
-    public async Task A_sub_cent_planned_amount_is_rejected_on_create_and_on_update()
-    {
-        using var db = _fixture.CreateSession();
-        db.BeginTransaction();
-        try
-        {
-            var seed = await SeedAsync(db, "money-lineitem@example.com");
-            var service = BudgetServiceFor(db);
-
-            var created = await service.CreateLineItemAsync(seed.GroupId, "Gas", 300.001m, false, seed.UserId);
-            var updated = await service.UpdateLineItemAsync(seed.LineItemId, "Item", 300.001m, null, seed.UserId);
-
-            Assert.Equal(Money.SubCentCode, created.Error?.Code);
-            Assert.Equal(Money.SubCentCode, updated.Error?.Code);
-            var stored = await new LineItemRepository(db).GetByIdAsync(seed.LineItemId);
-            Assert.Equal(300m, stored!.PlannedAmount);
         }
         finally
         {
