@@ -55,14 +55,6 @@ public class TransactionAssignmentRepository
         return results;
     }
 
-    public async Task<IEnumerable<TransactionAssignment>> GetByLineItemIdAsync(int lineItemId)
-    {
-        return await _db.Connection.QueryAsync<TransactionAssignment>(
-            "SELECT Id, TransactionId, LineItemId, Amount, CreatedAt, UpdatedAt FROM TransactionAssignments WHERE LineItemId = @lineItemId",
-            new { lineItemId },
-            _db.CurrentTransaction);
-    }
-
     public async Task<int> CreateAsync(int transactionId, int lineItemId, decimal amount)
     {
         return await _db.Connection.QuerySingleAsync<int>(

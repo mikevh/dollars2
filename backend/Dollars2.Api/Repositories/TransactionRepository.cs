@@ -262,14 +262,6 @@ public class TransactionRepository
             _db.CurrentTransaction);
     }
 
-    public async Task UpdatePendingStatusAsync(int id, bool isPending)
-    {
-        await _db.Connection.ExecuteAsync(
-            "UPDATE Transactions SET IsPending = @isPending, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id",
-            new { id, isPending },
-            _db.CurrentTransaction);
-    }
-
     public async Task<int> SoftDeleteByProviderTransactionIdAsync(int accountId, string providerTransactionId)
     {
         return await _db.Connection.ExecuteAsync(
