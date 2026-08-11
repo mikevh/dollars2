@@ -33,9 +33,9 @@ public class TransactionsController : DollarsControllerBase
     }
 
     [HttpGet("tracked")]
-    public async Task<IActionResult> GetTracked([FromQuery] DateOnly fromDate)
+    public async Task<IActionResult> GetTracked()
     {
-        var result = await _transactionService.GetTrackedAsync(GetUserId(), fromDate);
+        var result = await _transactionService.GetTrackedAsync(GetUserId());
         return Ok(result);
     }
 

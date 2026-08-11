@@ -38,9 +38,9 @@ public class TransactionService
         return DollarsApiResponse<List<TransactionResponse>>.Success(responses);
     }
 
-    public async Task<DollarsApiResponse<List<TransactionResponse>>> GetTrackedAsync(int userId, DateOnly fromDate)
+    public async Task<DollarsApiResponse<List<TransactionResponse>>> GetTrackedAsync(int userId)
     {
-        var transactions = await _transactionRepo.GetTrackedAsync(userId, fromDate);
+        var transactions = await _transactionRepo.GetTrackedAsync(userId);
         var responses = new List<TransactionResponse>();
         foreach (var t in transactions)
         {

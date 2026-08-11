@@ -179,7 +179,8 @@
 - `GET /api/transactions/by-account/{accountId}` — paged account transactions
   (`?page=&size=&sort=&dir=`), backing the per-account transactions page
 - `GET /api/transactions/new` — unassigned transactions
-- `GET /api/transactions/tracked?fromDate=...` — assigned transactions from date
+- `GET /api/transactions/tracked` — assigned transactions from the last 2 months (UTC clock,
+  server-owned window — same one `counts` uses, so the two can never disagree)
 - `GET /api/transactions/deleted` — soft-deleted transactions
 - `GET /api/transactions/pending` — pending bank transactions
 - `POST /api/transactions` — manual entry

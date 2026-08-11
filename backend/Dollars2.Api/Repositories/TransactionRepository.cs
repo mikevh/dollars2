@@ -36,8 +36,9 @@ public class TransactionRepository
             _db.CurrentTransaction);
     }
 
-    public async Task<IEnumerable<Transaction>> GetTrackedAsync(int userId, DateOnly fromDate)
+    public async Task<IEnumerable<Transaction>> GetTrackedAsync(int userId)
     {
+        var fromDate = GetTrackedFromDate();
         return await _db.Connection.QueryAsync<Transaction>(
             @"SELECT t.Id, t.AccountId, t.UserId, t.ProviderTransactionId, t.Date, t.Description, t.Payee, t.Memo, t.Amount, t.Notes, t.IsDeleted, t.IsPending, t.IsManual, t.CreatedAt, t.UpdatedAt
               FROM Transactions t
@@ -48,6 +49,10 @@ public class TransactionRepository
             new { userId, fromDate },
             _db.CurrentTransaction);
     }
+
+    // Single source of truth for the "Tracked" window (list + count), on the UTC clock — the
+    // frontend has no timezone concept in v1.
+    private static DateOnly GetTrackedFromDate() => DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(-2);
 
     public async Task<IEnumerable<Transaction>> GetDeletedAsync(int userId)
     {
@@ -140,7 +145,7 @@ public class TransactionRepository
 
     public async Task<TransactionCountsResponse> GetCountsAsync(int userId)
     {
-        var trackedFromDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(-2);
+        var trackedFromDate = GetTrackedFromDate();
         using var multi = await _db.Connection.QueryMultipleAsync(
             @"SELECT COUNT(*) FROM Transactions t
               LEFT JOIN TransactionAssignments ta ON ta.TransactionId = t.Id

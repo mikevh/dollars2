@@ -66,9 +66,7 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
     if (activeTab === 'new') {
       dispatch(fetchNewTransactions());
     } else if (activeTab === 'tracked') {
-      const fromDate = new Date();
-      fromDate.setMonth(fromDate.getMonth() - 2);
-      dispatch(fetchTrackedTransactions({ fromDate: fromDate.toISOString().split('T')[0] }));
+      dispatch(fetchTrackedTransactions());
     } else if (activeTab === 'deleted') {
       dispatch(fetchDeletedTransactions());
     } else if (activeTab === 'pending') {
