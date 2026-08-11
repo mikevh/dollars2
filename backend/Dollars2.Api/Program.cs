@@ -128,8 +128,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddExceptionHandler<DollarsExceptionHandler>();
 
 var app = builder.Build();
+
 
 if (app.Environment.IsDevelopment())
 {
