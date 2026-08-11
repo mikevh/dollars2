@@ -94,6 +94,13 @@ Sort key        sk  (S)   TXN#{providerTransactionId}#{syncedAt}
 (`2026-08-03T06:00:00.000Z`), which sorts lexicographically in chronological order — that's what
 makes the composite sort keys usable at all.
 
+**A `providerTransactionId` may itself contain `#`**, so a `TXN#{providerTransactionId}#{syncedAt}`
+sort key is only unambiguous read right-to-left — a `begins_with(sk, "TXN#{providerTransactionId}#")`
+prefix query is not by itself an exact match. `"TXN#abc#"` also matches every sighting of the id
+`"abc#def"`. `SyncArchiveRepository.GetTransactionHistoryAsync` pairs that prefix scan with an
+exact-match `FilterExpression` on the `providerTransactionId` attribute (below) to resolve the
+ambiguity — any new read built against `sk` needs the same pairing.
+
 Every item also carries:
 
 | attribute | type | notes |
