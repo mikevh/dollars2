@@ -52,16 +52,12 @@ public class AccountService
         var balancesByAccount = latestBalances.ToDictionary(b => b.AccountId);
         var groups = new List<AccountGroupResponse>();
 
-        var syncable = accounts.Where(a => !SyncConstants.IsManual(a.SourceType));
-        foreach (var bySource in syncable.GroupBy(a => a.SourceType, StringComparer.OrdinalIgnoreCase))
+        foreach (var (canonicalSourceType, provider, sourceAccounts) in SourceTypeGrouping.BySourceType(accounts, providers))
         {
-            providers.TryGetValue(bySource.Key, out var provider);
-            var canonicalSourceType = provider?.SourceType ?? bySource.Key;
-
             // Accounts that share a connection key are fetched together by the sync service; group them
             // together here too. Fall back to a per-account key when the provider is unknown, mirroring
             // how the sync service isolates such accounts.
-            var byConnection = bySource.GroupBy(a =>
+            var byConnection = sourceAccounts.GroupBy(a =>
                 provider is not null ? provider.GetConnectionKey(a) : $"account:{a.Id}");
 
             foreach (var connection in byConnection)

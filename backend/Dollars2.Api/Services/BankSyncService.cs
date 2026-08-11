@@ -158,20 +158,17 @@ public class BankSyncService
 
     /// <summary>
     /// Resolves the opaque connectionId back to the syncable accounts in that connection group. Mirrors
-    /// <see cref="AccountService.BuildGroups"/> grouping so ids round-trip. Pure (no I/O) so it can be
-    /// unit-tested. Returns an empty list when no syncable group matches (unknown id, or "manual").
+    /// <see cref="AccountService.BuildGroups"/> grouping (both go through <see cref="SourceTypeGrouping"/>)
+    /// so ids round-trip. Pure (no I/O) so it can be unit-tested. Returns an empty list when no syncable
+    /// group matches (unknown id, or "manual").
     /// </summary>
     public static IReadOnlyList<Account> ResolveConnectionAccounts(IReadOnlyList<Account> accounts, string connectionId, IReadOnlyDictionary<string, IBankSyncProvider> providers)
     {
-        var syncable = accounts.Where(a => !SyncConstants.IsManual(a.SourceType));
-        foreach (var bySource in syncable.GroupBy(a => a.SourceType, StringComparer.OrdinalIgnoreCase))
+        foreach (var (canonicalSourceType, provider, sourceAccounts) in SourceTypeGrouping.BySourceType(accounts, providers))
         {
-            providers.TryGetValue(bySource.Key, out var provider);
-            var canonicalSourceType = provider?.SourceType ?? bySource.Key;
-
             // Fall back to a per-account key when the provider is unknown, mirroring how the grouping in
             // AccountService and the sync isolate such accounts.
-            var byConnection = bySource.GroupBy(a =>
+            var byConnection = sourceAccounts.GroupBy(a =>
                 provider is not null ? provider.GetConnectionKey(a) : $"account:{a.Id}");
 
             foreach (var connection in byConnection)
@@ -422,8 +419,8 @@ public class BankSyncService
     /// the latter shouldn't claim there's a config toggle that doesn't exist.
     /// </summary>
     private string ProviderUnavailableMessage(string sourceType) =>
-        _providers.ContainsKey(sourceType)
-            ? $"{sourceType} sync is currently disabled."
+        _providers.TryGetValue(sourceType, out var provider)
+            ? $"{provider.SourceType} sync is currently disabled."
             : $"{sourceType} sync is not available.";
 
     private IBankSyncProvider? GetProvider(string sourceType)
