@@ -1,3 +1,4 @@
+SET QUOTED_IDENTIFIER ON;
 IF NOT EXISTS (SELECT * FROM Migrations WHERE ScriptName = '007_create_transactions')
 BEGIN
     CREATE TABLE Transactions (

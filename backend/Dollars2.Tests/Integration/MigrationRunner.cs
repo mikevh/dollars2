@@ -43,7 +43,13 @@ public static class MigrationRunner
         return ScriptPaths().Select(Path.GetFileNameWithoutExtension).ToArray()!;
     }
 
-    public static async Task ApplyAsync(string connectionString)
+    /// <param name="connectionString">Target database connection string.</param>
+    /// <param name="quotedIdentifierOff">
+    /// When true, issues <c>SET QUOTED_IDENTIFIER OFF</c> on the session before applying any
+    /// script, mirroring sqlcmd's default (ADO.NET's <see cref="SqlConnection"/> otherwise opens
+    /// sessions with it ON). Used to reproduce and guard against issue #76.
+    /// </param>
+    public static async Task ApplyAsync(string connectionString, bool quotedIdentifierOff = false)
     {
         GuardAgainstNonLocalTarget(connectionString);
 
@@ -51,6 +57,13 @@ public static class MigrationRunner
 
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync();
+
+        if (quotedIdentifierOff)
+        {
+            await using var setCommand = connection.CreateCommand();
+            setCommand.CommandText = "SET QUOTED_IDENTIFIER OFF;";
+            await setCommand.ExecuteNonQueryAsync();
+        }
 
         foreach (var scriptPath in scripts)
         {
