@@ -4,11 +4,14 @@ using Amazon.Runtime;
 using Dollars2.Api.Data;
 using Dollars2.Api.Json;
 using Dollars2.Api.Logging;
+using Dollars2.Api.Middleware;
+using Dollars2.Api.Models;
 using Dollars2.Api.Providers;
 using Dollars2.Api.Repositories;
 using Dollars2.Api.Services;
 using Going.Plaid;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -23,7 +26,18 @@ builder.Host.UseSerilog((context, loggerConfig) =>
     loggerConfig.ConfigureDollars2Logging(logFilePath, elasticsearchUri, minimumLevel));
 
 builder.Services.AddControllers()
-    .AddJsonOptions(options => Dollars2JsonOptions.Configure(options.JsonSerializerOptions));
+    .AddJsonOptions(options => Dollars2JsonOptions.Configure(options.JsonSerializerOptions))
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var message = string.Join("; ", context.ModelState
+                .Where(entry => entry.Value?.Errors.Count > 0)
+                .Select(entry => $"{entry.Key}: {string.Join(", ", entry.Value!.Errors.Select(e => e.ErrorMessage))}"));
+
+            return new BadRequestObjectResult(DollarsApiResponse<object>.Fail(message, "VALIDATION_ERROR"));
+        };
+    });
 builder.Services.AddOpenApi();
 var cs = builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -138,6 +152,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseExceptionHandler();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
