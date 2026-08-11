@@ -105,7 +105,7 @@ export default function Dialog({ onClose, labelledBy, initialFocusRef, className
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleTabTrap}
-        className={`relative w-full ${className} border border-divider bg-surface p-6 text-text shadow-elev-lg focus:outline-none`}
+        className={`relative w-full ${className} max-h-[calc(100vh-160px)] overflow-y-auto rounded-[var(--radius-card)] bg-[var(--app-card)] pt-[22px] px-6 pb-5 text-text shadow-[var(--app-shadow-lg)] focus:outline-none`}
       >
         {children}
       </div>

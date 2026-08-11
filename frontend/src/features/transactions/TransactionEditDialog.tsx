@@ -269,7 +269,7 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
   )
 
   return (
-    <Dialog onClose={onClose} labelledBy={titleId} initialFocusRef={descriptionRef} className="max-w-md">
+    <Dialog onClose={onClose} labelledBy={titleId} initialFocusRef={descriptionRef} className="max-w-[460px]">
       <DialogHeader
         id={titleId}
         title={isCreate ? 'New Transaction' : 'Edit Transaction'}
@@ -305,8 +305,8 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
       ) : (
         <div className="flex flex-col gap-3">
           {isEditable ? (
-            <div className="flex gap-4">
-              <label className="flex items-center gap-1.5 text-sm text-text">
+            <div className="flex gap-2">
+              <label className="flex items-center gap-1.5 rounded-[var(--radius-control)] border border-divider px-3 py-1.5 text-sm text-text has-[:checked]:border-accent has-[:checked]:bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)] has-[:checked]:text-accent-700">
                 <input
                   type="radio"
                   checked={isExpense}
@@ -315,7 +315,7 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
                 />
                 Expense
               </label>
-              <label className="flex items-center gap-1.5 text-sm text-text">
+              <label className="flex items-center gap-1.5 rounded-[var(--radius-control)] border border-divider px-3 py-1.5 text-sm text-text has-[:checked]:border-accent has-[:checked]:bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)] has-[:checked]:text-accent-700">
                 <input
                   type="radio"
                   checked={!isExpense}
