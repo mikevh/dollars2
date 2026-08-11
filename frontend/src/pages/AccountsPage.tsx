@@ -80,7 +80,7 @@ function SyncButton({ group }: { group: AccountGroup }) {
       type="button"
       onClick={handleSync}
       disabled={syncing || otherSyncing}
-      className="text-[12px] font-semibold uppercase tracking-wide text-accent disabled:cursor-not-allowed disabled:opacity-50"
+      className="text-[12px] font-semibold uppercase tracking-wide text-[var(--app-blue)] hover:text-[var(--app-blue-hover)] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {syncing ? 'Syncing…' : 'Sync'}
     </button>
@@ -99,7 +99,7 @@ function ResyncButton({ group }: { group: AccountGroup }) {
         type="button"
         onClick={() => setOpen(true)}
         disabled={anySyncing}
-        className="text-[12px] font-semibold uppercase tracking-wide text-accent disabled:cursor-not-allowed disabled:opacity-50"
+        className="text-[12px] font-semibold uppercase tracking-wide text-[var(--app-blue)] hover:text-[var(--app-blue-hover)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         Re-sync
       </button>
@@ -128,7 +128,7 @@ function ResyncDialog({ group, onClose }: { group: AccountGroup; onClose: () => 
   }
 
   return (
-    <Dialog onClose={onClose} labelledBy={titleId} initialFocusRef={confirmRef} className="max-w-sm">
+    <Dialog onClose={onClose} labelledBy={titleId} initialFocusRef={confirmRef} className="max-w-[420px]">
       <DialogHeader
         id={titleId}
         title={<>Re-sync {sourceTypeLabel(group.sourceType)}</>}
@@ -167,13 +167,13 @@ export default function AccountsPage() {
   }, [dispatch])
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg pb-14 text-text">
+    <div className="flex min-h-screen flex-col bg-[var(--app-bg)] pb-14 text-text">
       <div className="relative flex items-center border-b-2 border-divider px-4 py-3">
         <span className="font-heading text-[16px] font-extrabold">Dollars2</span>
         <h2 className="absolute left-1/2 -translate-x-1/2 text-[18px]">Accounts</h2>
       </div>
 
-      <div className="mx-auto w-full max-w-[720px] px-4 py-6">
+      <div className="mx-auto w-full max-w-[760px] px-4 py-6">
         {loading && <div className="text-muted py-12 text-center">Loading...</div>}
 
         {!loading && error && <div className="py-12 text-center text-accent">{error}</div>}
@@ -185,7 +185,7 @@ export default function AccountsPage() {
         {!loading && !error && groups.length > 0 && (
           <div className="space-y-4">
             {groups.map((group) => (
-              <div key={group.connectionId} className="border border-divider bg-surface shadow-elev-sm">
+              <div key={group.connectionId} className="card">
                 <div className="flex items-center justify-between border-b-2 border-divider px-4 py-2">
                   <span className="text-muted text-[12px] font-semibold uppercase tracking-wide">
                     {sourceTypeLabel(group.sourceType)}
@@ -202,7 +202,7 @@ export default function AccountsPage() {
                     <li key={account.id}>
                       <Link
                         to={`/accounts/${account.id}`}
-                        className="flex items-center justify-between px-4 py-2.5 text-[14px] hover:bg-[color-mix(in_srgb,var(--color-text)_6%,transparent)]"
+                        className="flex items-center justify-between px-4 py-2.5 text-[14px] hover:bg-[var(--app-hover)]"
                         title={`View ${account.name} transactions`}
                       >
                         <span>{account.name}</span>
