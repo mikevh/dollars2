@@ -9,7 +9,8 @@
 ## Include in Budget
 
 - Each account carries an `IncludeInBudget` flag (`bit`, default `1`)
-- When `0`, the account's transactions are hidden entirely from the budget transaction pane — they never appear in the New / Tracked / Deleted / Pending tabs or their counts, so they can't be assigned to a line item and never affect budget totals
+- When `0`, the account's transactions are hidden entirely from the budget transaction pane — they never appear in the New / Tracked / Deleted / Pending tabs or their counts, so they can't be newly assigned to a line item
+- Any assignments that already existed before the flag was set keep counting toward that line item's Spent and rollover — the flag only controls pane visibility and new assignability, not existing assignment totals. There's no UI or API path to toggle the flag on an account with existing history in v1 (see below), so this only arises from a direct database edit
 - The account otherwise behaves normally: it still syncs on the backend, still appears in the `/accounts` view, and its transactions remain viewable on the per-account transactions page. Account balances are unaffected
 - Manual transactions (no account) are always included regardless of any account's flag
 - V1 sets the flag directly in the database like all other account setup — no toggle UI
