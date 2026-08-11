@@ -41,10 +41,15 @@ public class LineItemRepository
 
     public async Task<LineItem?> GetByIdAsync(int id)
     {
-        return await _db.Connection.QuerySingleOrDefaultAsync<LineItem>(
-            "SELECT Id, GroupId, BudgetId, Name, PlannedAmount, IsIncome, SortOrder, Notes, PreviousLineItemId, CreatedAt, UpdatedAt FROM LineItems WHERE Id = @id",
+        var rv = await _db.Connection.QuerySingleOrDefaultAsync<LineItem>(
+            @"SELECT li.Id, GroupId, bg.BudgetId, li.Name, PlannedAmount, IsIncome, li.SortOrder, Notes, PreviousLineItemId, li.CreatedAt, li.UpdatedAt 
+            FROM LineItems li
+                LEFT JOIN BudgetGroups bg ON bg.Id = li.GroupId
+            WHERE li.Id = @id",
             new { id },
             _db.CurrentTransaction);
+
+        return rv;
     }
 
     public async Task<int> CreateAsync(int groupId, int budgetId, string name, decimal plannedAmount, int sortOrder, bool isIncome = false, int? previousLineItemId = null, string notes = "")
@@ -166,13 +171,16 @@ public class LineItemRepository
 
     public async Task<bool> IsOwnedByUserAsync(int lineItemId, int userId)
     {
-        return await _db.Connection.QuerySingleAsync<bool>(
+        var rv = await _db.Connection.QuerySingleAsync<bool>(
             @"SELECT CASE WHEN EXISTS (
                 SELECT 1 FROM LineItems li
-                INNER JOIN Budgets b ON b.Id = li.BudgetId
+                    LEFT JOIN BudgetGroups bg ON bg.Id = li.GroupId
+                    LEFT JOIN Budgets b on b.id = bg.BudgetId
                 WHERE li.Id = @lineItemId AND b.UserId = @userId
               ) THEN 1 ELSE 0 END",
             new { lineItemId, userId },
             _db.CurrentTransaction);
+
+        return rv;
     }
 }
