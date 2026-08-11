@@ -30,44 +30,28 @@ public class TransactionService
     public async Task<DollarsApiResponse<List<TransactionResponse>>> GetNewAsync(int userId)
     {
         var transactions = await _transactionRepo.GetNewAsync(userId);
-        var responses = new List<TransactionResponse>();
-        foreach (var t in transactions)
-        {
-            responses.Add(await BuildResponseAsync(t));
-        }
+        var responses = await BuildResponsesAsync(transactions.ToList());
         return DollarsApiResponse<List<TransactionResponse>>.Success(responses);
     }
 
     public async Task<DollarsApiResponse<List<TransactionResponse>>> GetTrackedAsync(int userId)
     {
         var transactions = await _transactionRepo.GetTrackedAsync(userId);
-        var responses = new List<TransactionResponse>();
-        foreach (var t in transactions)
-        {
-            responses.Add(await BuildResponseAsync(t));
-        }
+        var responses = await BuildResponsesAsync(transactions.ToList());
         return DollarsApiResponse<List<TransactionResponse>>.Success(responses);
     }
 
     public async Task<DollarsApiResponse<List<TransactionResponse>>> GetDeletedAsync(int userId)
     {
         var transactions = await _transactionRepo.GetDeletedAsync(userId);
-        var responses = new List<TransactionResponse>();
-        foreach (var t in transactions)
-        {
-            responses.Add(await BuildResponseAsync(t));
-        }
+        var responses = await BuildResponsesAsync(transactions.ToList());
         return DollarsApiResponse<List<TransactionResponse>>.Success(responses);
     }
 
     public async Task<DollarsApiResponse<List<TransactionResponse>>> GetPendingAsync(int userId)
     {
         var transactions = await _transactionRepo.GetPendingAsync(userId);
-        var responses = new List<TransactionResponse>();
-        foreach (var t in transactions)
-        {
-            responses.Add(await BuildResponseAsync(t));
-        }
+        var responses = await BuildResponsesAsync(transactions.ToList());
         return DollarsApiResponse<List<TransactionResponse>>.Success(responses);
     }
 
@@ -79,11 +63,7 @@ public class TransactionService
         }
 
         var transactions = await _transactionRepo.GetByLineItemIdAsync(lineItemId);
-        var responses = new List<TransactionResponse>();
-        foreach (var t in transactions)
-        {
-            responses.Add(await BuildResponseAsync(t));
-        }
+        var responses = await BuildResponsesAsync(transactions.ToList());
         return DollarsApiResponse<List<TransactionResponse>>.Success(responses);
     }
 
@@ -97,11 +77,9 @@ public class TransactionService
         }
 
         var (rows, totalCount) = await _transactionRepo.GetByAccountIdAsync(accountId, page, size, sort, dir, q, includeDeleted);
-        var responses = new List<TransactionResponse>();
-        foreach (var t in rows)
-        {
-            responses.Add(await BuildResponseAsync(t));
-        }
+        // Every row is already known to belong to accountId (the repo filters on it), so the
+        // account already in hand is reused instead of batch-fetching it again.
+        var responses = await BuildResponsesAsync(rows, new Dictionary<int, Account> { [account.Id] = account });
 
         return DollarsApiResponse<AccountTransactionsResponse>.Success(new AccountTransactionsResponse
         {
@@ -358,27 +336,56 @@ public class TransactionService
 
     private async Task<TransactionResponse> BuildResponseAsync(Transaction t)
     {
-        var assignments = await _assignmentRepo.GetByTransactionIdAsync(t.Id);
-        var assignmentResponses = new List<TransactionAssignmentResponse>();
+        return (await BuildResponsesAsync(new[] { t })).Single();
+    }
 
-        foreach (var a in assignments)
+    // Batches the assignment and account lookups that BuildResponseAsync used to issue once per
+    // transaction, so a page of N transactions costs a constant number of queries instead of O(N).
+    // knownAccounts lets a caller that already holds the account (GetByAccountAsync) skip refetching it.
+    private async Task<List<TransactionResponse>> BuildResponsesAsync(
+        IReadOnlyCollection<Transaction> transactions, IReadOnlyDictionary<int, Account>? knownAccounts = null)
+    {
+        if (transactions.Count == 0)
         {
-            var lineItem = await _lineItemRepo.GetByIdAsync(a.LineItemId);
-            assignmentResponses.Add(new TransactionAssignmentResponse
+            return new List<TransactionResponse>();
+        }
+
+        var transactionIds = transactions.Select(t => t.Id).ToList();
+        var assignmentsByTransactionId = (await _assignmentRepo.GetByTransactionIdsAsync(transactionIds))
+            .ToLookup(a => a.TransactionId);
+
+        var accountsById = knownAccounts;
+        if (accountsById is null)
+        {
+            var accountIds = transactions.Where(t => t.AccountId.HasValue).Select(t => t.AccountId!.Value).Distinct().ToList();
+            accountsById = accountIds.Count > 0
+                ? (await _accountRepo.GetByIdsAsync(accountIds)).ToDictionary(a => a.Id)
+                : new Dictionary<int, Account>();
+        }
+
+        return transactions
+            .Select(t => MapTransaction(t, assignmentsByTransactionId[t.Id], accountsById))
+            .ToList();
+    }
+
+    private static TransactionResponse MapTransaction(
+        Transaction t,
+        IEnumerable<TransactionAssignmentWithLineItem> assignments,
+        IReadOnlyDictionary<int, Account> accountsById)
+    {
+        var assignmentResponses = assignments
+            .Select(a => new TransactionAssignmentResponse
             {
                 Id = a.Id,
                 LineItemId = a.LineItemId,
-                LineItemName = lineItem?.Name ?? "",
+                LineItemName = a.LineItemName,
                 Amount = a.Amount
-            });
-        }
+            })
+            .ToList();
 
-        string? accountName = null;
-        if (t.AccountId.HasValue)
-        {
-            var account = await _accountRepo.GetByIdAsync(t.AccountId.Value);
-            accountName = account?.Name;
-        }
+        string? accountName = t.AccountId.HasValue && accountsById.TryGetValue(t.AccountId.Value, out var account)
+            ? account.Name
+            : null;
 
         return new TransactionResponse
         {

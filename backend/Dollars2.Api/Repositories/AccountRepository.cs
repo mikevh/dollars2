@@ -21,6 +21,16 @@ public class AccountRepository
             _db.CurrentTransaction);
     }
 
+    /// <summary>Accounts for every id in <paramref name="ids"/> in one round trip. Callers must not
+    /// pass an empty collection (produces an invalid "IN ()").</summary>
+    public async Task<IEnumerable<Account>> GetByIdsAsync(IEnumerable<int> ids)
+    {
+        return await _db.Connection.QueryAsync<Account>(
+            "SELECT Id, UserId, Name, SourceType, ConnectionDetailsJson, IncludeInBudget, CreatedAt, UpdatedAt FROM Accounts WHERE Id IN @ids",
+            new { ids },
+            _db.CurrentTransaction);
+    }
+
     public async Task<IEnumerable<Account>> GetByUserIdAsync(int userId)
     {
         return await _db.Connection.QueryAsync<Account>(
