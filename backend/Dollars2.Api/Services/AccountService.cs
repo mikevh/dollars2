@@ -52,10 +52,11 @@ public class AccountService
         var balancesByAccount = latestBalances.ToDictionary(b => b.AccountId);
         var groups = new List<AccountGroupResponse>();
 
-        var syncable = accounts.Where(a => a.SourceType != SyncConstants.SourceTypeManual);
-        foreach (var bySource in syncable.GroupBy(a => a.SourceType))
+        var syncable = accounts.Where(a => !SyncConstants.IsManual(a.SourceType));
+        foreach (var bySource in syncable.GroupBy(a => a.SourceType, StringComparer.OrdinalIgnoreCase))
         {
             providers.TryGetValue(bySource.Key, out var provider);
+            var canonicalSourceType = provider?.SourceType ?? bySource.Key;
 
             // Accounts that share a connection key are fetched together by the sync service; group them
             // together here too. Fall back to a per-account key when the provider is unknown, mirroring
@@ -67,14 +68,14 @@ public class AccountService
             {
                 groups.Add(new AccountGroupResponse
                 {
-                    ConnectionId = ConnectionKeyHasher.Hash(bySource.Key, connection.Key),
-                    SourceType = bySource.Key,
+                    ConnectionId = ConnectionKeyHasher.Hash(canonicalSourceType, connection.Key),
+                    SourceType = canonicalSourceType,
                     Accounts = connection.Select(a => ToInfo(a, logsByAccount, balancesByAccount)).ToList(),
                 });
             }
         }
 
-        var manual = accounts.Where(a => a.SourceType == SyncConstants.SourceTypeManual).ToList();
+        var manual = accounts.Where(a => SyncConstants.IsManual(a.SourceType)).ToList();
         if (manual.Count > 0)
         {
             groups.Add(new AccountGroupResponse

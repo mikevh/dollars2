@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Dollars2.Api.Models;
+using Dollars2.Api.Services;
 
 namespace Dollars2.Api.Providers;
 
@@ -21,7 +22,7 @@ public class SimplefinProvider : IBankSyncProvider
         MinSyncInterval = TimeSpan.FromHours(hours);
     }
 
-    public string SourceType => "SimpleFIN";
+    public string SourceType => SyncConstants.SourceTypeSimpleFin;
 
     public bool Enabled { get; }
 

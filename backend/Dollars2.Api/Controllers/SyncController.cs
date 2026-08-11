@@ -101,7 +101,7 @@ public class SyncController : DollarsControllerBase
     {
         var userId = GetUserId();
         var accounts = (await _accountRepo.GetByUserIdAsync(userId)).ToList();
-        var syncable = accounts.Where(a => a.SourceType != SyncConstants.SourceTypeManual).ToList();
+        var syncable = accounts.Where(a => !SyncConstants.IsManual(a.SourceType)).ToList();
 
         if (syncable.Count == 0)
         {
