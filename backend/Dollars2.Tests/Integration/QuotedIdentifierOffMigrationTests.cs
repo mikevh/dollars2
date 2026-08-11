@@ -23,20 +23,7 @@ public sealed class QuotedIdentifierOffMigrationFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         await _container.StartAsync();
-
-        var masterConnectionString = _container.GetConnectionString();
-        await using (var master = new SqlConnection(masterConnectionString))
-        {
-            await master.OpenAsync();
-            await using var create = master.CreateCommand();
-            create.CommandText = $"IF DB_ID('{TestDatabaseName}') IS NULL CREATE DATABASE [{TestDatabaseName}];";
-            await create.ExecuteNonQueryAsync();
-        }
-
-        _connectionString = new SqlConnectionStringBuilder(masterConnectionString)
-        {
-            InitialCatalog = TestDatabaseName,
-        }.ConnectionString;
+        _connectionString = await MsSqlContainerFixture.ProvisionDatabaseAsync(_container, TestDatabaseName);
     }
 
     public string ConnectionString => _connectionString;

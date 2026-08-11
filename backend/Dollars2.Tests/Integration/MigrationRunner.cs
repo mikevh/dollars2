@@ -45,9 +45,12 @@ public static class MigrationRunner
 
     /// <param name="connectionString">Target database connection string.</param>
     /// <param name="quotedIdentifierOff">
-    /// When true, issues <c>SET QUOTED_IDENTIFIER OFF</c> on the session before applying any
-    /// script, mirroring sqlcmd's default (ADO.NET's <see cref="SqlConnection"/> otherwise opens
-    /// sessions with it ON). Used to reproduce and guard against issue #76.
+    /// When true, resets the session to <c>SET QUOTED_IDENTIFIER OFF</c> before every script,
+    /// mirroring sqlcmd (a fresh process/session per file, defaulting OFF — ADO.NET's
+    /// <see cref="SqlConnection"/> otherwise opens sessions with it ON). Reset per-script rather
+    /// than once, so an earlier script's own <c>SET ... ON</c> (e.g. 007's) can't leak into later
+    /// scripts on this shared connection the way it never could across sqlcmd's separate
+    /// sessions. Used to reproduce and guard against issue #76.
     /// </param>
     public static async Task ApplyAsync(string connectionString, bool quotedIdentifierOff = false)
     {
@@ -58,15 +61,15 @@ public static class MigrationRunner
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync();
 
-        if (quotedIdentifierOff)
-        {
-            await using var setCommand = connection.CreateCommand();
-            setCommand.CommandText = "SET QUOTED_IDENTIFIER OFF;";
-            await setCommand.ExecuteNonQueryAsync();
-        }
-
         foreach (var scriptPath in scripts)
         {
+            if (quotedIdentifierOff)
+            {
+                await using var setCommand = connection.CreateCommand();
+                setCommand.CommandText = "SET QUOTED_IDENTIFIER OFF;";
+                await setCommand.ExecuteNonQueryAsync();
+            }
+
             var sql = await File.ReadAllTextAsync(scriptPath);
             await using var command = connection.CreateCommand();
             command.CommandText = sql;

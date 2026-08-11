@@ -24,22 +24,7 @@ public sealed class MsSqlContainerFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         await _container.StartAsync();
-
-        // The container's default connection string targets master; carve out a dedicated DB.
-        var masterConnectionString = _container.GetConnectionString();
-        await using (var master = new SqlConnection(masterConnectionString))
-        {
-            await master.OpenAsync();
-            await using var create = master.CreateCommand();
-            create.CommandText = $"IF DB_ID('{TestDatabaseName}') IS NULL CREATE DATABASE [{TestDatabaseName}];";
-            await create.ExecuteNonQueryAsync();
-        }
-
-        _connectionString = new SqlConnectionStringBuilder(masterConnectionString)
-        {
-            InitialCatalog = TestDatabaseName,
-        }.ConnectionString;
-
+        _connectionString = await ProvisionDatabaseAsync(_container, TestDatabaseName);
         await MigrationRunner.ApplyAsync(_connectionString);
     }
 
@@ -55,6 +40,28 @@ public sealed class MsSqlContainerFixture : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         await _container.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Creates (if missing) a dedicated database on an already-started container and returns a
+    /// connection string targeting it. Shared by fixtures that need their own throwaway database
+    /// without duplicating the master-connection/CREATE DATABASE dance.
+    /// </summary>
+    internal static async Task<string> ProvisionDatabaseAsync(MsSqlContainer container, string databaseName)
+    {
+        var masterConnectionString = container.GetConnectionString();
+        await using (var master = new SqlConnection(masterConnectionString))
+        {
+            await master.OpenAsync();
+            await using var create = master.CreateCommand();
+            create.CommandText = $"IF DB_ID('{databaseName}') IS NULL CREATE DATABASE [{databaseName}];";
+            await create.ExecuteNonQueryAsync();
+        }
+
+        return new SqlConnectionStringBuilder(masterConnectionString)
+        {
+            InitialCatalog = databaseName,
+        }.ConnectionString;
     }
 }
 
