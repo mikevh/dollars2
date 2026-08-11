@@ -33,24 +33,24 @@ public sealed class BuildBudgetResponseAsyncTests
 
             var mayBudgetId = await SeedBudgetAsync(db, userId, 2026, 5);
             var mayGroupId = await SeedGroupAsync(db, mayBudgetId, "Bills", sortOrder: 0);
-            var mayWaterId = await SeedLineItemAsync(db, mayGroupId, "Water", plannedAmount: 40m, sortOrder: 0);
+            var mayWaterId = await SeedLineItemAsync(db, mayGroupId, mayBudgetId, "Water", plannedAmount: 40m, sortOrder: 0);
             await AssignAsync(db, userId, mayWaterId, -10m); // May leftover: 40 + (-10) = 30
 
             var juneBudgetId = await SeedBudgetAsync(db, userId, 2026, 6);
             var juneGroupId = await SeedGroupAsync(db, juneBudgetId, "Bills", sortOrder: 0);
-            var juneWaterId = await SeedLineItemAsync(db, juneGroupId, "Water", plannedAmount: 50m, sortOrder: 0, previousLineItemId: mayWaterId);
+            var juneWaterId = await SeedLineItemAsync(db, juneGroupId, juneBudgetId, "Water", plannedAmount: 50m, sortOrder: 0, previousLineItemId: mayWaterId);
             await AssignAsync(db, userId, juneWaterId, -20m); // June leftover: 50 + (-20) = 30
 
             var julyBudgetId = await SeedBudgetAsync(db, userId, 2026, 7);
             var incomeGroupId = await SeedGroupAsync(db, julyBudgetId, "Income", sortOrder: 0);
-            var paycheckId = await SeedLineItemAsync(db, incomeGroupId, "Paycheck", plannedAmount: 1000m, sortOrder: 0, isIncome: true);
+            var paycheckId = await SeedLineItemAsync(db, incomeGroupId, julyBudgetId, "Paycheck", plannedAmount: 1000m, sortOrder: 0, isIncome: true);
             await AssignAsync(db, userId, paycheckId, 900m);
 
             var billsGroupId = await SeedGroupAsync(db, julyBudgetId, "Bills", sortOrder: 1);
             // Seed Rent before Water but give it a higher SortOrder, so a correctness check on
             // ordering actually exercises the ORDER BY rather than matching insertion order by luck.
-            var rentId = await SeedLineItemAsync(db, billsGroupId, "Rent", plannedAmount: 800m, sortOrder: 1);
-            var julyWaterId = await SeedLineItemAsync(db, billsGroupId, "Water", plannedAmount: 60m, sortOrder: 0, previousLineItemId: juneWaterId);
+            var rentId = await SeedLineItemAsync(db, billsGroupId, julyBudgetId, "Rent", plannedAmount: 800m, sortOrder: 1);
+            var julyWaterId = await SeedLineItemAsync(db, billsGroupId, julyBudgetId, "Water", plannedAmount: 60m, sortOrder: 0, previousLineItemId: juneWaterId);
             await AssignAsync(db, userId, julyWaterId, -15m);
 
             var service = BudgetServiceFor(db);
@@ -111,7 +111,7 @@ public sealed class BuildBudgetResponseAsyncTests
                 var groupId = await SeedGroupAsync(db, budgetId, $"Group {g}", sortOrder: g);
                 for (var i = 0; i < itemsPerGroup; i++)
                 {
-                    var itemId = await SeedLineItemAsync(db, groupId, $"Item {g}-{i}", plannedAmount: 100m, sortOrder: i);
+                    var itemId = await SeedLineItemAsync(db, groupId, budgetId, $"Item {g}-{i}", plannedAmount: 100m, sortOrder: i);
                     await AssignAsync(db, userId, itemId, -25m);
                 }
             }
@@ -183,13 +183,13 @@ public sealed class BuildBudgetResponseAsyncTests
             db.CurrentTransaction);
     }
 
-    private static async Task<int> SeedLineItemAsync(DbSession db, int groupId, string name, decimal plannedAmount, int sortOrder, int? previousLineItemId = null, bool isIncome = false)
+    private static async Task<int> SeedLineItemAsync(DbSession db, int groupId, int budgetId, string name, decimal plannedAmount, int sortOrder, int? previousLineItemId = null, bool isIncome = false)
     {
         return await db.Connection.QuerySingleAsync<int>(
-            @"INSERT INTO LineItems (GroupId, Name, PlannedAmount, IsIncome, SortOrder, PreviousLineItemId, CreatedAt, UpdatedAt)
-              VALUES (@groupId, @name, @plannedAmount, @isIncome, @sortOrder, @previousLineItemId, SYSUTCDATETIME(), SYSUTCDATETIME());
+            @"INSERT INTO LineItems (GroupId, BudgetId, Name, PlannedAmount, IsIncome, SortOrder, PreviousLineItemId, CreatedAt, UpdatedAt)
+              VALUES (@groupId, @budgetId, @name, @plannedAmount, @isIncome, @sortOrder, @previousLineItemId, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { groupId, name, plannedAmount, isIncome, sortOrder, previousLineItemId },
+            new { groupId, budgetId, name, plannedAmount, isIncome, sortOrder, previousLineItemId },
             db.CurrentTransaction);
     }
 }

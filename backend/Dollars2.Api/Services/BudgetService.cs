@@ -70,7 +70,7 @@ public class BudgetService
             else
             {
                 var groupId = await _groupRepo.CreateAsync(budgetId, "Income", 0);
-                await _lineItemRepo.CreateAsync(groupId, "Paycheck", 0, 0, isIncome: true);
+                await _lineItemRepo.CreateAsync(groupId, budgetId, "Paycheck", 0, 0, isIncome: true);
             }
 
             _dbSession.Commit();
@@ -211,7 +211,7 @@ public class BudgetService
         }
 
         var maxSort = await _lineItemRepo.GetMaxSortOrderAsync(groupId);
-        var itemId = await _lineItemRepo.CreateAsync(groupId, name, plannedAmount, maxSort + 1, isIncome);
+        var itemId = await _lineItemRepo.CreateAsync(groupId, group.BudgetId, name, plannedAmount, maxSort + 1, isIncome);
         var item = (await _lineItemRepo.GetByIdAsync(itemId))!;
 
         return DollarsApiResponse<LineItemResponse>.Success(await MapLineItemAsync(item));
@@ -403,7 +403,7 @@ public class BudgetService
 
             foreach (var sourceItem in sourceItems)
             {
-                await _lineItemRepo.CreateAsync(newGroupId, sourceItem.Name, sourceItem.PlannedAmount, sourceItem.SortOrder, sourceItem.IsIncome, sourceItem.Id, sourceItem.Notes);
+                await _lineItemRepo.CreateAsync(newGroupId, targetBudgetId, sourceItem.Name, sourceItem.PlannedAmount, sourceItem.SortOrder, sourceItem.IsIncome, sourceItem.Id, sourceItem.Notes);
             }
         }
     }
@@ -426,12 +426,8 @@ public class BudgetService
 
     private async Task<bool> VerifyLineItemOwnershipAsync(LineItem item, int userId)
     {
-        var group = await _groupRepo.GetByIdAsync(item.GroupId);
-        if (group is null)
-        {
-            return false;
-        }
-        return await VerifyGroupOwnershipAsync(group, userId);
+        var budget = await _budgetRepo.GetByIdAsync(item.BudgetId);
+        return budget is not null && budget.UserId == userId;
     }
 
     private async Task<LineItemResponse> MapLineItemAsync(LineItem item)

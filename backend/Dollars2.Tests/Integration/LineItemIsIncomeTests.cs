@@ -41,8 +41,8 @@ public sealed class LineItemIsIncomeTests
             var groupId = await SeedGroupAsync(db, budgetId, "Group");
             var repo = new LineItemRepository(db);
 
-            var incomeId = await repo.CreateAsync(groupId, "Paycheck", 0, 0, isIncome: true);
-            var expenseId = await repo.CreateAsync(groupId, "Rent", 0, 1, isIncome: false);
+            var incomeId = await repo.CreateAsync(groupId, budgetId, "Paycheck", 0, 0, isIncome: true);
+            var expenseId = await repo.CreateAsync(groupId, budgetId, "Rent", 0, 1, isIncome: false);
 
             var income = await repo.GetByIdAsync(incomeId);
             var expense = await repo.GetByIdAsync(expenseId);
@@ -67,11 +67,11 @@ public sealed class LineItemIsIncomeTests
             var budgetId = await SeedBudgetAsync(db, userId, 2026, 7);
             var groupId = await SeedGroupAsync(db, budgetId, "Group");
 
-            var prevExpenseId = await SeedLineItemAsync(db, groupId, "Rent (prior)", 100, isIncome: false);
-            var curExpenseId = await SeedLineItemAsync(db, groupId, "Rent", 50, isIncome: false, previousLineItemId: prevExpenseId);
+            var prevExpenseId = await SeedLineItemAsync(db, groupId, budgetId, "Rent (prior)", 100, isIncome: false);
+            var curExpenseId = await SeedLineItemAsync(db, groupId, budgetId, "Rent", 50, isIncome: false, previousLineItemId: prevExpenseId);
 
-            var prevIncomeId = await SeedLineItemAsync(db, groupId, "Paycheck (prior)", 200, isIncome: true);
-            var curIncomeId = await SeedLineItemAsync(db, groupId, "Paycheck", 300, isIncome: true, previousLineItemId: prevIncomeId);
+            var prevIncomeId = await SeedLineItemAsync(db, groupId, budgetId, "Paycheck (prior)", 200, isIncome: true);
+            var curIncomeId = await SeedLineItemAsync(db, groupId, budgetId, "Paycheck", 300, isIncome: true, previousLineItemId: prevIncomeId);
 
             var service = BudgetServiceFor(db);
 
@@ -150,7 +150,7 @@ public sealed class LineItemIsIncomeTests
             userId = await SeedUserAsync(db, email);
             var budgetId = await SeedBudgetAsync(db, userId, 2026, 7);
             var groupId = await SeedGroupAsync(db, budgetId, "Income");
-            var onlyIncomeId = await SeedLineItemAsync(db, groupId, "Paycheck", 0, isIncome: true);
+            var onlyIncomeId = await SeedLineItemAsync(db, groupId, budgetId, "Paycheck", 0, isIncome: true);
 
             var service = BudgetServiceFor(db);
             var result = await service.DeleteLineItemAsync(onlyIncomeId, userId);
@@ -175,8 +175,8 @@ public sealed class LineItemIsIncomeTests
             userId = await SeedUserAsync(db, email);
             var budgetId = await SeedBudgetAsync(db, userId, 2026, 7);
             var groupId = await SeedGroupAsync(db, budgetId, "Income");
-            var firstIncomeId = await SeedLineItemAsync(db, groupId, "Paycheck 1", 0, isIncome: true);
-            await SeedLineItemAsync(db, groupId, "Paycheck 2", 0, isIncome: true);
+            var firstIncomeId = await SeedLineItemAsync(db, groupId, budgetId, "Paycheck 1", 0, isIncome: true);
+            await SeedLineItemAsync(db, groupId, budgetId, "Paycheck 2", 0, isIncome: true);
 
             var service = BudgetServiceFor(db);
             var result = await service.DeleteLineItemAsync(firstIncomeId, userId);
@@ -209,8 +209,8 @@ public sealed class LineItemIsIncomeTests
             userId = await SeedUserAsync(seedDb, email);
             var budgetId = await SeedBudgetAsync(seedDb, userId, 2026, 7);
             var groupId = await SeedGroupAsync(seedDb, budgetId, "Income");
-            var firstIncomeId = await SeedLineItemAsync(seedDb, groupId, "Paycheck 1", 0, isIncome: true);
-            var secondIncomeId = await SeedLineItemAsync(seedDb, groupId, "Paycheck 2", 0, isIncome: true);
+            var firstIncomeId = await SeedLineItemAsync(seedDb, groupId, budgetId, "Paycheck 1", 0, isIncome: true);
+            var secondIncomeId = await SeedLineItemAsync(seedDb, groupId, budgetId, "Paycheck 2", 0, isIncome: true);
 
             using var dbA = _fixture.CreateSession();
             using var dbB = _fixture.CreateSession();
@@ -243,8 +243,8 @@ public sealed class LineItemIsIncomeTests
             userId = await SeedUserAsync(db, email);
             var budgetId = await SeedBudgetAsync(db, userId, 2026, 7);
             var groupId = await SeedGroupAsync(db, budgetId, "Group");
-            await SeedLineItemAsync(db, groupId, "Paycheck", 0, isIncome: true); // the only income item
-            var expenseId = await SeedLineItemAsync(db, groupId, "Rent", 0, isIncome: false);
+            await SeedLineItemAsync(db, groupId, budgetId, "Paycheck", 0, isIncome: true); // the only income item
+            var expenseId = await SeedLineItemAsync(db, groupId, budgetId, "Rent", 0, isIncome: false);
 
             var service = BudgetServiceFor(db);
             var result = await service.DeleteLineItemAsync(expenseId, userId);
@@ -329,13 +329,13 @@ public sealed class LineItemIsIncomeTests
             db.CurrentTransaction);
     }
 
-    private static async Task<int> SeedLineItemAsync(DbSession db, int groupId, string name, decimal plannedAmount, bool isIncome, int? previousLineItemId = null)
+    private static async Task<int> SeedLineItemAsync(DbSession db, int groupId, int budgetId, string name, decimal plannedAmount, bool isIncome, int? previousLineItemId = null)
     {
         return await db.Connection.QuerySingleAsync<int>(
-            @"INSERT INTO LineItems (GroupId, Name, PlannedAmount, IsIncome, SortOrder, PreviousLineItemId, CreatedAt, UpdatedAt)
-              VALUES (@groupId, @name, @plannedAmount, @isIncome, 0, @previousLineItemId, SYSUTCDATETIME(), SYSUTCDATETIME());
+            @"INSERT INTO LineItems (GroupId, BudgetId, Name, PlannedAmount, IsIncome, SortOrder, PreviousLineItemId, CreatedAt, UpdatedAt)
+              VALUES (@groupId, @budgetId, @name, @plannedAmount, @isIncome, 0, @previousLineItemId, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { groupId, name, plannedAmount, isIncome, previousLineItemId },
+            new { groupId, budgetId, name, plannedAmount, isIncome, previousLineItemId },
             db.CurrentTransaction);
     }
 

@@ -4,6 +4,7 @@ public class LineItem
 {
     public int Id { get; set; }
     public int GroupId { get; set; }
+    public int BudgetId { get; set; }
     public required string Name { get; set; }
     public decimal PlannedAmount { get; set; }
     public bool IsIncome { get; set; }

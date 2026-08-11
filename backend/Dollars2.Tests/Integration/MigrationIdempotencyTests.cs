@@ -71,7 +71,29 @@ public sealed class MigrationIdempotencyTests
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         Assert.Contains("Payee", transactionColumns);
         Assert.Contains("Memo", transactionColumns);
+
+        // Issue #86: LineItems.BudgetId survives the repeat apply, stays NOT NULL, and keeps its FK
+        // to Budgets — the backfill migration only runs once, guarded by its own Migrations row.
+        var lineItemColumns = (await db.Connection.QueryAsync<LineItemColumnInfo>(
+            "SELECT name AS Name, is_nullable AS IsNullable FROM sys.columns WHERE object_id = OBJECT_ID('LineItems')"))
+            .ToDictionary(c => c.Name, c => c.IsNullable, StringComparer.OrdinalIgnoreCase);
+        Assert.True(lineItemColumns.ContainsKey("BudgetId"));
+        Assert.False(lineItemColumns["BudgetId"]);
+
+        var foreignKeys = (await db.Connection.QueryAsync<string>(
+            "SELECT name FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('LineItems')"))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("FK_LineItems_Budgets", foreignKeys);
+
+        // No pre-existing LineItems row was left with a NULL or mismatched BudgetId by the backfill.
+        var badBackfillCount = await db.Connection.ExecuteScalarAsync<int>(
+            @"SELECT COUNT(*) FROM LineItems li
+              INNER JOIN BudgetGroups bg ON bg.Id = li.GroupId
+              WHERE li.BudgetId IS NULL OR li.BudgetId <> bg.BudgetId");
+        Assert.Equal(0, badBackfillCount);
     }
 
     private sealed record MigrationCount(string ScriptName, int Count);
+
+    private sealed record LineItemColumnInfo(string Name, bool IsNullable);
 }
