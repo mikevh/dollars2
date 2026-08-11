@@ -25,20 +25,34 @@ public class TransactionAssignmentRepository
             _db.CurrentTransaction);
     }
 
-    /// <summary>All assignments for every id in <paramref name="transactionIds"/> in one round trip,
-    /// joined to the line item name so callers don't need a per-assignment lookup. A transaction with
-    /// no assignments has no rows in the result. Callers must not pass an empty collection (produces
-    /// an invalid "IN ()").</summary>
+    // Chunk size for GetByTransactionIdsAsync's IN clause. Dapper expands "IN @ids" into one SQL
+    // parameter per id, and SQL Server rejects a batch with more than ~2100 total parameters — a
+    // real ceiling here since GetDeletedAsync/GetPendingAsync/GetNewAsync are unbounded and can
+    // accumulate past it over a long-lived account's history. Comfortably under that limit.
+    private const int TransactionIdBatchSize = 2000;
+
+    /// <summary>All assignments for every id in <paramref name="transactionIds"/>, joined to the line
+    /// item name so callers don't need a per-assignment lookup. Batched internally at
+    /// <see cref="TransactionIdBatchSize"/> ids per round trip so a large caller-supplied set can't
+    /// blow past SQL Server's per-query parameter limit; the common case (well under the batch size)
+    /// still costs exactly one round trip. A transaction with no assignments has no rows in the
+    /// result. Callers must not pass an empty collection (produces an invalid "IN ()").</summary>
     public async Task<IEnumerable<TransactionAssignmentWithLineItem>> GetByTransactionIdsAsync(IEnumerable<int> transactionIds)
     {
-        return await _db.Connection.QueryAsync<TransactionAssignmentWithLineItem>(
-            @"SELECT ta.Id, ta.TransactionId, ta.LineItemId, li.Name AS LineItemName, ta.Amount
-              FROM TransactionAssignments ta
-              INNER JOIN LineItems li ON li.Id = ta.LineItemId
-              WHERE ta.TransactionId IN @transactionIds
-              ORDER BY ta.Id",
-            new { transactionIds },
-            _db.CurrentTransaction);
+        var results = new List<TransactionAssignmentWithLineItem>();
+        foreach (var batch in transactionIds.Chunk(TransactionIdBatchSize))
+        {
+            var rows = await _db.Connection.QueryAsync<TransactionAssignmentWithLineItem>(
+                @"SELECT ta.Id, ta.TransactionId, ta.LineItemId, li.Name AS LineItemName, ta.Amount
+                  FROM TransactionAssignments ta
+                  INNER JOIN LineItems li ON li.Id = ta.LineItemId
+                  WHERE ta.TransactionId IN @transactionIds
+                  ORDER BY ta.Id",
+                new { transactionIds = batch },
+                _db.CurrentTransaction);
+            results.AddRange(rows);
+        }
+        return results;
     }
 
     public async Task<IEnumerable<TransactionAssignment>> GetByLineItemIdAsync(int lineItemId)
