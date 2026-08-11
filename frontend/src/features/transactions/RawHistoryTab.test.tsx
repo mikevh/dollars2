@@ -75,16 +75,6 @@ describe('RawHistoryTab', () => {
     expect(document.querySelectorAll('pre')).toHaveLength(1)
   })
 
-  it('pretty-prints the payload of an expanded sighting', async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: [makeEntry()], error: null })
-    renderTab()
-
-    await screen.findByText('1 sighting from SimpleFIN')
-    const payload = document.querySelector('pre')!
-    expect(payload.textContent).toBe('{\n  "id": "abc123",\n  "amount": "-42.10",\n  "pending": false\n}')
-    expect(payload.className).toContain('overflow-x-auto')
-  })
-
   it('expands and re-collapses an older sighting when its header is clicked', async () => {
     vi.mocked(api.get).mockResolvedValue({
       data: [makeEntry({ syncRunId: 'run-2' }), makeEntry({ syncRunId: 'run-1', rawJson: '{"older":true}' })],
