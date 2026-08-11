@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../api/client'
@@ -36,7 +36,7 @@ function makeLineItem(overrides: Partial<LineItemResponse> = {}): LineItemRespon
 function renderRow(props: Partial<Parameters<typeof LineItemRow>[0]> = {}) {
   const { rerender } = render(
     <Provider store={store}>
-      <LineItemRow lineItem={makeLineItem()} groupId={1} {...props} />
+      <LineItemRow lineItem={makeLineItem()} groupId={1} metric="remaining" {...props} />
     </Provider>,
   )
   return {
@@ -44,7 +44,7 @@ function renderRow(props: Partial<Parameters<typeof LineItemRow>[0]> = {}) {
     setLineItem: (lineItem: LineItemResponse) =>
       rerender(
         <Provider store={store}>
-          <LineItemRow lineItem={lineItem} groupId={1} {...props} />
+          <LineItemRow lineItem={lineItem} groupId={1} metric="remaining" {...props} />
         </Provider>,
       ),
   }
@@ -61,11 +61,23 @@ describe('LineItemRow name editing', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
-  it('mounts with the name editor open and empty when startEditing is set', () => {
+  it('mounts with the name editor open and empty when startEditing is set', async () => {
     renderRow({ startEditing: true })
     const input = screen.getByRole('textbox')
     expect(input).toHaveValue('')
-    expect(input).toHaveFocus()
+    await waitFor(() => expect(input).toHaveFocus())
+  })
+})
+
+describe('LineItemRow focus+select on open', () => {
+  it('focuses and selects the amount editor text once it opens', async () => {
+    renderRow()
+    fireEvent.click(screen.getByText('$200.00'))
+
+    const input = screen.getByRole('textbox') as HTMLInputElement
+    await waitFor(() => expect(input).toHaveFocus())
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(input.value.length)
   })
 })
 
@@ -75,7 +87,7 @@ describe('LineItemRow draft re-sync', () => {
     setLineItem(makeLineItem({ plannedAmount: 400 }))
 
     fireEvent.click(screen.getByText('$400.00'))
-    expect(screen.getByRole('spinbutton')).toHaveValue(400)
+    expect(screen.getByRole('textbox')).toHaveValue('400')
   })
 
   it('seeds the name editor from the latest prop after an in-place rename', () => {
@@ -92,7 +104,7 @@ describe('LineItemRow draft re-sync', () => {
 
     const span = screen.getByText('$400.00')
     fireEvent.click(span)
-    fireEvent.blur(screen.getByRole('spinbutton'))
+    fireEvent.blur(screen.getByRole('textbox'))
 
     await vi.waitFor(() => expect(screen.getByText('$400.00')).toBeInTheDocument())
     expect(vi.mocked(api.put)).not.toHaveBeenCalled()
@@ -102,10 +114,10 @@ describe('LineItemRow draft re-sync', () => {
     const { setLineItem } = renderRow()
 
     fireEvent.click(screen.getByText('$200.00'))
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '999' } })
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '999' } })
     setLineItem(makeLineItem({ plannedAmount: 400 }))
 
-    expect(screen.getByRole('spinbutton')).toHaveValue(999)
+    expect(screen.getByRole('textbox')).toHaveValue('999')
   })
 
   // A rejected save leaves the prop unchanged, so the re-seed can't fire on its own.
@@ -117,15 +129,15 @@ describe('LineItemRow draft re-sync', () => {
     renderRow()
 
     fireEvent.click(screen.getByText('$200.00'))
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '999' } })
-    fireEvent.blur(screen.getByRole('spinbutton'))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '999' } })
+    fireEvent.blur(screen.getByRole('textbox'))
     await vi.waitFor(() => expect(screen.getByText('$200.00')).toBeInTheDocument())
 
     vi.mocked(api.put).mockClear()
     fireEvent.click(screen.getByText('$200.00'))
-    expect(screen.getByRole('spinbutton')).toHaveValue(200)
+    expect(screen.getByRole('textbox')).toHaveValue('200')
 
-    fireEvent.blur(screen.getByRole('spinbutton'))
+    fireEvent.blur(screen.getByRole('textbox'))
     await vi.waitFor(() => expect(screen.getByText('$200.00')).toBeInTheDocument())
     expect(vi.mocked(api.put)).not.toHaveBeenCalled()
   })
@@ -149,5 +161,38 @@ describe('LineItemRow draft re-sync', () => {
     fireEvent.blur(screen.getByRole('textbox'))
     await vi.waitFor(() => expect(screen.getByText('Rent')).toBeInTheDocument())
     expect(vi.mocked(api.put)).not.toHaveBeenCalled()
+  })
+})
+
+describe('LineItemRow amount masking', () => {
+  it('rejects a keystroke that would produce more than two decimal places', () => {
+    renderRow()
+    fireEvent.click(screen.getByText('$200.00'))
+
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: '12.345' } })
+    expect(input).toHaveValue('200')
+  })
+
+  it('accepts a valid decimal draft', () => {
+    renderRow()
+    fireEvent.click(screen.getByText('$200.00'))
+
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: '12.34' } })
+    expect(input).toHaveValue('12.34')
+  })
+})
+
+describe('LineItemRow metric column', () => {
+  it('shows Remaining by default', () => {
+    renderRow({ lineItem: makeLineItem({ plannedAmount: 200, spentAmount: 50 }) })
+    expect(screen.getByText('$150.00')).toBeInTheDocument()
+  })
+
+  it('shows the Spent/Received figure when metric is "actual"', () => {
+    renderRow({ metric: 'actual', lineItem: makeLineItem({ plannedAmount: 200, spentAmount: 50 }) })
+    expect(screen.getByText('$50.00')).toBeInTheDocument()
+    expect(screen.queryByText('$150.00')).not.toBeInTheDocument()
   })
 })

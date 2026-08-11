@@ -152,7 +152,11 @@ export default function BudgetPage()
 
             {currentMonthBudget && (
               <div className={loading ? 'opacity-60' : ''} aria-busy={loading}>
-                <BudgetPane budget={currentMonthBudget} onSelectLineItem={setSelectedLineItemId} />
+                <BudgetPane
+                  budget={currentMonthBudget}
+                  selectedLineItemId={selectedLineItemId}
+                  onSelectLineItem={setSelectedLineItemId}
+                />
               </div>
             )}
           </div>

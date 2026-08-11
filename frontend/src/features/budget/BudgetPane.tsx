@@ -8,10 +8,11 @@ import BudgetGroupCard from './BudgetGroupCard'
 
 interface BudgetPaneProps {
   budget: BudgetResponse
+  selectedLineItemId?: number | null
   onSelectLineItem?: (lineItemId: number) => void
 }
 
-export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps) {
+export default function BudgetPane({ budget, selectedLineItemId, onSelectLineItem }: BudgetPaneProps) {
   const dispatch = useAppDispatch()
   const [addingGroup, setAddingGroup] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
@@ -91,7 +92,12 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
 
       <div>
         {budget.groups.map((group) => (
-          <BudgetGroupCard key={group.id} group={group} onSelectLineItem={onSelectLineItem} />
+          <BudgetGroupCard
+            key={group.id}
+            group={group}
+            selectedLineItemId={selectedLineItemId}
+            onSelectLineItem={onSelectLineItem}
+          />
         ))}
 
         {addingGroup ? (
@@ -123,7 +129,10 @@ export default function BudgetPane({ budget, onSelectLineItem }: BudgetPaneProps
             </button>
           </div>
         ) : (
-          <button onClick={() => setAddingGroup(true)} className="btn btn-ghost">
+          <button
+            onClick={() => setAddingGroup(true)}
+            className="font-heading text-sm font-extrabold text-[var(--app-blue)] hover:text-[var(--app-blue-hover)]"
+          >
             + Add Group
           </button>
         )}

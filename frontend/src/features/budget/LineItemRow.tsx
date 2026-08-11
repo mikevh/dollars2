@@ -3,19 +3,24 @@ import toast from 'react-hot-toast'
 import { useDroppable } from '@dnd-kit/core'
 import type { LineItemResponse } from '../../types/budget'
 import { formatCurrency } from '../../utils/format'
+import { isMoneyDraft } from '../../utils/money'
 import { useAppDispatch } from '../../app/hooks'
+import { useFocusSelectOnOpen } from '../../hooks/useFocusSelectOnOpen'
 import { updateLineItem, deleteLineItem } from './budgetSlice'
+import { GROUP_GRID_COLUMNS, type GroupMetric } from './groupGridColumns'
 import FlowAmount from './FlowAmount'
 
 interface LineItemRowProps {
   lineItem: LineItemResponse
   groupId: number
+  metric: GroupMetric
+  isSelected?: boolean
   startEditing?: boolean
   onEditComplete?: () => void
   onSelect?: () => void
 }
 
-export default function LineItemRow({ lineItem, groupId, startEditing, onEditComplete, onSelect }: LineItemRowProps) {
+export default function LineItemRow({ lineItem, groupId, metric, isSelected, startEditing, onEditComplete, onSelect }: LineItemRowProps) {
   const isIncome = lineItem.isIncome
   const dispatch = useAppDispatch()
   const { isOver, setNodeRef } = useDroppable({
@@ -28,6 +33,8 @@ export default function LineItemRow({ lineItem, groupId, startEditing, onEditCom
   const [editingAmount, setEditingAmount] = useState(false)
   const [nameValue, setNameValue] = useState(startEditing ? '' : lineItem.name)
   const [amountValue, setAmountValue] = useState(lineItem.plannedAmount.toString())
+  const nameInputRef = useFocusSelectOnOpen<HTMLInputElement>(editingName)
+  const amountInputRef = useFocusSelectOnOpen<HTMLInputElement>(editingAmount)
 
   // Re-seed the drafts whenever the saved values change. A reducer that replaces
   // the line item in place — another tab's edit landing through a refresh, or a
@@ -115,13 +122,15 @@ export default function LineItemRow({ lineItem, groupId, startEditing, onEditCom
     <div
       ref={setNodeRef}
       onClick={(e) => { e.stopPropagation(); onSelect?.() }}
-      className={`flex h-11 cursor-pointer items-center justify-between border-b border-divider px-4 last:border-b-0 hover:bg-[color-mix(in_srgb,var(--color-text)_6%,transparent)] ${
-        isOver ? 'bg-accent-100 ring-1 ring-inset ring-accent' : ''
-      }`}
+      className={`grid h-[50px] cursor-pointer items-center gap-4 border-b border-divider px-6 last:border-b-0 hover:bg-[var(--app-hover)] ${
+        isSelected ? 'bg-[var(--app-hover)] shadow-[inset_3px_0_0_var(--color-accent)]' : ''
+      } ${isOver ? 'bg-accent-100 ring-1 ring-inset ring-accent' : ''}`}
+      style={{ gridTemplateColumns: GROUP_GRID_COLUMNS }}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         {editingName ? (
           <input
+            ref={nameInputRef}
             type="text"
             value={nameValue}
             onChange={(e) => setNameValue(e.target.value)}
@@ -135,13 +144,12 @@ export default function LineItemRow({ lineItem, groupId, startEditing, onEditCom
                 setNameValue(lineItem.name)
               }
             }}
-            autoFocus
             className="border border-divider bg-surface px-2 py-0.5 text-sm text-text"
           />
         ) : (
           <span
             onClick={(e) => { e.stopPropagation(); setEditingName(true) }}
-            className="cursor-text text-sm text-text hover:text-accent-700"
+            className="cursor-text truncate text-sm text-text hover:text-accent-700"
           >
             {lineItem.name}
           </span>
@@ -149,7 +157,7 @@ export default function LineItemRow({ lineItem, groupId, startEditing, onEditCom
         {editingName && <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={(e) => { e.stopPropagation(); handleDelete() }}
-          className="text-muted hover:text-accent-700"
+          className="shrink-0 text-muted hover:text-accent-700"
           title="Delete item"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
@@ -157,12 +165,15 @@ export default function LineItemRow({ lineItem, groupId, startEditing, onEditCom
           </svg>
         </button>}
       </div>
-      <div className="flex gap-6 text-sm tabular-nums">
+
+      <div className="text-right text-sm tabular-nums">
         {editingAmount ? (
           <input
-            type="number"
+            ref={amountInputRef}
+            type="text"
+            inputMode="decimal"
             value={amountValue}
-            onChange={(e) => setAmountValue(e.target.value)}
+            onChange={(e) => { if (isMoneyDraft(e.target.value)) { setAmountValue(e.target.value) } }}
             onClick={(e) => e.stopPropagation()}
             onBlur={handleSaveAmount}
             onKeyDown={(e) => {
@@ -173,27 +184,31 @@ export default function LineItemRow({ lineItem, groupId, startEditing, onEditCom
                 setAmountValue(lineItem.plannedAmount.toString())
               }
             }}
-            step="0.01"
-            autoFocus
-            className="w-24 border border-divider bg-surface px-2 py-0.5 text-right text-sm text-text"
+            className="w-full border border-divider bg-surface px-2 py-0.5 text-right text-sm text-text"
           />
         ) : (
           <span
             onClick={(e) => { e.stopPropagation(); setEditingAmount(true) }}
-            className="w-24 cursor-text border border-transparent px-2 py-0.5 text-right text-text hover:text-accent-700"
+            className="cursor-text border-b border-transparent px-2 py-0.5 text-text hover:border-dashed hover:border-b-[var(--color-neutral-500)]"
           >
             {formatCurrency(lineItem.plannedAmount)}
           </span>
         )}
-        <FlowAmount
-          value={isIncome ? lineItem.receivedAmount : lineItem.spentAmount}
-          isIncome={isIncome}
-          neutralClass="text-muted"
-          className="w-24 border border-transparent px-2 py-0.5 text-right"
-        />
-        <span className={`w-24 border border-transparent px-2 py-0.5 text-right ${remaining < 0 ? 'text-accent-700' : 'text-text'}`}>
-          {formatCurrency(remaining)}
-        </span>
+      </div>
+
+      <div className="text-right text-sm tabular-nums">
+        {metric === 'actual' ? (
+          <FlowAmount
+            value={isIncome ? lineItem.receivedAmount : lineItem.spentAmount}
+            isIncome={isIncome}
+            neutralClass="text-text"
+            className="px-2 py-0.5"
+          />
+        ) : (
+          <span className={`px-2 py-0.5 ${remaining < 0 ? 'font-semibold text-accent-700' : 'text-text'}`}>
+            {formatCurrency(remaining)}
+          </span>
+        )}
       </div>
     </div>
   )
