@@ -251,8 +251,7 @@ public class BudgetService
             return DollarsApiResponse<bool>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
         }
 
-        var group = await _groupRepo.GetByIdAsync(item.GroupId);
-        if (group is null || !await VerifyGroupOwnershipAsync(group, userId))
+        if (!await VerifyLineItemOwnershipAsync(item, userId))
         {
             return DollarsApiResponse<bool>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
         }
@@ -267,7 +266,7 @@ public class BudgetService
             // proceed, leaving zero.
             if (item.IsIncome)
             {
-                var incomeCount = await _lineItemRepo.CountIncomeInBudgetAsync(group.BudgetId);
+                var incomeCount = await _lineItemRepo.CountIncomeInBudgetAsync(item.BudgetId);
                 if (incomeCount <= 1)
                 {
                     _dbSession.Rollback();

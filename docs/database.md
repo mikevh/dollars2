@@ -90,7 +90,8 @@ Unique constraint: (UserId, Year, Month)
 | Column | Type | Notes |
 |--------|------|-------|
 | Id | int | PK, identity |
-| GroupId | int | FK → BudgetGroups |
+| GroupId | int | FK → BudgetGroups. Presentation/grouping reference only — ownership and aggregation queries use BudgetId directly |
+| BudgetId | int | FK → Budgets (migration 021/022). Direct link so ownership/aggregation queries don't have to route through BudgetGroups |
 | Name | nvarchar(256) | |
 | PlannedAmount | decimal(18,2) | |
 | IsIncome | bit | moved from BudgetGroups (migration 019) — income-ness is a line item property; a budget always keeps at least one |
