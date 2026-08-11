@@ -6,6 +6,8 @@ namespace Dollars2.Api.Repositories;
 
 public sealed record LineItemNetAmount(int LineItemId, decimal Amount);
 
+public sealed record TransactionAssignmentWithLineItem(int Id, int TransactionId, int LineItemId, string LineItemName, decimal Amount);
+
 public class TransactionAssignmentRepository
 {
     private readonly DbSession _db;
@@ -20,6 +22,22 @@ public class TransactionAssignmentRepository
         return await _db.Connection.QueryAsync<TransactionAssignment>(
             "SELECT Id, TransactionId, LineItemId, Amount, CreatedAt, UpdatedAt FROM TransactionAssignments WHERE TransactionId = @transactionId",
             new { transactionId },
+            _db.CurrentTransaction);
+    }
+
+    /// <summary>All assignments for every id in <paramref name="transactionIds"/> in one round trip,
+    /// joined to the line item name so callers don't need a per-assignment lookup. A transaction with
+    /// no assignments has no rows in the result. Callers must not pass an empty collection (produces
+    /// an invalid "IN ()").</summary>
+    public async Task<IEnumerable<TransactionAssignmentWithLineItem>> GetByTransactionIdsAsync(IEnumerable<int> transactionIds)
+    {
+        return await _db.Connection.QueryAsync<TransactionAssignmentWithLineItem>(
+            @"SELECT ta.Id, ta.TransactionId, ta.LineItemId, li.Name AS LineItemName, ta.Amount
+              FROM TransactionAssignments ta
+              INNER JOIN LineItems li ON li.Id = ta.LineItemId
+              WHERE ta.TransactionId IN @transactionIds
+              ORDER BY ta.Id",
+            new { transactionIds },
             _db.CurrentTransaction);
     }
 
