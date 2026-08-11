@@ -150,7 +150,7 @@ describe('BudgetPane (Modernist restyle)', () => {
     // Switch Housing's metric to Spent to see the signed credit.
     const housingCard = screen.getByText('Gifts').closest('.card') as HTMLElement
     fireEvent.click(within(housingCard).getByRole('button', { name: /Remaining/ }))
-    fireEvent.click(within(housingCard).getByRole('button', { name: 'Spent' }))
+    fireEvent.click(within(housingCard).getByRole('menuitem', { name: 'Spent' }))
 
     const spent = screen.getByText('+$690.89')
     expect(spent.className).toContain('text-positive')

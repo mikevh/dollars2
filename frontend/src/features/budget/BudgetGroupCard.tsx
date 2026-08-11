@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import type { BudgetGroupResponse } from '../../types/budget'
 import { formatCurrency } from '../../utils/format'
 import { useAppDispatch } from '../../app/hooks'
 import { useFocusSelectOnOpen } from '../../hooks/useFocusSelectOnOpen'
+import { useOutsideMousedown } from '../../hooks/useOutsideMousedown'
 import { updateGroup, deleteGroup, createLineItem } from './budgetSlice'
 import { GROUP_GRID_COLUMNS, type GroupMetric } from './groupGridColumns'
+import { lineItemActual, lineItemRemaining } from './lineItemAmounts'
 import LineItemRow from './LineItemRow'
 
 interface BudgetGroupCardProps {
@@ -42,18 +44,7 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
   const nameInputRef = useFocusSelectOnOpen<HTMLInputElement>(editingName)
 
   // Close the metric menu on any outside mousedown, per the redesign's dropdown spec.
-  useEffect(() => {
-    if (!metricMenuOpen) {
-      return
-    }
-    const handleMouseDown = (e: MouseEvent) => {
-      if (metricMenuRef.current && !metricMenuRef.current.contains(e.target as Node)) {
-        setMetricMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleMouseDown)
-    return () => document.removeEventListener('mousedown', handleMouseDown)
-  }, [metricMenuOpen])
+  useOutsideMousedown(metricMenuRef, metricMenuOpen, () => setMetricMenuOpen(false))
 
   // Re-seed the draft whenever the saved name changes. A reducer that replaces the
   // group in place updates this prop without remounting the card, so without this
@@ -71,16 +62,10 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
   const metricLabel = metric === 'remaining' ? 'Remaining' : actualLabel
 
   const totalPlanned = group.lineItems.reduce((sum, item) => sum + item.plannedAmount, 0)
-  const totalActual = group.lineItems.reduce(
-    (sum, item) => sum + (item.isIncome ? item.receivedAmount : item.spentAmount),
-    0,
-  )
-  const totalRemaining = group.lineItems.reduce(
-    (sum, item) =>
-      sum + (item.isIncome ? item.plannedAmount - item.receivedAmount : item.plannedAmount + item.rolloverAmount - item.spentAmount),
-    0,
-  )
+  const totalActual = group.lineItems.reduce((sum, item) => sum + lineItemActual(item), 0)
+  const totalRemaining = group.lineItems.reduce((sum, item) => sum + lineItemRemaining(item), 0)
   const totalMetric = metric === 'remaining' ? totalRemaining : totalActual
+  const itemCountLabel = `${group.lineItems.length} ${group.lineItems.length === 1 ? 'item' : 'items'}`
 
   const handleSaveName = async () => {
     const trimmed = nameValue.trim()
@@ -174,6 +159,8 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
             <div ref={metricMenuRef} className="relative">
               <button
                 onClick={() => setMetricMenuOpen((o) => !o)}
+                aria-haspopup="menu"
+                aria-expanded={metricMenuOpen}
                 className="flex w-full items-center justify-end gap-1 font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-muted hover:text-text"
               >
                 {metricLabel}
@@ -181,11 +168,13 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
               </button>
               {metricMenuOpen && (
                 <div
+                  role="menu"
                   className="absolute right-0 top-full z-10 mt-1 w-36 rounded-[var(--radius-control)] bg-[var(--app-card)] py-1.5 shadow-[var(--app-shadow-lg)]"
                 >
                   {(['remaining', 'actual'] as GroupMetric[]).map((m) => (
                     <button
                       key={m}
+                      role="menuitem"
                       onClick={() => { setMetric(m); setMetricMenuOpen(false) }}
                       className="flex h-11 w-full items-center justify-between px-3 text-sm normal-case tracking-normal text-text hover:bg-[var(--app-hover)]"
                     >
@@ -200,44 +189,50 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
         </div>
 
         {collapsed ? (
-          <div className="flex h-[60px] items-center justify-between px-6 text-sm text-muted">
-            <span>{group.lineItems.length} items</span>
-            <div className="flex gap-6 font-heading text-sm font-extrabold text-text">
-              <span className="w-24 text-right">{formatCurrency(totalPlanned)}</span>
-              <span className="w-24 text-right">{formatCurrency(totalMetric)}</span>
-            </div>
-          </div>
-        ) : group.lineItems.length === 0 ? (
-          <div className="px-6 py-3 text-sm text-muted">
-            No items
+          <div
+            className="grid h-[60px] items-center gap-4 px-6 text-sm text-muted"
+            style={{ gridTemplateColumns: GROUP_GRID_COLUMNS }}
+          >
+            <span>{itemCountLabel}</span>
+            <span className="text-right font-heading text-sm font-extrabold text-text">{formatCurrency(totalPlanned)}</span>
+            <span className="text-right font-heading text-sm font-extrabold text-text">{formatCurrency(totalMetric)}</span>
           </div>
         ) : (
-          group.lineItems.map((item) => (
-            <LineItemRow
-              key={item.id}
-              lineItem={item}
-              groupId={group.id}
-              metric={metric}
-              isSelected={item.id === selectedLineItemId}
-              startEditing={item.id === editingNewItemId}
-              onEditComplete={() => setEditingNewItemId(null)}
-              onSelect={() => onSelectLineItem?.(item.id)}
-            />
-          ))
-        )}
+          <>
+            {group.lineItems.length === 0 ? (
+              <div className="px-6 py-3 text-sm text-muted">
+                No items
+              </div>
+            ) : (
+              group.lineItems.map((item) => (
+                <LineItemRow
+                  key={item.id}
+                  lineItem={item}
+                  groupId={group.id}
+                  metric={metric}
+                  isSelected={item.id === selectedLineItemId}
+                  startEditing={item.id === editingNewItemId}
+                  onEditComplete={() => setEditingNewItemId(null)}
+                  onSelect={() => onSelectLineItem?.(item.id)}
+                />
+              ))
+            )}
 
-        <div className="flex h-[68px] items-center justify-between border-t border-divider px-6">
-          <button
-            onClick={handleAddItem}
-            className="font-heading text-sm font-extrabold text-[var(--app-blue)] hover:text-[var(--app-blue-hover)]"
-          >
-            {isAllIncome ? '+ Add income' : '+ Add item'}
-          </button>
-          <div className="flex gap-6 font-heading text-[20px] font-extrabold text-text">
-            <span className="w-24 text-right">{formatCurrency(totalPlanned)}</span>
-            <span className="w-24 text-right">{formatCurrency(totalMetric)}</span>
-          </div>
-        </div>
+            <div
+              className="grid h-[68px] items-center gap-4 border-t border-divider px-6"
+              style={{ gridTemplateColumns: GROUP_GRID_COLUMNS }}
+            >
+              <button
+                onClick={handleAddItem}
+                className="justify-self-start font-heading text-sm font-extrabold text-[var(--app-blue)] hover:text-[var(--app-blue-hover)]"
+              >
+                {isAllIncome ? '+ Add income' : '+ Add item'}
+              </button>
+              <span className="text-right font-heading text-[20px] font-extrabold text-text">{formatCurrency(totalPlanned)}</span>
+              <span className="text-right font-heading text-[20px] font-extrabold text-text">{formatCurrency(totalMetric)}</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
