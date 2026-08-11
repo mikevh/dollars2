@@ -8,6 +8,7 @@ import { useAppDispatch } from '../../app/hooks'
 import { useFocusSelectOnOpen } from '../../hooks/useFocusSelectOnOpen'
 import { updateLineItem, deleteLineItem } from './budgetSlice'
 import { GROUP_GRID_COLUMNS, type GroupMetric } from './groupGridColumns'
+import { lineItemActual, lineItemRemaining } from './lineItemAmounts'
 import FlowAmount from './FlowAmount'
 
 interface LineItemRowProps {
@@ -65,9 +66,7 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
     }
   }
 
-  const remaining = isIncome
-    ? lineItem.plannedAmount - lineItem.receivedAmount
-    : lineItem.plannedAmount + lineItem.rolloverAmount - lineItem.spentAmount
+  const remaining = lineItemRemaining(lineItem)
 
   const saveUpdate = async (name: string, plannedAmount: number) => {
     if (name === lineItem.name && plannedAmount === lineItem.plannedAmount) {
@@ -189,7 +188,7 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
         ) : (
           <span
             onClick={(e) => { e.stopPropagation(); setEditingAmount(true) }}
-            className="cursor-text border-b border-transparent px-2 py-0.5 text-text hover:border-dashed hover:border-b-[var(--color-neutral-500)]"
+            className="cursor-text border border-transparent px-2 py-0.5 text-text hover:[border-bottom-style:dashed] hover:border-b-[var(--color-neutral-500)]"
           >
             {formatCurrency(lineItem.plannedAmount)}
           </span>
@@ -199,7 +198,7 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
       <div className="text-right text-sm tabular-nums">
         {metric === 'actual' ? (
           <FlowAmount
-            value={isIncome ? lineItem.receivedAmount : lineItem.spentAmount}
+            value={lineItemActual(lineItem)}
             isIncome={isIncome}
             neutralClass="text-text"
             className="px-2 py-0.5"

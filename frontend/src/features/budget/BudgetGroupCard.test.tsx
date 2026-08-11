@@ -184,7 +184,7 @@ describe('BudgetGroupCard metric dropdown', () => {
     expect(screen.getAllByText('$150.00')).toHaveLength(2)
 
     fireEvent.click(screen.getByRole('button', { name: /Remaining/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Spent' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Spent' }))
 
     expect(screen.queryByText('$150.00')).not.toBeInTheDocument()
     expect(screen.getAllByText('$50.00')).toHaveLength(2)
@@ -193,19 +193,29 @@ describe('BudgetGroupCard metric dropdown', () => {
   it('closes the menu on an outside mousedown', () => {
     renderCard(makeGroup({ lineItems: [] }))
     fireEvent.click(screen.getByRole('button', { name: /Remaining/ }))
-    expect(screen.getByRole('button', { name: 'Spent' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Spent' })).toBeInTheDocument()
 
     fireEvent.mouseDown(document.body)
-    expect(screen.queryByRole('button', { name: 'Spent' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Spent' })).not.toBeInTheDocument()
   })
 })
 
 describe('BudgetGroupCard collapse', () => {
-  it('replaces the line item rows with an item-count + totals summary when collapsed', () => {
+  it('replaces the line item rows and footer with a single item-count + totals summary when collapsed', () => {
     renderCard(makeGroup({ lineItems: [makeLineItem({ id: 1, name: 'Rent', plannedAmount: 200, spentAmount: 50 })] }))
     fireEvent.click(screen.getByRole('button', { name: 'Collapse group' }))
 
     expect(screen.queryByText('Rent')).not.toBeInTheDocument()
-    expect(screen.getByText('1 items')).toBeInTheDocument()
+    expect(screen.getByText('1 item')).toBeInTheDocument()
+    // The footer (with its own "+ Add item" and duplicate totals) is hidden while collapsed —
+    // otherwise it would both double-render the totals and offer a silent, edit-less add.
+    expect(screen.queryByRole('button', { name: '+ Add item' })).not.toBeInTheDocument()
+    expect(screen.getAllByText('$150.00')).toHaveLength(1)
+  })
+
+  it('pluralizes the item count for more than one item', () => {
+    renderCard(makeGroup({ lineItems: [makeLineItem({ id: 1 }), makeLineItem({ id: 2 })] }))
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse group' }))
+    expect(screen.getByText('2 items')).toBeInTheDocument()
   })
 })
