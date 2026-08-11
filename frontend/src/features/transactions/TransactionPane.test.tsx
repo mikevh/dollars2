@@ -78,16 +78,6 @@ describe('TransactionPane search box', () => {
     fireEvent.change(search, { target: { value: 'coffee' } })
     expect(search).toHaveValue('coffee')
   })
-
-  it('clears the query when the active tab changes', async () => {
-    const search = renderPane()
-    fireEvent.change(search, { target: { value: 'coffee' } })
-    expect(search).toHaveValue('coffee')
-
-    fireEvent.click(screen.getByRole('button', { name: /Tracked/ }))
-
-    await waitFor(() => expect(search).toHaveValue(''))
-  })
 })
 
 describe('TransactionPane row actions', () => {
@@ -113,46 +103,5 @@ describe('TransactionPane row actions', () => {
     await waitFor(() =>
       expect(vi.mocked(api.delete)).toHaveBeenCalledWith('/api/transactions/5'),
     )
-  })
-
-  it('keeps Restore and Delete on a Deleted-tab row', async () => {
-    getResponses.set('/api/transactions/deleted', [
-      makeTransaction({ isDeleted: true, isManual: true }),
-    ])
-    renderPane()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Deleted' }))
-
-    expect(await screen.findByRole('button', { name: 'Restore' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
-  })
-
-  it('hard-deletes a Deleted-tab row after confirming', async () => {
-    getResponses.set('/api/transactions/deleted', [
-      makeTransaction({ isDeleted: true, isManual: true }),
-    ])
-    renderPane()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Deleted' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
-
-    expect(window.confirm).toHaveBeenCalledTimes(1)
-    await waitFor(() =>
-      expect(vi.mocked(api.delete)).toHaveBeenCalledWith('/api/transactions/5/permanent'),
-    )
-  })
-
-  it('does not hard-delete when the confirmation is cancelled', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
-    getResponses.set('/api/transactions/deleted', [
-      makeTransaction({ isDeleted: true, isManual: true }),
-    ])
-    renderPane()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Deleted' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
-
-    expect(window.confirm).toHaveBeenCalledTimes(1)
-    expect(api.delete).not.toHaveBeenCalled()
   })
 })

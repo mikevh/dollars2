@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
 import {
@@ -13,13 +13,14 @@ import {
 } from './transactionSlice'
 import TransactionRow from './TransactionRow'
 import TransactionEditDialog from './TransactionEditDialog'
+import { useOutsideMousedown } from '../../hooks/useOutsideMousedown'
 import type { TransactionResponse } from '../../types/transaction'
 
 const tabs = [
-  { key: 'new' as const, label: 'New', showCount: true },
-  { key: 'tracked' as const, label: 'Tracked', showCount: false },
-  { key: 'deleted' as const, label: 'Deleted', showCount: false },
-  { key: 'pending' as const, label: 'Pending', showCount: true },
+  { key: 'new' as const, label: 'New' },
+  { key: 'tracked' as const, label: 'Tracked' },
+  { key: 'deleted' as const, label: 'Deleted' },
+  { key: 'pending' as const, label: 'Pending' },
 ];
 
 interface TransactionPaneProps {
@@ -39,6 +40,9 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
   const { currentYear, currentMonth } = useAppSelector(s => s.budget);
   const [editingTransaction, setEditingTransaction] = useState<TransactionResponse | null | 'create'>(null);
   const [search, setSearch] = useState('');
+  const [listMenuOpen, setListMenuOpen] = useState(false);
+  const listMenuRef = useRef<HTMLDivElement>(null);
+  useOutsideMousedown(listMenuRef, listMenuOpen, () => setListMenuOpen(false));
 
   // Clear the search box when the tab changes. Adjusting state during render
   // (rather than in an effect) is React's recommended way to reset state on an
@@ -102,39 +106,52 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
     onBudgetMutate?.();
   }
 
+  const activeTabLabel = tabs.find(t => t.key === activeTab)?.label ?? '';
+
   return (
     <div className="flex h-full flex-col">
-      {/* TABS */}
-      <div className="flex border-b-2 border-divider">
-        {tabs.map((tab) => {
-          const count = tab.showCount ? counts[tab.key] : 0
-          const isActive = activeTab === tab.key
-          return (
-            <button
-              key={tab.key}
-              onClick={() => dispatch(setActiveTab(tab.key))}
-              className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2.5 font-heading text-xs font-extrabold uppercase tracking-[0.08em] ${
-                isActive
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-muted hover:text-text'
-              }`}
+      {/* HEADER: list selector dropdown + row count */}
+      <div className="flex items-center justify-between border-b-2 border-divider px-4 py-3">
+        <div ref={listMenuRef} className="relative">
+          <button
+            onClick={() => setListMenuOpen(o => !o)}
+            aria-haspopup="menu"
+            aria-expanded={listMenuOpen}
+            className="flex items-center gap-1.5 font-heading text-sm font-extrabold uppercase tracking-wide text-text hover:text-[var(--app-blue)]"
+          >
+            {activeTabLabel}
+            <ChevronIcon className="h-3.5 w-3.5" />
+          </button>
+          {listMenuOpen && (
+            <div
+              role="menu"
+              className="absolute left-0 top-full z-10 mt-1 w-44 rounded-[var(--radius-control)] bg-[var(--app-card)] py-1.5 shadow-[var(--app-shadow-lg)]"
             >
-              {tab.label}
-              {count > 0 && (
-                <span className={`px-1.5 py-0.5 text-[11px] font-bold leading-none tabular-nums ${
-                  isActive
-                    ? 'bg-accent text-bg'
-                    : 'border border-divider text-muted'
-                }`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          )
-        })}
+              {tabs.map((tab) => {
+                const count = counts[tab.key]
+                return (
+                  <button
+                    key={tab.key}
+                    role="menuitem"
+                    onClick={() => { dispatch(setActiveTab(tab.key)); setListMenuOpen(false) }}
+                    className="flex h-11 w-full items-center justify-between px-3 text-sm normal-case tracking-normal text-text hover:bg-[var(--app-hover)]"
+                  >
+                    <span>{tab.label}</span>
+                    {count > 0 && (
+                      <span className="rounded-full bg-[var(--color-neutral-200)] px-1.5 py-0.5 text-[11px] font-bold leading-none tabular-nums text-[var(--color-neutral-700)]">
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+        <span className="text-xs font-medium tabular-nums text-muted">{filteredTransactions.length}</span>
       </div>
       {/* SEARCH BOX */}
-      <div className="border-b border-divider p-2">
+      <div className="border-b border-divider px-4 py-3">
         <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search transactions..." className="input" />
       </div>
 
@@ -190,7 +207,12 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
 
       {activeTab === 'new' && (
         <div className="border-t-2 border-divider p-2">
-          <button onClick={() => setEditingTransaction('create')} className="btn btn-ghost">+ Add Transaction</button>
+          <button
+            onClick={() => setEditingTransaction('create')}
+            className="font-heading text-sm font-extrabold text-[var(--app-blue)] hover:text-[var(--app-blue-hover)]"
+          >
+            + Add Transaction
+          </button>
         </div>
       )}
 
@@ -202,5 +224,13 @@ export default function TransactionPane({ onBudgetMutate }: TransactionPaneProps
         />
       )}
     </div>
+  )
+}
+
+function ChevronIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
+      <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 011.06 0L10 11.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 9.28a.75.75 0 010-1.06z" clipRule="evenodd" />
+    </svg>
   )
 }
