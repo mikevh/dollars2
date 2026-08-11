@@ -40,8 +40,8 @@ export const fetchNewTransactions = createAsyncThunk(
 
 export const fetchTrackedTransactions = createAsyncThunk(
   'transactions/fetchTracked',
-  async ({ fromDate }: { fromDate: string }, { rejectWithValue }) => {
-    const result = await api.get<TransactionResponse[]>(`/api/transactions/tracked?fromDate=${encodeURIComponent(fromDate)}`)
+  async (_, { rejectWithValue }) => {
+    const result = await api.get<TransactionResponse[]>('/api/transactions/tracked')
     if (result.error) {
       return rejectWithValue(result.error.message)
     }

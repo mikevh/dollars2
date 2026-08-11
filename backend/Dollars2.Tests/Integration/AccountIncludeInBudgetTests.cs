@@ -82,7 +82,7 @@ public sealed class AccountIncludeInBudgetTests
             var excludedPending = await SeedSyncedTransactionAsync(db, userId, excluded, "PENDING BROKERAGE", isPending: true);
 
             var newIds = (await repository.GetNewAsync(userId)).Select(t => t.Id).ToHashSet();
-            var trackedIds = (await repository.GetTrackedAsync(userId, new DateOnly(2026, 1, 1))).Select(t => t.Id).ToHashSet();
+            var trackedIds = (await repository.GetTrackedAsync(userId)).Select(t => t.Id).ToHashSet();
             var deletedIds = (await repository.GetDeletedAsync(userId)).Select(t => t.Id).ToHashSet();
             var pendingIds = (await repository.GetPendingAsync(userId)).Select(t => t.Id).ToHashSet();
 
@@ -144,11 +144,15 @@ public sealed class AccountIncludeInBudgetTests
     private static async Task<int> SeedSyncedTransactionAsync(
         DbSession db, int userId, int accountId, string description, bool isPending = false)
     {
+        // Dated "today" (UTC) rather than a fixed date, so the tracked-window check
+        // (repository.GetTrackedAsync, now = UtcNow.AddMonths(-2)) stays true regardless of when
+        // the suite runs.
+        var date = DateOnly.FromDateTime(DateTime.UtcNow);
         return await db.Connection.QuerySingleAsync<int>(
             @"INSERT INTO Transactions (UserId, AccountId, Date, Description, Payee, Memo, Amount, IsPending, IsManual, CreatedAt, UpdatedAt)
-              VALUES (@userId, @accountId, '2026-07-15', @description, '', '', -10.00, @isPending, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+              VALUES (@userId, @accountId, @date, @description, '', '', -10.00, @isPending, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { userId, accountId, description, isPending },
+            new { userId, accountId, date, description, isPending },
             db.CurrentTransaction);
     }
 
