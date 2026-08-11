@@ -162,13 +162,11 @@ export default function BudgetPage()
           </div>
 
           {/* Pinned so the drag source stays on screen while the budget list scrolls past it.
-              top-86px = the 62px sticky MonthNav + this row's py-6, i.e. exactly where the pane
-              already sits unscrolled, so it never jumps. Height is bounded to the viewport
-              (86px offset + 56px footer reserve + 8px gap) with no min-height: a sticky box
-              taller than its slot pins at `top` and its overflowing bottom becomes unreachable.
-              TransactionPane scrolls its own list, so fitting the viewport costs nothing. */}
+              Height is bounded to the viewport with no min-height: a sticky box taller than its
+              slot pins at `top` and its overflowing bottom becomes unreachable. TransactionPane
+              and ActivityPane scroll their own lists, so fitting the viewport costs nothing. */}
           <div
-            className="sticky top-21.5 flex h-[calc(100vh-150px)] w-95 flex-none flex-col border border-divider bg-surface shadow-elev-sm"
+            className="card sticky top-[100px] flex h-[calc(100vh-160px)] w-95 flex-none flex-col"
             onClick={e => e.stopPropagation()}
           >
             {selectedLineItem ? (
