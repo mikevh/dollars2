@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { useDroppable } from '@dnd-kit/core'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { LineItemResponse } from '../../types/budget'
 import { formatCurrency } from '../../utils/format'
 import { isMoneyDraft } from '../../utils/money'
@@ -24,14 +25,41 @@ interface LineItemRowProps {
 export default function LineItemRow({ lineItem, groupId, metric, isSelected, startEditing, onEditComplete, onSelect }: LineItemRowProps) {
   const isIncome = lineItem.isIncome
   const dispatch = useAppDispatch()
-  const { isOver, setNodeRef } = useDroppable({
-    id: `lineitem-${lineItem.id}`,
-    data: { lineItemId: lineItem.id },
-  })
   // A freshly added item mounts with startEditing set, so seed the name editor open
   // and empty rather than opening it from an effect after the first paint.
   const [editingName, setEditingName] = useState(startEditing ?? false)
   const [editingAmount, setEditingAmount] = useState(false)
+  const editing = editingName || editingAmount
+  // Same node doubles as the transaction-assignment drop target (isOver below) and the
+  // reorder drag source — dnd-kit hooks bind to the nearest DndContext, so this has to
+  // stay one registration under the page-level context rather than a separate droppable.
+  // Disabled while editing so a click-drag used to select input text can't be read as a
+  // reorder gesture. Only `listeners` (not `attributes`) are spread onto the row below —
+  // `attributes` defaults `role="button"`/`tabIndex`, which nests a fake button around the
+  // row's real name/delete buttons; dropping it costs nothing since only PointerSensor is
+  // wired up (no KeyboardSensor for that role/tabIndex to serve).
+  const {
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isOver,
+    isDragging,
+    active,
+  } = useSortable({
+    id: `lineitem-${lineItem.id}`,
+    data: { type: 'lineitem', lineItemId: lineItem.id, groupId },
+    disabled: editing,
+  })
+  // Geometry alone (isOver) lights up for any drag hovering the row, including a line item
+  // from a different group or a group card — drops the row's handlers will silently ignore.
+  // Only show the drop-target affordance for drags this row will actually accept: any
+  // transaction, or a line item from the same group.
+  const activeData = active?.data.current
+  const isValidDropHover = isOver && (
+    activeData?.type === 'transaction' ||
+    (activeData?.type === 'lineitem' && activeData?.groupId === groupId)
+  )
   const [nameValue, setNameValue] = useState(startEditing ? '' : lineItem.name)
   const [amountValue, setAmountValue] = useState(lineItem.plannedAmount.toString())
   const nameInputRef = useFocusSelectOnOpen<HTMLInputElement>(editingName)
@@ -120,11 +148,14 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
   return (
     <div
       ref={setNodeRef}
+      {...(editing ? {} : listeners)}
       onClick={(e) => { e.stopPropagation(); onSelect?.() }}
-      className={`grid h-[50px] cursor-pointer items-center gap-4 border-b border-divider px-6 last:border-b-0 hover:bg-[var(--app-hover)] ${
-        isSelected ? 'bg-[var(--app-hover)] shadow-[inset_3px_0_0_var(--color-accent)]' : ''
-      } ${isOver ? 'bg-accent-100 ring-1 ring-inset ring-accent' : ''}`}
-      style={{ gridTemplateColumns: GROUP_GRID_COLUMNS }}
+      className={`grid h-[50px] items-center gap-4 border-b border-divider px-6 last:border-b-0 hover:bg-[var(--app-hover)] ${
+        editing ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'
+      } ${isSelected ? 'bg-[var(--app-hover)] shadow-[inset_3px_0_0_var(--color-accent)]' : ''} ${
+        isValidDropHover ? 'bg-accent-100 ring-1 ring-inset ring-accent' : ''
+      } ${isDragging ? 'opacity-50' : ''}`}
+      style={{ gridTemplateColumns: GROUP_GRID_COLUMNS, transform: CSS.Transform.toString(transform), transition }}
     >
       <div className="flex min-w-0 items-center gap-2">
         {editingName ? (

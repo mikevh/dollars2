@@ -1,9 +1,18 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent, Over } from '@dnd-kit/core'
+import { arrayMove } from '@dnd-kit/sortable'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
-import { fetchBudget, createBudget, applyTransactionAssignment } from '../features/budget/budgetSlice'
+import {
+  fetchBudget,
+  createBudget,
+  applyTransactionAssignment,
+  reorderGroups,
+  reorderGroupsLocally,
+  reorderLineItems,
+  reorderLineItemsLocally,
+} from '../features/budget/budgetSlice'
 import { assignTransaction, fetchCounts } from '../features/transactions/transactionSlice'
 import MonthNav from '../features/budget/MonthNav'
 import BudgetPane from '../features/budget/BudgetPane'
@@ -96,10 +105,74 @@ export default function BudgetPage()
     }
   }
 
+  // Shared by both reorder handlers below: null means the drop isn't a real move (dropped on
+  // itself, or an id no longer present — e.g. a stale drag racing a concurrent refetch).
+  const reorderedIds = (ids: number[], activeId: number, overId: number): number[] | null => {
+    if (activeId === overId) {
+      return null
+    }
+    const oldIndex = ids.indexOf(activeId)
+    const newIndex = ids.indexOf(overId)
+    if (oldIndex === -1 || newIndex === -1) {
+      return null
+    }
+    return arrayMove(ids, oldIndex, newIndex)
+  }
+
+  const handleGroupReorder = async (groupId: number, over: Over | null) => {
+    if (!over || !currentMonthBudget || over.data.current?.type !== 'group') {
+      return
+    }
+    const overGroupId = over.data.current?.groupId as number
+    const newIds = reorderedIds(currentMonthBudget.groups.map((g) => g.id), groupId, overGroupId)
+    if (!newIds) {
+      return
+    }
+    dispatch(reorderGroupsLocally({ ids: newIds }))
+    const result = await dispatch(reorderGroups({ budgetId: currentMonthBudget.id, ids: newIds }))
+    if (reorderGroups.rejected.match(result)) {
+      toast.error(result.payload as string)
+      dispatch(fetchBudget({ year: currentYear, month: currentMonth }))
+    }
+  }
+
+  const handleLineItemReorder = async (lineItemId: number, over: Over | null) => {
+    if (!over || !currentMonthBudget || over.data.current?.type !== 'lineitem') {
+      return
+    }
+    const overLineItemId = over.data.current?.lineItemId as number
+    const group = currentMonthBudget.groups.find((g) => g.lineItems.some((li) => li.id === lineItemId))
+    if (!group || !group.lineItems.some((li) => li.id === overLineItemId)) {
+      return
+    }
+    const newIds = reorderedIds(group.lineItems.map((li) => li.id), lineItemId, overLineItemId)
+    if (!newIds) {
+      return
+    }
+    dispatch(reorderLineItemsLocally({ groupId: group.id, ids: newIds }))
+    const result = await dispatch(reorderLineItems({ groupId: group.id, ids: newIds }))
+    if (reorderLineItems.rejected.match(result)) {
+      toast.error(result.payload as string)
+      dispatch(fetchBudget({ year: currentYear, month: currentMonth }))
+    }
+  }
+
   const handleDragEnd = async (event: DragEndEvent) => {
     setDraggingTransaction(null)
 
     const { active, over } = event
+    const type = active.data.current?.type
+
+    if (type === 'group') {
+      await handleGroupReorder(active.data.current?.groupId as number, over)
+      return
+    }
+
+    if (type === 'lineitem') {
+      await handleLineItemReorder(active.data.current?.lineItemId as number, over)
+      return
+    }
+
     if (!over) {
       return
     }

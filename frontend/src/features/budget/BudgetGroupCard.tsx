@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import toast from 'react-hot-toast'
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { BudgetGroupResponse } from '../../types/budget'
 import { formatCurrency } from '../../utils/format'
 import { useAppDispatch } from '../../app/hooks'
@@ -45,6 +47,23 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
 
   // Close the metric menu on any outside mousedown, per the redesign's dropdown spec.
   useOutsideMousedown(metricMenuRef, metricMenuOpen, () => setMetricMenuOpen(false))
+
+  // Disabled while editing so a click-drag used to select the name input's text can't be
+  // read as a reorder gesture. Only `listeners` (not `attributes`) are spread onto the header
+  // below — `attributes` defaults `role="button"`/`tabIndex`, which nests a fake button around
+  // the header's real chevron/name/delete/metric-menu buttons; dropping it costs nothing since
+  // only PointerSensor is wired up (no KeyboardSensor for that role/tabIndex to serve).
+  const {
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: group.id,
+    data: { type: 'group', groupId: group.id },
+    disabled: editingName,
+  })
 
   // Re-seed the draft whenever the saved name changes. A reducer that replaces the
   // group in place updates this prop without remounting the card, so without this
@@ -99,9 +118,16 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
   }
 
   return (
-    <div className="mb-8">
+    <div
+      ref={setNodeRef}
+      className={`mb-8 ${isDragging ? 'opacity-50' : ''}`}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+    >
       <div className="card">
-        <div className="border-b-2 border-divider px-6 pt-[22px] pb-[18px]">
+        <div
+          {...(editingName ? {} : listeners)}
+          className={`border-b-2 border-divider px-6 pt-[22px] pb-[18px] ${editingName ? '' : 'cursor-grab active:cursor-grabbing'}`}
+        >
           <div className="grid items-center gap-4" style={{ gridTemplateColumns: GROUP_GRID_COLUMNS }}>
             <div className="flex min-w-0 items-center gap-2">
               <button
@@ -204,18 +230,20 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
                 No items
               </div>
             ) : (
-              group.lineItems.map((item) => (
-                <LineItemRow
-                  key={item.id}
-                  lineItem={item}
-                  groupId={group.id}
-                  metric={metric}
-                  isSelected={item.id === selectedLineItemId}
-                  startEditing={item.id === editingNewItemId}
-                  onEditComplete={() => setEditingNewItemId(null)}
-                  onSelect={() => onSelectLineItem?.(item.id)}
-                />
-              ))
+              <SortableContext items={group.lineItems.map((item) => `lineitem-${item.id}`)} strategy={verticalListSortingStrategy}>
+                {group.lineItems.map((item) => (
+                  <LineItemRow
+                    key={item.id}
+                    lineItem={item}
+                    groupId={group.id}
+                    metric={metric}
+                    isSelected={item.id === selectedLineItemId}
+                    startEditing={item.id === editingNewItemId}
+                    onEditComplete={() => setEditingNewItemId(null)}
+                    onSelect={() => onSelectLineItem?.(item.id)}
+                  />
+                ))}
+              </SortableContext>
             )}
 
             <div
