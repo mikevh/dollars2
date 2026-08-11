@@ -18,7 +18,7 @@ public class LineItemRepository
     public async Task<IEnumerable<LineItem>> GetByGroupIdAsync(int groupId)
     {
         return await _db.Connection.QueryAsync<LineItem>(
-            "SELECT Id, GroupId, Name, PlannedAmount, IsIncome, SortOrder, Notes, PreviousLineItemId, CreatedAt, UpdatedAt FROM LineItems WHERE GroupId = @groupId ORDER BY SortOrder",
+            "SELECT Id, GroupId, BudgetId, Name, PlannedAmount, IsIncome, SortOrder, Notes, PreviousLineItemId, CreatedAt, UpdatedAt FROM LineItems WHERE GroupId = @groupId ORDER BY SortOrder",
             new { groupId },
             _db.CurrentTransaction);
     }
@@ -28,10 +28,9 @@ public class LineItemRepository
     public async Task<IEnumerable<LineItem>> GetByBudgetIdAsync(int budgetId)
     {
         return await _db.Connection.QueryAsync<LineItem>(
-            @"SELECT li.Id, li.GroupId, li.Name, li.PlannedAmount, li.IsIncome, li.SortOrder, li.Notes, li.PreviousLineItemId, li.CreatedAt, li.UpdatedAt
+            @"SELECT li.Id, li.GroupId, li.BudgetId, li.Name, li.PlannedAmount, li.IsIncome, li.SortOrder, li.Notes, li.PreviousLineItemId, li.CreatedAt, li.UpdatedAt
               FROM LineItems li
-              INNER JOIN BudgetGroups bg ON bg.Id = li.GroupId
-              WHERE bg.BudgetId = @budgetId
+              WHERE li.BudgetId = @budgetId
               ORDER BY li.GroupId, li.SortOrder",
             new { budgetId },
             _db.CurrentTransaction);
@@ -40,16 +39,16 @@ public class LineItemRepository
     public async Task<LineItem?> GetByIdAsync(int id)
     {
         return await _db.Connection.QuerySingleOrDefaultAsync<LineItem>(
-            "SELECT Id, GroupId, Name, PlannedAmount, IsIncome, SortOrder, Notes, PreviousLineItemId, CreatedAt, UpdatedAt FROM LineItems WHERE Id = @id",
+            "SELECT Id, GroupId, BudgetId, Name, PlannedAmount, IsIncome, SortOrder, Notes, PreviousLineItemId, CreatedAt, UpdatedAt FROM LineItems WHERE Id = @id",
             new { id },
             _db.CurrentTransaction);
     }
 
-    public async Task<int> CreateAsync(int groupId, string name, decimal plannedAmount, int sortOrder, bool isIncome = false, int? previousLineItemId = null, string notes = "")
+    public async Task<int> CreateAsync(int groupId, int budgetId, string name, decimal plannedAmount, int sortOrder, bool isIncome = false, int? previousLineItemId = null, string notes = "")
     {
         return await _db.Connection.QuerySingleAsync<int>(
-            "INSERT INTO LineItems (GroupId, Name, PlannedAmount, IsIncome, SortOrder, Notes, PreviousLineItemId, CreatedAt, UpdatedAt) VALUES (@groupId, @name, @plannedAmount, @isIncome, @sortOrder, @notes, @previousLineItemId, SYSUTCDATETIME(), SYSUTCDATETIME()); SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { groupId, name, plannedAmount, isIncome, sortOrder, notes, previousLineItemId },
+            "INSERT INTO LineItems (GroupId, BudgetId, Name, PlannedAmount, IsIncome, SortOrder, Notes, PreviousLineItemId, CreatedAt, UpdatedAt) VALUES (@groupId, @budgetId, @name, @plannedAmount, @isIncome, @sortOrder, @notes, @previousLineItemId, SYSUTCDATETIME(), SYSUTCDATETIME()); SELECT CAST(SCOPE_IDENTITY() AS INT)",
+            new { groupId, budgetId, name, plannedAmount, isIncome, sortOrder, notes, previousLineItemId },
             _db.CurrentTransaction);
     }
 
@@ -61,8 +60,7 @@ public class LineItemRepository
     {
         return await _db.Connection.ExecuteScalarAsync<int>(
             @"SELECT COUNT(*) FROM LineItems li WITH (UPDLOCK, HOLDLOCK)
-              INNER JOIN BudgetGroups bg ON bg.Id = li.GroupId
-              WHERE bg.BudgetId = @budgetId AND li.IsIncome = 1",
+              WHERE li.BudgetId = @budgetId AND li.IsIncome = 1",
             new { budgetId },
             _db.CurrentTransaction);
     }
@@ -168,8 +166,7 @@ public class LineItemRepository
         return await _db.Connection.QuerySingleAsync<bool>(
             @"SELECT CASE WHEN EXISTS (
                 SELECT 1 FROM LineItems li
-                INNER JOIN BudgetGroups bg ON bg.Id = li.GroupId
-                INNER JOIN Budgets b ON b.Id = bg.BudgetId
+                INNER JOIN Budgets b ON b.Id = li.BudgetId
                 WHERE li.Id = @lineItemId AND b.UserId = @userId
               ) THEN 1 ELSE 0 END",
             new { lineItemId, userId },

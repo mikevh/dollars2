@@ -33,8 +33,9 @@ public sealed class LineItemNotesCopyForwardTests
         try
         {
             userId = await SeedUserAsync(db, email);
-            var sourceGroupId = await SeedGroupAsync(db, await SeedBudgetAsync(db, userId, 2026, 7), "Bills");
-            var sourceLineItemId = await SeedLineItemAsync(db, sourceGroupId, "Water", "pay by the 5th");
+            var sourceBudgetId = await SeedBudgetAsync(db, userId, 2026, 7);
+            var sourceGroupId = await SeedGroupAsync(db, sourceBudgetId, "Bills");
+            var sourceLineItemId = await SeedLineItemAsync(db, sourceGroupId, sourceBudgetId, "Water", "pay by the 5th");
 
             var service = BudgetServiceFor(db);
 
@@ -96,13 +97,13 @@ public sealed class LineItemNotesCopyForwardTests
             new { budgetId, name });
     }
 
-    private static async Task<int> SeedLineItemAsync(DbSession db, int groupId, string name, string notes)
+    private static async Task<int> SeedLineItemAsync(DbSession db, int groupId, int budgetId, string name, string notes)
     {
         return await db.Connection.QuerySingleAsync<int>(
-            @"INSERT INTO LineItems (GroupId, Name, PlannedAmount, SortOrder, Notes, CreatedAt, UpdatedAt)
-              VALUES (@groupId, @name, 0, 0, @notes, SYSUTCDATETIME(), SYSUTCDATETIME());
+            @"INSERT INTO LineItems (GroupId, BudgetId, Name, PlannedAmount, SortOrder, Notes, CreatedAt, UpdatedAt)
+              VALUES (@groupId, @budgetId, @name, 0, 0, @notes, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { groupId, name, notes });
+            new { groupId, budgetId, name, notes });
     }
 
     private static async Task CleanupUserAsync(DbSession db, int userId)

@@ -179,10 +179,10 @@ public sealed class TransactionAssignmentNetTests
             db.CurrentTransaction);
 
         var lineItemId = await db.Connection.QuerySingleAsync<int>(
-            @"INSERT INTO LineItems (GroupId, Name, PlannedAmount, SortOrder, CreatedAt, UpdatedAt)
-              VALUES (@groupId, 'Item', 300, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+            @"INSERT INTO LineItems (GroupId, BudgetId, Name, PlannedAmount, SortOrder, CreatedAt, UpdatedAt)
+              VALUES (@groupId, @budgetId, 'Item', 300, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { groupId },
+            new { groupId, budgetId },
             db.CurrentTransaction);
 
         return new Seed(userId, lineItemId);

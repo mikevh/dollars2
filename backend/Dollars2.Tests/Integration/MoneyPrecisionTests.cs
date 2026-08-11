@@ -197,19 +197,19 @@ public sealed class MoneyPrecisionTests
             new { budgetId },
             db.CurrentTransaction);
 
-        var lineItemId = await InsertLineItemAsync(db, groupId, "Item", 0);
-        var otherLineItemId = await InsertLineItemAsync(db, groupId, "Other", 1);
+        var lineItemId = await InsertLineItemAsync(db, groupId, budgetId, "Item", 0);
+        var otherLineItemId = await InsertLineItemAsync(db, groupId, budgetId, "Other", 1);
 
         return new Seed(userId, groupId, lineItemId, otherLineItemId);
     }
 
-    private static async Task<int> InsertLineItemAsync(DbSession db, int groupId, string name, int sortOrder)
+    private static async Task<int> InsertLineItemAsync(DbSession db, int groupId, int budgetId, string name, int sortOrder)
     {
         return await db.Connection.QuerySingleAsync<int>(
-            @"INSERT INTO LineItems (GroupId, Name, PlannedAmount, SortOrder, CreatedAt, UpdatedAt)
-              VALUES (@groupId, @name, 300, @sortOrder, SYSUTCDATETIME(), SYSUTCDATETIME());
+            @"INSERT INTO LineItems (GroupId, BudgetId, Name, PlannedAmount, SortOrder, CreatedAt, UpdatedAt)
+              VALUES (@groupId, @budgetId, @name, 300, @sortOrder, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { groupId, name, sortOrder },
+            new { groupId, budgetId, name, sortOrder },
             db.CurrentTransaction);
     }
 }

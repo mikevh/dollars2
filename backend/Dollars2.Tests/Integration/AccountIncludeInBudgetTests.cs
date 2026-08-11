@@ -169,10 +169,10 @@ public sealed class AccountIncludeInBudgetTests
             db.CurrentTransaction);
 
         return await db.Connection.QuerySingleAsync<int>(
-            @"INSERT INTO LineItems (GroupId, Name, PlannedAmount, SortOrder, CreatedAt, UpdatedAt)
-              VALUES (@groupId, 'Item', 0, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+            @"INSERT INTO LineItems (GroupId, BudgetId, Name, PlannedAmount, SortOrder, CreatedAt, UpdatedAt)
+              VALUES (@groupId, @budgetId, 'Item', 0, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
               SELECT CAST(SCOPE_IDENTITY() AS INT)",
-            new { groupId },
+            new { groupId, budgetId },
             db.CurrentTransaction);
     }
 }
