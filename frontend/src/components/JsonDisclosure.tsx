@@ -27,7 +27,7 @@ export default function JsonDisclosure({ header, trailing, rawJson, defaultExpan
         {trailing}
       </button>
       {expanded && (
-        <pre className="overflow-x-auto border-t border-divider bg-bg px-3 py-2 font-mono text-xs text-text">
+        <pre className="whitespace-pre-wrap break-words border-t border-divider bg-[var(--app-bg)] px-3 py-2 font-mono text-sm text-text">
           {text}
         </pre>
       )}

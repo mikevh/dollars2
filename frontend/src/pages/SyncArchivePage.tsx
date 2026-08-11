@@ -80,7 +80,7 @@ function SyncArchive({ accountId }: { accountId: string | undefined }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg pb-14 text-text">
+    <div className="flex min-h-screen flex-col bg-[var(--app-bg)] pb-14 text-text">
       <div className="relative flex items-center border-b-2 border-divider px-4 py-3">
         <Link
           to={`/accounts/${accountId}`}
@@ -119,7 +119,7 @@ function SyncArchive({ accountId }: { accountId: string | undefined }) {
 
         {runs.length > 0 && (
           <>
-            <div className="border border-divider bg-surface shadow-elev-sm">
+            <div className="card">
               {runs.map((run) => (
                 <SyncArchiveRunRow key={run.syncRunId} run={run} />
               ))}
@@ -149,8 +149,13 @@ function SyncArchiveRunRow({ run }: { run: SyncArchiveRun }) {
         aria-expanded={expanded}
         className="flex w-full items-center gap-3 px-3 py-2 text-left hover:text-accent"
       >
-        <span aria-hidden="true" className="text-xs text-muted">
-          {expanded ? '▾' : '▸'}
+        <span
+          aria-hidden="true"
+          className={`inline-block text-xs text-muted transition-transform duration-[120ms] ease-[ease] ${
+            expanded ? 'rotate-90' : ''
+          }`}
+        >
+          ▸
         </span>
         <span className="font-mono text-xs text-text">{formatInstant(run.syncedAt)}</span>
         <span className="text-xs text-muted">{run.sourceType}</span>
@@ -183,7 +188,7 @@ function SyncArchiveRunItems({ run }: { run: SyncArchiveRun }) {
   const skipped = run.items.filter((item) => item.itemType === 'SkippedTransaction')
 
   return (
-    <div className="border-t border-divider bg-bg px-3 py-2">
+    <div className="border-t border-divider px-3 py-2">
       {run.accountMetadataJson && (
         <div className="mb-2 border border-divider">
           <JsonDisclosure header="Account metadata" rawJson={run.accountMetadataJson} />
@@ -192,7 +197,7 @@ function SyncArchiveRunItems({ run }: { run: SyncArchiveRun }) {
 
       {transactions.length > 0 && (
         <div className="mb-2">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+          <p className="mb-1 text-[13px] font-semibold uppercase tracking-wide text-muted">
             {transactions.length} transaction{transactions.length === 1 ? '' : 's'}
           </p>
           <div className="border border-divider">
@@ -209,7 +214,7 @@ function SyncArchiveRunItems({ run }: { run: SyncArchiveRun }) {
 
       {removed.length > 0 && (
         <div className="mb-2">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+          <p className="mb-1 text-[13px] font-semibold uppercase tracking-wide text-muted">
             {removed.length} removed
           </p>
           <div className="border border-divider">
@@ -227,7 +232,7 @@ function SyncArchiveRunItems({ run }: { run: SyncArchiveRun }) {
 
       {errors.length > 0 && (
         <div className={skipped.length > 0 ? 'mb-2' : ''}>
-          <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-accent-700">
+          <p className="mb-1 flex items-center gap-1 text-[13px] font-semibold uppercase tracking-wide text-accent-700">
             <FontAwesomeIcon icon={faTriangleExclamation} className="h-[10px] w-[10px]" />
             {errors.length} provider error{errors.length === 1 ? '' : 's'}
           </p>
@@ -241,7 +246,7 @@ function SyncArchiveRunItems({ run }: { run: SyncArchiveRun }) {
 
       {skipped.length > 0 && (
         <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+          <p className="mb-1 text-[13px] font-semibold uppercase tracking-wide text-muted">
             {skipped.length} skipped
           </p>
           <div className="border border-divider">
