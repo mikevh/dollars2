@@ -81,11 +81,15 @@ public class TransactionAssignmentRepository
             _db.CurrentTransaction);
     }
 
+    // UPDLOCK+HOLDLOCK, held until the caller's transaction commits or rolls back — same reasoning
+    // as LineItemRepository.CountIncomeInBudgetAsync: without it, an assignment created concurrently
+    // (a drag-assign, a bank-sync auto-assign) between this check and the caller's delete would be
+    // silently wiped out instead of blocking the delete.
     public async Task<bool> HasAssignmentsAsync(int lineItemId)
     {
         return await _db.Connection.ExecuteScalarAsync<bool>(
             @"SELECT CASE WHEN EXISTS (
-                SELECT 1 FROM TransactionAssignments ta
+                SELECT 1 FROM TransactionAssignments ta WITH (UPDLOCK, HOLDLOCK)
                 INNER JOIN Transactions t ON t.Id = ta.TransactionId
                 WHERE ta.LineItemId = @lineItemId AND t.IsDeleted = 0
               ) THEN 1 ELSE 0 END",
