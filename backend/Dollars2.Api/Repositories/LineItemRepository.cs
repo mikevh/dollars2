@@ -129,10 +129,14 @@ public class LineItemRepository
             _db.CurrentTransaction);
     }
 
+    // UPDLOCK+HOLDLOCK, same reasoning as CountIncomeInBudgetAsync above: without it, a line item
+    // created concurrently (e.g. next month's budget copy) with PreviousLineItemId = id after this
+    // check passes would hit the FK_LineItems_PreviousLineItem constraint on the caller's DeleteAsync
+    // instead of being caught here as a business-rule Fail().
     public async Task<bool> HasSuccessorAsync(int id)
     {
         return await _db.Connection.ExecuteScalarAsync<bool>(
-            "SELECT CASE WHEN EXISTS (SELECT 1 FROM LineItems WHERE PreviousLineItemId = @id) THEN 1 ELSE 0 END",
+            "SELECT CASE WHEN EXISTS (SELECT 1 FROM LineItems WITH (UPDLOCK, HOLDLOCK) WHERE PreviousLineItemId = @id) THEN 1 ELSE 0 END",
             new { id },
             _db.CurrentTransaction);
     }

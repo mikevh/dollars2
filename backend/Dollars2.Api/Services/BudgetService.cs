@@ -246,6 +246,12 @@ public class BudgetService
             return DollarsApiResponse<bool>.Fail("Line item not found.", "LINE_ITEM_NOT_FOUND");
         }
 
+        DollarsApiResponse<bool> Reject(string message, string code)
+        {
+            _dbSession.Rollback();
+            return DollarsApiResponse<bool>.Fail(message, code);
+        }
+
         _dbSession.BeginTransaction();
         try
         {
@@ -259,28 +265,24 @@ public class BudgetService
                 var incomeCount = await _lineItemRepo.CountIncomeInBudgetAsync(item.BudgetId);
                 if (incomeCount <= 1)
                 {
-                    _dbSession.Rollback();
-                    return DollarsApiResponse<bool>.Fail("Cannot delete the last income line item.", "CANNOT_DELETE_LAST_INCOME");
+                    return Reject("Cannot delete the last income line item.", "CANNOT_DELETE_LAST_INCOME");
                 }
             }
 
             var rollover = await _lineItemRepo.GetRolloverAsync(id);
             if (rollover != 0)
             {
-                _dbSession.Rollback();
-                return DollarsApiResponse<bool>.Fail("Cannot delete a line item with a rollover balance from a previous month.", "LINE_ITEM_HAS_ROLLOVER");
+                return Reject("Cannot delete a line item with a rollover balance from a previous month.", "LINE_ITEM_HAS_ROLLOVER");
             }
 
             if (await _assignmentRepo.HasAssignmentsAsync(id))
             {
-                _dbSession.Rollback();
-                return DollarsApiResponse<bool>.Fail("Cannot delete a line item with transactions assigned to it.", "LINE_ITEM_HAS_TRANSACTIONS");
+                return Reject("Cannot delete a line item with transactions assigned to it.", "LINE_ITEM_HAS_TRANSACTIONS");
             }
 
             if (await _lineItemRepo.HasSuccessorAsync(id))
             {
-                _dbSession.Rollback();
-                return DollarsApiResponse<bool>.Fail("Cannot delete a line item that has been carried forward to a later month.", "LINE_ITEM_HAS_SUCCESSOR");
+                return Reject("Cannot delete a line item that has been carried forward to a later month.", "LINE_ITEM_HAS_SUCCESSOR");
             }
 
             await _assignmentRepo.DeleteByLineItemIdAsync(id);
