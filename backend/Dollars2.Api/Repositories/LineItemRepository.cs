@@ -129,11 +129,11 @@ public class LineItemRepository
             _db.CurrentTransaction);
     }
 
-    public async Task ClearPreviousLinkAsync(int previousLineItemId)
+    public async Task<bool> HasSuccessorAsync(int id)
     {
-        await _db.Connection.ExecuteAsync(
-            "UPDATE LineItems SET PreviousLineItemId = NULL WHERE PreviousLineItemId = @previousLineItemId",
-            new { previousLineItemId },
+        return await _db.Connection.ExecuteScalarAsync<bool>(
+            "SELECT CASE WHEN EXISTS (SELECT 1 FROM LineItems WHERE PreviousLineItemId = @id) THEN 1 ELSE 0 END",
+            new { id },
             _db.CurrentTransaction);
     }
 

@@ -40,8 +40,11 @@
 - Each line item shows: planned (this month), spent (sum of assigned transactions), remaining (planned + rollover - spent)
 - Planned amount can be $0
 - Negative remaining is displayed with red text
-- A line item can only be deleted if it has zero balance and no synced transactions assigned to it,
-  and — for an income line item — only if it is not the last income line item in the budget
+- A line item can only be deleted if all of the following hold: it has no rollover balance carried
+  in from a previous month, it has no transactions (manual or synced) assigned to it this month, and
+  no later month's line item points back to it via `PreviousLineItemId`; deletion is rejected
+  otherwise, nothing is cascaded or unassigned
+- For an income line item, deletion is also blocked if it is the last income line item in the budget
 
 ## Zero-Based Equation
 

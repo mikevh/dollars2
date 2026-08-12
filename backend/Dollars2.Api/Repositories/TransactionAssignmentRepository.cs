@@ -81,6 +81,18 @@ public class TransactionAssignmentRepository
             _db.CurrentTransaction);
     }
 
+    public async Task<bool> HasAssignmentsAsync(int lineItemId)
+    {
+        return await _db.Connection.ExecuteScalarAsync<bool>(
+            @"SELECT CASE WHEN EXISTS (
+                SELECT 1 FROM TransactionAssignments ta
+                INNER JOIN Transactions t ON t.Id = ta.TransactionId
+                WHERE ta.LineItemId = @lineItemId AND t.IsDeleted = 0
+              ) THEN 1 ELSE 0 END",
+            new { lineItemId },
+            _db.CurrentTransaction);
+    }
+
     // Net sum of every assignment for the line item, all signs included. Debits are negative and
     // credits positive, so a spend-heavy item nets negative and a credit-heavy one nets positive.
     // No sign filter: a positive assignment on an expense item (a refund, or money someone sent you
