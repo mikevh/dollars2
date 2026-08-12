@@ -264,7 +264,25 @@ public class BudgetService
                 }
             }
 
-            await _lineItemRepo.ClearPreviousLinkAsync(id);
+            var rollover = await _lineItemRepo.GetRolloverAsync(id);
+            if (rollover != 0)
+            {
+                _dbSession.Rollback();
+                return DollarsApiResponse<bool>.Fail("Cannot delete a line item with a rollover balance from a previous month.", "LINE_ITEM_HAS_ROLLOVER");
+            }
+
+            if (await _assignmentRepo.HasAssignmentsAsync(id))
+            {
+                _dbSession.Rollback();
+                return DollarsApiResponse<bool>.Fail("Cannot delete a line item with transactions assigned to it.", "LINE_ITEM_HAS_TRANSACTIONS");
+            }
+
+            if (await _lineItemRepo.HasSuccessorAsync(id))
+            {
+                _dbSession.Rollback();
+                return DollarsApiResponse<bool>.Fail("Cannot delete a line item that has been carried forward to a later month.", "LINE_ITEM_HAS_SUCCESSOR");
+            }
+
             await _assignmentRepo.DeleteByLineItemIdAsync(id);
             await _lineItemRepo.DeleteAsync(id);
             _dbSession.Commit();
