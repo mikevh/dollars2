@@ -6,12 +6,14 @@ interface AccountTransactionsState {
   data: AccountTransactions | null
   loading: boolean
   error: string | null
+  currentRequestId: string | null
 }
 
 const initialState: AccountTransactionsState = {
   data: null,
   loading: false,
   error: null,
+  currentRequestId: null,
 }
 
 export interface AccountTransactionsQuery {
@@ -60,19 +62,27 @@ const accountTransactionsSlice = createSlice({
     clearAccountTransactions: (state) => {
       state.data = null
       state.error = null
+      state.currentRequestId = null
     },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchAccountTransactions.pending, (state) => {
+      .addCase(fetchAccountTransactions.pending, (state, action) => {
         state.loading = true
         state.error = null
+        state.currentRequestId = action.meta.requestId
       })
       .addCase(fetchAccountTransactions.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.currentRequestId) {
+          return
+        }
         state.loading = false
         state.data = action.payload
       })
       .addCase(fetchAccountTransactions.rejected, (state, action) => {
+        if (action.meta.requestId !== state.currentRequestId) {
+          return
+        }
         state.loading = false
         state.data = null
         state.error = action.payload as string
