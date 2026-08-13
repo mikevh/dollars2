@@ -61,6 +61,7 @@ const accountTransactionsSlice = createSlice({
   reducers: {
     clearAccountTransactions: (state) => {
       state.data = null
+      state.loading = false
       state.error = null
       state.currentRequestId = null
     },
