@@ -15,22 +15,12 @@ namespace Dollars2.Api.Services;
 /// </remarks>
 public class SyncArchiveTableInitializer : IHostedService
 {
-    /// <summary>Partition key: <c>USER#{userId}#ACCT#{accountId}</c>.</summary>
-    public const string PartitionKeyAttribute = "pk";
-
     /// <summary>
-    /// Sort key: <c>TXN#{providerTransactionId}#{syncedAt}</c>, <c>REMOVED#{providerTransactionId}#{syncedAt}</c>,
-    /// <c>ACCTMETA#{syncedAt}</c>, or <c>ERROR#{syncedAt}#{seq}</c>. The trailing instant is ISO-8601 UTC
-    /// with a <c>Z</c> marker, which sorts lexicographically in chronological order — that is what makes
-    /// the composite sort keys usable.
+    /// Partition key: <c>{sourceType}#{syncedAt}</c>, or <c>{sourceType}#{syncedAt}#{page}</c> when a
+    /// connection-level fetch captured more than one raw response (a paginated provider). The table has
+    /// no sort key — the whole item identity lives in this one attribute.
     /// </summary>
-    public const string SortKeyAttribute = "sk";
-
-    /// <summary>Bare ISO-8601 UTC instant, indexed by <see cref="SyncedAtIndexName"/>.</summary>
-    public const string SyncedAtAttribute = "syncedAt";
-
-    /// <summary>Index behind "show me this account's archive, newest first".</summary>
-    public const string SyncedAtIndexName = "LSI_SyncedAt";
+    public const string PartitionKeyAttribute = "pk";
 
     private static readonly TimeSpan ActivePollInterval = TimeSpan.FromMilliseconds(250);
 
@@ -83,10 +73,7 @@ public class SyncArchiveTableInitializer : IHostedService
 
                 await WaitForActiveAsync(timeout.Token);
 
-                _logger.LogInformation(
-                    "Created sync archive table {TableName} with local secondary index {IndexName}",
-                    _options.TableName,
-                    SyncedAtIndexName);
+                _logger.LogInformation("Created sync archive table {TableName}", _options.TableName);
             }
             catch (ResourceInUseException)
             {
@@ -131,30 +118,10 @@ public class SyncArchiveTableInitializer : IHostedService
             KeySchema =
             [
                 new KeySchemaElement { AttributeName = PartitionKeyAttribute, KeyType = KeyType.HASH },
-                new KeySchemaElement { AttributeName = SortKeyAttribute, KeyType = KeyType.RANGE },
             ],
             AttributeDefinitions =
             [
                 new AttributeDefinition { AttributeName = PartitionKeyAttribute, AttributeType = ScalarAttributeType.S },
-                new AttributeDefinition { AttributeName = SortKeyAttribute, AttributeType = ScalarAttributeType.S },
-                new AttributeDefinition { AttributeName = SyncedAtAttribute, AttributeType = ScalarAttributeType.S },
-            ],
-            // An LSI (rather than a GSI) because the partition is already scoped to a single account.
-            // It must be declared at table-creation time and can never be added afterwards, so it ships
-            // with the first table or not at all. The cost is that it caps a single partition — here,
-            // one account — at 10GB; at this app's volume that is decades away.
-            LocalSecondaryIndexes =
-            [
-                new LocalSecondaryIndex
-                {
-                    IndexName = SyncedAtIndexName,
-                    KeySchema =
-                    [
-                        new KeySchemaElement { AttributeName = PartitionKeyAttribute, KeyType = KeyType.HASH },
-                        new KeySchemaElement { AttributeName = SyncedAtAttribute, KeyType = KeyType.RANGE },
-                    ],
-                    Projection = new Projection { ProjectionType = ProjectionType.ALL },
-                },
             ],
             // dynamodb-local ignores throughput settings entirely, so this has no runtime effect. It is
             // chosen over provisioned throughput only because there is no capacity here to plan for —

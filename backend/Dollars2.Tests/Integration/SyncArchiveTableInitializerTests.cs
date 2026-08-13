@@ -53,7 +53,7 @@ public sealed class SyncArchiveTableInitializerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task StartAsync_creates_the_table_with_the_syncedAt_local_secondary_index()
+    public async Task StartAsync_creates_the_table_with_a_partition_key_only_schema()
     {
         var options = OptionsFor("archive-create");
         var initializer = new SyncArchiveTableInitializer(_dynamoDb, options, new CapturingLogger<SyncArchiveTableInitializer>());
@@ -63,22 +63,18 @@ public sealed class SyncArchiveTableInitializerTests : IAsyncLifetime
         var table = await DescribeAsync(options.TableName);
         Assert.Equal(TableStatus.ACTIVE, table.TableStatus);
 
+        // No sort key: the whole item identity lives in pk (issue #259 dropped the per-account
+        // partitioning and the LSI it required).
         Assert.Equal(
-            new[] { ("pk", KeyType.HASH), ("sk", KeyType.RANGE) },
+            new[] { ("pk", KeyType.HASH) },
             table.KeySchema.Select(k => (k.AttributeName, k.KeyType)).ToArray());
 
-        // syncedAt is only ever an index key, so it has to be declared as a table attribute too.
         var attributes = table.AttributeDefinitions.ToDictionary(a => a.AttributeName, a => a.AttributeType);
         Assert.Equal(ScalarAttributeType.S, attributes["pk"]);
-        Assert.Equal(ScalarAttributeType.S, attributes["sk"]);
-        Assert.Equal(ScalarAttributeType.S, attributes["syncedAt"]);
 
-        var index = Assert.Single(table.LocalSecondaryIndexes);
-        Assert.Equal("LSI_SyncedAt", index.IndexName);
-        Assert.Equal(
-            new[] { ("pk", KeyType.HASH), ("syncedAt", KeyType.RANGE) },
-            index.KeySchema.Select(k => (k.AttributeName, k.KeyType)).ToArray());
-        Assert.Equal(ProjectionType.ALL, index.Projection.ProjectionType);
+        // DynamoDB omits LocalSecondaryIndexes from DescribeTable entirely when the table has none —
+        // it comes back null, not an empty list.
+        Assert.True(table.LocalSecondaryIndexes is null or { Count: 0 });
     }
 
     [Fact]
@@ -162,7 +158,6 @@ public sealed class SyncArchiveTableInitializerTests : IAsyncLifetime
 
         Assert.Equal(BillingMode.PAY_PER_REQUEST, request.BillingMode);
         Assert.Null(request.ProvisionedThroughput);
-        Assert.All(request.LocalSecondaryIndexes, index => Assert.Equal(ProjectionType.ALL, index.Projection.ProjectionType));
     }
 
     /// <summary>

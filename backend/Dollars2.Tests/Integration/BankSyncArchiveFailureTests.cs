@@ -102,17 +102,12 @@ public sealed class BankSyncArchiveFailureTests : IDisposable
         var (userId, accountId) = await SeedAsync(db, "archive-outage-error@example.com");
         try
         {
-            // ErrorsJson has to be non-empty for this test to mean anything: ArchiveAsync short-circuits
-            // on an empty result, so an all-empty ProviderSyncResult would never reach DynamoDB and this
-            // would pass without exercising the error path at all. Provider errors are also exactly what
-            // the archive is for here — they are the record of why the account failed.
             var logger = new CapturingLogger<BankSyncService>();
             var provider = new StubProvider(new ProviderSyncResult(
                 [],
                 [],
                 null,
-                Error: "connection details are misconfigured",
-                ErrorsJson: ["""{"code":"ITEM_LOGIN_REQUIRED"}"""]));
+                Error: "connection details are misconfigured"));
             var service = BuildService(db, provider, logger);
 
             var results = await service.SyncForUserAsync(userId, cancellationToken: TestContext.Current.CancellationToken);
@@ -168,8 +163,7 @@ public sealed class BankSyncArchiveFailureTests : IDisposable
             "Beans",
             "",
             -4.25m,
-            IsPending: false,
-            RawJson: $$"""{"id":"{{providerTransactionId}}"}""");
+            IsPending: false);
     }
 
     /// <summary>
@@ -218,7 +212,11 @@ public sealed class BankSyncArchiveFailureTests : IDisposable
         return (userId, accountId);
     }
 
-    /// <summary>Returns one canned result for every account, without touching a network.</summary>
+    /// <summary>
+    /// Returns one canned result for every account, without touching a network. Always reports a raw
+    /// response body so the connection-level archive write is exercised — it no longer depends on what
+    /// the per-account ProviderSyncResult carries.
+    /// </summary>
     private sealed class StubProvider : IBankSyncProvider
     {
         private readonly ProviderSyncResult _result;
@@ -236,7 +234,7 @@ public sealed class BankSyncArchiveFailureTests : IDisposable
 
         public string GetConnectionKey(Account account) => "stub-connection";
 
-        public Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
+        public Task<ProviderFetchResult> FetchTransactionsForConnectionAsync(
             IReadOnlyList<Account> accounts,
             DateTime? since,
             bool fullResync = false,
@@ -244,7 +242,7 @@ public sealed class BankSyncArchiveFailureTests : IDisposable
         {
             IReadOnlyDictionary<int, ProviderSyncResult> results =
                 accounts.ToDictionary(a => a.Id, _ => _result);
-            return Task.FromResult(results);
+            return Task.FromResult(new ProviderFetchResult(results, ["{}"]));
         }
     }
 

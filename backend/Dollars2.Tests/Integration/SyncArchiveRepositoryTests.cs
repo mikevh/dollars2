@@ -3,8 +3,6 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using Dollars2.Api.Data;
-using Dollars2.Api.Models;
-using Dollars2.Api.Providers;
 using Dollars2.Api.Repositories;
 using Dollars2.Api.Services;
 using DotNet.Testcontainers.Builders;
@@ -22,8 +20,6 @@ namespace Dollars2.Tests.Integration;
 public sealed class SyncArchiveRepositoryTests : IAsyncLifetime
 {
     private const ushort DynamoDbPort = 8000;
-
-    private static readonly DateOnly TransactionDate = new(2026, 8, 1);
 
     private readonly IContainer _container = new ContainerBuilder("amazon/dynamodb-local")
         .WithEntrypoint("java")
@@ -54,163 +50,52 @@ public sealed class SyncArchiveRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ArchiveAsync_writes_one_item_per_payload_all_sharing_the_sync_run()
+    public async Task ArchiveAsync_writes_one_item_per_raw_response_body()
     {
         var repository = await RepositoryForAsync("archive-write");
-        var account = AccountFor(userId: 7, accountId: 42);
-        var syncRunId = Guid.NewGuid();
         var syncedAt = new DateTime(2026, 8, 1, 6, 0, 0, DateTimeKind.Utc);
-        var result = new ProviderSyncResult(
-            [Synced("abc123", pending: true), Synced("def456", pending: false)],
-            ["gone789"],
-            UpdatedConnectionDetailsJson: null,
-            AccountMetadataJson: """{"id":"acct-1","balance":"100.00"}""",
-            ErrorsJson: ["""{"code":"AUTH_FAILED"}"""],
-            SkippedTransactionsJson: ["""{"id":"bad1","amount":"not-a-number"}"""]);
 
-        await repository.ArchiveAsync(account, result, syncRunId, syncedAt, TestContext.Current.CancellationToken);
+        await repository.ArchiveAsync(
+            "Plaid",
+            ["""{"page":1}""", """{"page":2}"""],
+            syncedAt,
+            TestContext.Current.CancellationToken);
 
         var items = await ScanAsync();
-
-        // Every item lands in the account's partition and carries the run that produced it — that is
-        // what lets the archive page group a run back together.
-        Assert.All(items, item => Assert.Equal("USER#7#ACCT#42", item["pk"].S));
-        Assert.All(items, item => Assert.Equal(syncRunId.ToString(), item["syncRunId"].S));
-        Assert.All(items, item => Assert.Equal("2026-08-01T06:00:00.000Z", item["syncedAt"].S));
-        Assert.All(items, item => Assert.Equal("SimpleFIN", item["sourceType"].S));
-        Assert.All(items, item => Assert.Equal("7", item["userId"].N));
-        Assert.All(items, item => Assert.Equal("42", item["accountId"].N));
 
         Assert.Equal(
             [
-                "ACCTMETA#2026-08-01T06:00:00.000Z",
-                "ERROR#2026-08-01T06:00:00.000Z#0000",
-                "REMOVED#gone789#2026-08-01T06:00:00.000Z",
-                "SKIPPED#2026-08-01T06:00:00.000Z#0000",
-                "TXN#abc123#2026-08-01T06:00:00.000Z",
-                "TXN#def456#2026-08-01T06:00:00.000Z",
+                "Plaid#2026-08-01T06:00:00.000Z#0000",
+                "Plaid#2026-08-01T06:00:00.000Z#0001",
             ],
-            items.Select(i => i["sk"].S).Order().ToArray());
+            items.Select(i => i["pk"].S).Order().ToArray());
 
-        var transaction = Single(items, "TXN#abc123#2026-08-01T06:00:00.000Z");
-        Assert.Equal("Transaction", transaction["itemType"].S);
-        Assert.Equal("abc123", transaction["providerTransactionId"].S);
-        Assert.Equal(RawJsonFor("abc123", pending: true), transaction["rawJson"].S);
+        var first = Single(items, "Plaid#2026-08-01T06:00:00.000Z#0000");
+        Assert.Equal("""{"page":1}""", first["rawJson"].S);
 
-        var removed = Single(items, "REMOVED#gone789#2026-08-01T06:00:00.000Z");
-        Assert.Equal("Removed", removed["itemType"].S);
-        Assert.Equal("gone789", removed["providerTransactionId"].S);
-        // The id is the whole payload a removal carries, and it already has its own attribute.
-        Assert.False(removed.ContainsKey("rawJson"));
-
-        var metadata = Single(items, "ACCTMETA#2026-08-01T06:00:00.000Z");
-        Assert.Equal("AccountMetadata", metadata["itemType"].S);
-        Assert.Equal("""{"id":"acct-1","balance":"100.00"}""", metadata["rawJson"].S);
-        Assert.False(metadata.ContainsKey("providerTransactionId"));
-
-        var error = Single(items, "ERROR#2026-08-01T06:00:00.000Z#0000");
-        Assert.Equal("ProviderError", error["itemType"].S);
-        Assert.Equal("""{"code":"AUTH_FAILED"}""", error["rawJson"].S);
-
-        var skipped = Single(items, "SKIPPED#2026-08-01T06:00:00.000Z#0000");
-        Assert.Equal("SkippedTransaction", skipped["itemType"].S);
-        Assert.Equal("""{"id":"bad1","amount":"not-a-number"}""", skipped["rawJson"].S);
+        var second = Single(items, "Plaid#2026-08-01T06:00:00.000Z#0001");
+        Assert.Equal("""{"page":2}""", second["rawJson"].S);
     }
 
     [Fact]
-    public async Task Re_archiving_a_transaction_adds_a_version_instead_of_overwriting_it()
+    public async Task ArchiveAsync_writes_a_single_raw_response_body_without_a_page_suffix()
     {
-        var repository = await RepositoryForAsync("archive-versions");
-        var account = AccountFor(userId: 1, accountId: 1);
-        var firstSeen = new DateTime(2026, 8, 1, 6, 0, 0, DateTimeKind.Utc);
-        var thenPosted = new DateTime(2026, 8, 3, 6, 0, 0, DateTimeKind.Utc);
+        var repository = await RepositoryForAsync("archive-single");
+        var syncedAt = new DateTime(2026, 8, 1, 6, 0, 0, DateTimeKind.Utc);
 
-        await repository.ArchiveAsync(
-            account,
-            new ProviderSyncResult([Synced("abc123", pending: true)], [], null),
-            Guid.NewGuid(),
-            firstSeen,
-            TestContext.Current.CancellationToken);
+        await repository.ArchiveAsync("SimpleFIN", ["""{"accounts":[]}"""], syncedAt, TestContext.Current.CancellationToken);
 
-        await repository.ArchiveAsync(
-            account,
-            new ProviderSyncResult([Synced("abc123", pending: false)], [], null),
-            Guid.NewGuid(),
-            thenPosted,
-            TestContext.Current.CancellationToken);
-
-        // Two sightings of one transaction must be two items. Overwriting is what would make the
-        // pending→posted transition — the thing this archive exists to show — invisible.
-        var items = await ScanAsync();
-        Assert.Equal(2, items.Count);
-
-        var versions = items
-            .OrderBy(i => i["syncedAt"].S, StringComparer.Ordinal)
-            .Select(i => i["rawJson"].S)
-            .ToArray();
-        Assert.Equal(RawJsonFor("abc123", pending: true), versions[0]);
-        Assert.Equal(RawJsonFor("abc123", pending: false), versions[1]);
+        var item = Assert.Single(await ScanAsync());
+        Assert.Equal("SimpleFIN#2026-08-01T06:00:00.000Z", item["pk"].S);
+        Assert.Equal("""{"accounts":[]}""", item["rawJson"].S);
     }
 
     [Fact]
-    public async Task ArchiveAsync_writes_every_item_when_the_result_exceeds_one_batch()
-    {
-        var repository = await RepositoryForAsync("archive-chunking");
-        // 60 transactions is three BatchWriteItem requests: DynamoDB caps one at 25 items and rejects
-        // anything larger outright, so an unchunked write would land nothing at all.
-        var upserts = Enumerable.Range(0, 60).Select(i => Synced($"txn-{i:D3}", pending: false)).ToList();
-
-        await repository.ArchiveAsync(
-            AccountFor(userId: 1, accountId: 1),
-            new ProviderSyncResult(upserts, [], null),
-            Guid.NewGuid(),
-            DateTime.UtcNow,
-            TestContext.Current.CancellationToken);
-
-        var items = await ScanAsync();
-        Assert.Equal(60, items.Count);
-        Assert.Equal(
-            upserts.Select(u => u.ProviderTransactionId).Order().ToArray(),
-            items.Select(i => i["providerTransactionId"].S).Order().ToArray());
-    }
-
-    [Fact]
-    public async Task A_transaction_reported_twice_in_one_payload_does_not_cost_the_whole_batch()
-    {
-        var repository = await RepositoryForAsync("archive-duplicates");
-        // DynamoDB rejects a BatchWriteItem containing two items with the same key as a whole request,
-        // so a provider echoing one transaction twice would otherwise lose the entire run's archive.
-        var result = new ProviderSyncResult(
-            [Synced("abc123", pending: true), Synced("abc123", pending: false), Synced("def456", pending: false)],
-            [],
-            null);
-
-        await repository.ArchiveAsync(
-            AccountFor(userId: 1, accountId: 1),
-            result,
-            Guid.NewGuid(),
-            new DateTime(2026, 8, 1, 6, 0, 0, DateTimeKind.Utc),
-            TestContext.Current.CancellationToken);
-
-        var items = await ScanAsync();
-        Assert.Equal(2, items.Count);
-
-        // Same key, so only the payload can differ — the last sighting is the one kept.
-        var deduped = Single(items, "TXN#abc123#2026-08-01T06:00:00.000Z");
-        Assert.Equal(RawJsonFor("abc123", pending: false), deduped["rawJson"].S);
-    }
-
-    [Fact]
-    public async Task ArchiveAsync_does_nothing_when_the_provider_reported_nothing()
+    public async Task ArchiveAsync_does_nothing_when_there_are_no_raw_response_bodies()
     {
         var repository = await RepositoryForAsync("archive-empty");
 
-        await repository.ArchiveAsync(
-            AccountFor(userId: 1, accountId: 1),
-            new ProviderSyncResult([], [], null),
-            Guid.NewGuid(),
-            DateTime.UtcNow,
-            TestContext.Current.CancellationToken);
+        await repository.ArchiveAsync("SimpleFIN", [], DateTime.UtcNow, TestContext.Current.CancellationToken);
 
         Assert.Empty(await ScanAsync());
     }
@@ -218,17 +103,15 @@ public sealed class SyncArchiveRepositoryTests : IAsyncLifetime
     [Fact]
     public void BuildItems_stamps_an_unspecified_kind_instant_as_UTC_rather_than_shifting_it()
     {
-        // ToUniversalTime would read an Unspecified DateTime as local time and move the sort key by the
+        // ToUniversalTime would read an Unspecified DateTime as local time and move the key by the
         // machine's offset, so the same run would key differently depending on where it ran.
         var items = SyncArchiveRepository.BuildItems(
-            AccountFor(userId: 1, accountId: 1),
-            new ProviderSyncResult([Synced("abc123", pending: false)], [], null),
-            Guid.NewGuid(),
+            "SimpleFIN",
+            ["""{"accounts":[]}"""],
             new DateTime(2026, 8, 1, 6, 0, 0, DateTimeKind.Unspecified));
 
         var item = Assert.Single(items);
-        Assert.Equal("2026-08-01T06:00:00.000Z", item["syncedAt"].S);
-        Assert.Equal("TXN#abc123#2026-08-01T06:00:00.000Z", item["sk"].S);
+        Assert.Equal("SimpleFIN#2026-08-01T06:00:00.000Z", item["pk"].S);
     }
 
     /// <summary>
@@ -249,38 +132,9 @@ public sealed class SyncArchiveRepositoryTests : IAsyncLifetime
 
     private static Dictionary<string, AttributeValue> Single(
         IReadOnlyList<Dictionary<string, AttributeValue>> items,
-        string sortKey)
+        string partitionKey)
     {
-        return Assert.Single(items, item => item["sk"].S == sortKey);
-    }
-
-    private static SyncedTransaction Synced(string providerTransactionId, bool pending)
-    {
-        return new SyncedTransaction(
-            providerTransactionId,
-            TransactionDate,
-            "Coffee",
-            "Beans",
-            "",
-            -4.25m,
-            pending,
-            RawJsonFor(providerTransactionId, pending));
-    }
-
-    private static string RawJsonFor(string providerTransactionId, bool pending)
-    {
-        return $$"""{"id":"{{providerTransactionId}}","pending":{{(pending ? "true" : "false")}}}""";
-    }
-
-    private static Account AccountFor(int userId, int accountId)
-    {
-        return new Account
-        {
-            Id = accountId,
-            UserId = userId,
-            Name = "Checking",
-            SourceType = SyncConstants.SourceTypeSimpleFin,
-        };
+        return Assert.Single(items, item => item["pk"].S == partitionKey);
     }
 
     /// <summary>
@@ -292,8 +146,7 @@ public sealed class SyncArchiveRepositoryTests : IAsyncLifetime
         _tableName = tableName;
         var options = new DynamoDbOptions { TableName = tableName, ServiceUrl = _serviceUrl };
 
-        // Provisioned through the initializer so these tests write against the real schema — the sort
-        // keys are only meaningful against the key schema the app actually creates.
+        // Provisioned through the initializer so these tests write against the real schema.
         var initializer = new SyncArchiveTableInitializer(_dynamoDb, options, NullLogger<SyncArchiveTableInitializer>.Instance);
         await initializer.StartAsync(TestContext.Current.CancellationToken);
 
