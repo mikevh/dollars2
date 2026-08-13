@@ -14,9 +14,10 @@
       divergence reintroduces a flash. useTheme remains the authority once React
       is mounted; this only pre-seeds the class so its first effect is a no-op.
 
-      CSP allows this script by SHA-256 hash (frontend/nginx.conf), not 'unsafe-inline'.
-      Any edit to the text below changes the hash and must be recomputed there too, or the
-      script gets silently blocked (console CSP violation, page falls back to light mode).
+      CSP allows this script by SHA-256 hash (frontend/security-headers.conf), not
+      'unsafe-inline'. Any edit to the text below changes the hash and must be recomputed
+      there too, or the script gets silently blocked (console CSP violation, page falls
+      back to light mode).
     -->
     <script>
       try {
