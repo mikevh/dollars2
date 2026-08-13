@@ -202,14 +202,6 @@ function AccountTransactions({ accountId }: { accountId: string | undefined }) {
         <h2 className="absolute left-1/2 -translate-x-1/2 text-[18px]">
           {data?.accountName ?? 'Account'}
         </h2>
-        {data && data.sourceType !== 'Manual' && (
-          <Link
-            to={`/accounts/${accountId}/sync-archive`}
-            className="btn btn-ghost ml-auto text-[13px]"
-          >
-            Sync archive
-          </Link>
-        )}
       </div>
 
       <div className="mx-auto w-full max-w-[900px] px-4 py-6">

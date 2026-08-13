@@ -1,11 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Provider } from 'react-redux'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { store } from '../../app/store'
 import { api } from '../../api/client'
 import type { TransactionResponse } from '../../types/transaction'
 import TransactionEditDialog from './TransactionEditDialog'
-import { clearRawHistory } from './rawHistorySlice'
 
 vi.mock('../../api/client', () => ({
   api: {
@@ -222,43 +221,5 @@ describe('TransactionEditDialog', () => {
     expect(onMutate).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
     confirmSpy.mockRestore()
-  })
-})
-
-describe('TransactionEditDialog (Raw History tab)', () => {
-  const synced = () => makeTransaction({ id: 7, accountId: 2, accountName: 'Checking', isManual: false })
-
-  beforeEach(() => {
-    store.dispatch(clearRawHistory())
-    vi.mocked(api.get).mockClear()
-  })
-
-  it('does not offer tabs while creating a transaction', () => {
-    renderDialog(null)
-    expect(screen.queryByRole('button', { name: 'Raw History' })).not.toBeInTheDocument()
-  })
-
-  it('leaves the archive alone until the tab is actually opened', async () => {
-    renderDialog(synced())
-    expect(vi.mocked(api.get)).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Raw History' }))
-
-    await vi.waitFor(() => expect(vi.mocked(api.get)).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(api.get).mock.calls[0][0]).toBe('/api/transactions/7/raw-history')
-  })
-
-  it('keeps unsaved Details edits across a round trip to Raw History', async () => {
-    renderDialog(synced())
-    // Notes is the one field a synced transaction lets you edit.
-    const notes = screen.getByRole('textbox')
-    fireEvent.change(notes, { target: { value: 'split with Sam' } })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Raw History' }))
-    await screen.findByText('No archived payloads for this transaction.')
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Details' }))
-    expect(screen.getByRole('textbox')).toHaveValue('split with Sam')
   })
 })

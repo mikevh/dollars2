@@ -422,20 +422,4 @@ describe('AccountTransactionsPage', () => {
     expect(sizeOf(lastUrl())).toBe('50')
     expect((screen.getByLabelText('Transactions per page') as HTMLSelectElement).value).toBe('50')
   })
-
-  it('links to the sync archive for a synced account', async () => {
-    getMock.mockResolvedValue({ data: page([], 0, 'SimpleFIN'), error: null })
-    renderPage('3')
-
-    const link = await screen.findByRole('link', { name: 'Sync archive' })
-    expect(link).toHaveAttribute('href', '/accounts/3/sync-archive')
-  })
-
-  it('does not link to the sync archive for a manual account', async () => {
-    getMock.mockResolvedValue({ data: page([], 0, 'Manual'), error: null })
-    renderPage('3')
-
-    await screen.findByText('No transactions for this account.')
-    expect(screen.queryByRole('link', { name: 'Sync archive' })).toBeNull()
-  })
 })
