@@ -8,6 +8,7 @@ interface BudgetState {
   error: string | null
   currentYear: number
   currentMonth: number
+  currentRequestId: string | null
 }
 
 function currentYearMonth() {
@@ -23,6 +24,7 @@ const initialState: BudgetState = {
   error: null,
   currentYear: initYear,
   currentMonth: initMonth,
+  currentRequestId: null,
 }
 
 export const fetchBudget = createAsyncThunk(
@@ -201,15 +203,22 @@ const budgetSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchBudget.pending, (state) => {
+      .addCase(fetchBudget.pending, (state, action) => {
         state.loading = true
         state.error = null
+        state.currentRequestId = action.meta.requestId
       })
       .addCase(fetchBudget.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.currentRequestId) {
+          return
+        }
         state.loading = false
         state.budget = action.payload
       })
       .addCase(fetchBudget.rejected, (state, action) => {
+        if (action.meta.requestId !== state.currentRequestId) {
+          return
+        }
         state.loading = false
         state.error = action.payload as string
       })
