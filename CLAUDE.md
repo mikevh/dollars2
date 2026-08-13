@@ -27,7 +27,8 @@ Detailed product specs live in `docs/`. Read these before building new features:
 - `docs/transaction_handling.md` — Bank sync (Plaid/SimpleFIN), manual entry, drag-and-drop assignment, splits, deletion
 - `docs/accounts.md` — Per-user accounts, JSON connection details, v1 direct DB setup
 - `docs/auth_users.md` — Email-only login (v1), JWT + refresh tokens, multi-user isolation
-- `docs/ui_layout.md` — Budget pane + transaction pane layout, activity pane, edit dialog, tabs
+- `docs/ui_layout.md` — Page layout geometry only (pane split, scroll/pin behavior); component
+  behavior lives in `docs/frontend.md`
 - `docs/backend.md` — Architecture, all API endpoints, bank sync service, provider abstraction
 - `docs/frontend.md` — All UI components, interactions, theme, routing, data fetching
 - `docs/database.md` — Full schema (all tables, columns, types, constraints, relationships)

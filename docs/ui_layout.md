@@ -16,61 +16,24 @@
 
 ## Budget Pane (Left)
 
-- "Left to budget" indicator at the top (Income Planned - Expenses Planned)
-- Income group pinned at top (planned / received / remaining)
-- Expense groups below with line items (planned / spent / remaining)
-- Groups and line items reorderable via drag-and-drop
-- Negative remaining values shown in red text
-- Clicking a line item replaces the transaction pane with the line item activity pane
+See `frontend.md` § Budget Pane (Left) for component behavior (month nav, zero-based indicator,
+income group, expense groups, line items, currency input).
 
-## Transaction Pane (Right) — Tabs
+## Transaction Pane (Right)
 
-### New Tab
-- Unassigned transactions from bank sync and manual entry
-- Drag-and-drop onto line items to assign
-- Shows all unassigned transactions regardless of date
-- Manual entry button
-- Sorted by date
-
-### Tracked Tab
-- All transactions assigned to a line item
-- Initially shows 2 months back, with a button to load 2 more months
-- Clicking a transaction opens the edit dialog modal
-
-### Deleted Tab
-- Soft-deleted transactions
-- Can restore synced transactions (returns to "New" tab)
-- Can hard-delete manual transactions
-
-### Pending Tab
-- Pending bank transactions (not yet posted)
-- View-only
-
-### Search
-- Search bar below tabs
-- Searches on name and amount (as text)
-- Applies to the currently active tab
+See `frontend.md` § Transaction Pane (Right) for tabs (New/Tracked/Deleted/Pending), search, and
+display rules.
 
 ## Line Item Activity Pane
 
-- Replaces the transaction pane when a line item is clicked
-- Shows transactions assigned to this line item for the current month
-- Shows a line for the incoming rollover value
-- Clicking a transaction opens the edit dialog modal
-- Back button/action to return to the transaction pane
+See `frontend.md` § Line Item Activity Pane.
 
 ## Transaction Edit Dialog (Modal)
 
-- Editing shows two tabs: Details and Raw History (the archived provider payloads for that transaction); creating shows the form alone
-- Synced transactions: read-only fields (date, description, amount, account) + editable notes + line item assignment with split amounts
-- Manual transactions: all fields editable
-- Multiple line item assignments with amount inputs for splits (amounts must total to transaction amount)
-- Actions: unassign, delete
+See `frontend.md` § Transaction Edit Dialog (Modal).
 
 ## Accounts Pages
 
-- `/accounts` — accounts grouped by connection, with sync / re-sync per connection
-- `/accounts/:accountId` — paged transactions for a single account
-- Read-only views: account creation and editing stay in the database for v1
+See `frontend.md` § Routing for the `/accounts` and `/accounts/:accountId` routes.
 
 A settings page (connection management, user profile) is deferred — see `out_of_scope.md`.

@@ -28,9 +28,8 @@
 
 ## Display
 
-- Income transactions (positive amounts): green text with "+" prefix
-- Expense transactions: standard display with "-" prefix
-- Sorted by date in all views
+Sorted by date in all views. See `frontend.md` § Transaction Item Display for presentation rules
+(income/expense styling, manual-transaction labeling).
 
 ## Assignment
 
@@ -50,9 +49,7 @@
 
 ## Edit Dialog (Modal)
 
-- **Synced transactions:** date, description, amount, account are read-only. Editable: notes, line item assignment(s), split amounts
-- **Manual transactions:** all fields editable (date, description, amount, account, notes, line item assignment(s))
-- Actions available: unassign, delete
+See `frontend.md` § Transaction Edit Dialog (Modal) for the dialog's fields, tabs, and actions.
 
 ## Deletion
 
