@@ -120,6 +120,12 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
     // drop the failed draft here or the next blur would silently re-submit it.
     if (!await saveUpdate(trimmed, lineItem.plannedAmount)) {
       setNameValue(lineItem.name)
+      // A failed rename mid-new-item-flow must not advance to the amount editor — leave the
+      // name editor open so the rejected name stays correctable instead of proceeding as if
+      // the rename had landed.
+      if (startEditing) {
+        return
+      }
     }
     setEditingName(false)
     if (startEditing) {
