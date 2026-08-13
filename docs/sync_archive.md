@@ -1,45 +1,49 @@
 # Sync Archive
 
-An append-only, versioned record of the raw JSON the bank sync providers (Plaid, SimpleFIN) actually
-return — kept alongside, not inside, the MSSQL budget data.
+An append-only record of the raw HTTP response bodies the bank sync providers (Plaid, SimpleFIN)
+actually return — kept alongside, not inside, the MSSQL budget data.
 
 ## What It Is and Why
 
-Every time a sync run touches an account, the provider's raw payload for each transaction, each
-removed transaction, the account metadata, and any provider-reported error is written to a separate
-DynamoDB table (`Dollars2SyncArchive`) as a new item. Nothing is ever overwritten and nothing expires.
+Every time a sync run fetches from a provider, the raw response body of each upstream HTTP call —
+one for SimpleFIN, one per page for Plaid — is written to a separate DynamoDB table
+(`Dollars2SyncArchive`) as a new item, verbatim and unparsed. Nothing is ever overwritten and
+nothing expires.
 
 Three reasons this exists:
 
 - **Forensics.** "What did the bank actually send?" MSSQL only ever holds what `TransactionService`
   chose to keep — description/payee/memo truncated to `nvarchar(500)`, fields the app doesn't model
-  dropped entirely. The archive holds the payload verbatim.
+  dropped entirely. The archive holds the whole response verbatim.
 - **History.** Re-seeing the same transaction across sync runs — pending → posted, an amount
   correction, a description rewrite — normally overwrites the MSSQL row in place. The archive is the
-  only place those intermediate states survive.
+  only place those intermediate states survive, inside whichever response body happened to carry them.
 - **Future features.** Auto-categorization, merchant enrichment, and balance history (all currently
   `docs/out_of_scope.md`) would need the provider's original fields, not the subset MSSQL keeps
   today. The archive exists so that data isn't already gone by the time those features are built.
 
+There is no read path for any of this inside the app — the archive is pure write, inspected only ad
+hoc (see [Inspecting the Table Directly](#inspecting-the-table-directly)). It previously had two GET
+endpoints and a UI surfaced them; both were removed as unused before this schema existed.
+
 ## Why DynamoDB, Not an MSSQL `nvarchar(max)` Column
 
-This was a deliberate choice, not a reflex reach for a new technology, for three reasons:
+This was a deliberate choice, not a reflex reach for a new technology:
 
 - **The write path must never be able to affect a sync.** Archiving is best-effort
   (see [Best-Effort Writes](#best-effort-writes) below) — a DynamoDB outage must never fail or roll
   back the MSSQL transaction that lands a transaction in the budget. Putting the archive in a wholly
   separate store makes that a structural guarantee rather than a discipline every future change has to
   remember: there is no shared connection or shared transaction scope to accidentally couple through.
-- **The access pattern is key-value and time-ordered, not relational.** Every read the app performs
-  is either "every sighting of this one transaction, newest first" or "this one account's history,
-  newest first" — a single-partition query, never a join. That's exactly what a partition key + sort
-  key is for; modeling the same access pattern in MSSQL means a side table with a hand-rolled
-  `(TransactionId, SyncedAt DESC)` index doing the same job DynamoDB's key schema gives for free.
 - **Keeping high-churn archival writes out of the transactional log chain.** The sync window overlaps
-  7 days by design, and a full resync re-fetches 180 days, so most transactions get archived many
-  times with identical payloads — the archive absorbs a lot of blob churn. `docs/backups.md`'s hourly
-  transaction-log backups exist to protect real financial data with point-in-time recovery; inflating
-  that log chain with archival JSON that needs none of that guarantee would be pure cost.
+  7 days by design, and a full resync re-fetches 180 days, so a given response's contents get
+  re-archived many times across runs. `docs/backups.md`'s hourly transaction-log backups exist to
+  protect real financial data with point-in-time recovery; inflating that log chain with archival
+  JSON that needs none of that guarantee would be pure cost.
+
+The schema is now a plain key-value log with no query pattern behind it (the app never reads it
+back), so the case for DynamoDB specifically — rather than any other blob store — rests on the two
+points above, not on an access-pattern win.
 
 ## This Is dynamodb-local Everywhere — There Is No AWS Account
 
@@ -82,104 +86,85 @@ idempotently at startup by `SyncArchiveTableInitializer` (an `IHostedService` �
 beyond its key attributes, so there's nothing resembling the numbered SQL migration chain here).
 
 ```
-Partition key   pk  (S)   USER#{userId}#ACCT#{accountId}
-Sort key        sk  (S)   TXN#{providerTransactionId}#{syncedAt}
-                          REMOVED#{providerTransactionId}#{syncedAt}
-                          ACCTMETA#{syncedAt}
-                          ERROR#{syncedAt}#{seq}
-                          SKIPPED#{syncedAt}#{seq}
+Partition key   pk  (S)   {sourceType}#{instant}
+                          {sourceType}#{instant}#{page}
 ```
 
-`syncedAt` is ISO-8601 UTC with a `Z` marker and millisecond precision
-(`2026-08-03T06:00:00.000Z`), which sorts lexicographically in chronological order — that's what
-makes the composite sort keys usable at all.
+No sort key — the whole item identity lives in `pk`.
 
-**A `providerTransactionId` may itself contain `#`**, so a `TXN#{providerTransactionId}#{syncedAt}`
-sort key is only unambiguous read right-to-left — a `begins_with(sk, "TXN#{providerTransactionId}#")`
-prefix query is not by itself an exact match. `"TXN#abc#"` also matches every sighting of the id
-`"abc#def"`. `SyncArchiveRepository.GetTransactionHistoryAsync` pairs that prefix scan with an
-exact-match `FilterExpression` on the `providerTransactionId` attribute (below) to resolve the
-ambiguity — any new read built against `sk` needs the same pairing.
+- `{sourceType}` is `SimpleFIN` or `Plaid`.
+- `{instant}` is ISO-8601 UTC with a `Z` marker and millisecond precision
+  (`2026-08-03T06:00:00.000Z`), stamped once per connection-level fetch (`BankSyncService.SyncConnectionAsync`).
+- `{page}` is a zero-padded index (`0000`, `0001`, ...), present only when a fetch captured more
+  than one raw response body. SimpleFIN always fetches in one call, so its key never carries a page
+  segment. Plaid pages through `/transactions/sync`, and without a sort key two pages sharing the
+  same `{instant}` would otherwise collide on the same `pk` — silently overwriting one page's
+  archive, or making DynamoDB reject the whole `BatchWriteItem` (it rejects a batch containing two
+  items with the same key rather than rejecting them individually). The page index makes every
+  item's key unique regardless.
 
-Every item also carries:
+Every item carries just:
 
 | attribute | type | notes |
 |---|---|---|
-| `pk` | S | `USER#{userId}#ACCT#{accountId}` |
-| `sk` | S | see above |
-| `syncedAt` | S | ISO-8601 UTC with `Z`; also the LSI sort key |
-| `syncRunId` | S | GUID, identical for every item one `SyncConnectionAsync` call writes |
-| `userId` | N | |
-| `accountId` | N | |
-| `sourceType` | S | `SimpleFIN` / `Plaid` |
-| `itemType` | S | `Transaction` / `Removed` / `AccountMetadata` / `ProviderError` / `SkippedTransaction` |
-| `providerTransactionId` | S | `Transaction` and `Removed` items only |
-| `rawJson` | S | the payload, verbatim — absent on `Removed` items, whose whole payload is the id |
+| `pk` | S | see above |
+| `rawJson` | S | the upstream HTTP response body, verbatim |
 
-### Local Secondary Index
-
-```
-LSI name   LSI_SyncedAt
-Sort key   syncedAt (S)
-Projection ALL
-```
-
-The partition is already scoped to a single account, so an LSI — not a GSI — is the right primitive
-for "this account's archive, newest first" (what the sync archive page needs). An LSI must be declared
-at table-creation time and can never be added later, so it ships with the first table or not at all.
-
-The cost: an LSI caps a single partition at **10GB**. Because the partition key already scopes to one
-account (`USER#{userId}#ACCT#{accountId}`), that cap applies per-account rather than globally — at
-this app's volume, decades away either way, but worth knowing before assuming it's a whole-table
-limit.
+No `userId`, `accountId`, `sourceType`, or `syncRunId` attributes — deliberately, in favor of maximum
+simplicity over scan-time filterability. A connection-level fetch can cover several stored accounts
+(a shared Plaid Item or SimpleFIN access URL), so per-account attribution was never a single ownership
+fact per item anyway.
 
 Billing mode is `PAY_PER_REQUEST`. dynamodb-local ignores throughput settings entirely, so this has no
 runtime effect — it's chosen only because there's no capacity to plan for and no AWS account behind
 this table to plan it against.
 
+### Migrating an Existing Table
+
+DynamoDB has no `ALTER TABLE` for key schema, and `SyncArchiveTableInitializer` only creates the
+table when it's absent — it will not touch a table that already exists under the old
+`pk`/`sk`/LSI schema. Deploying this schema change requires manually dropping the existing
+`Dollars2SyncArchive` table (via `dynamodb-admin` at `http://localhost:8001`, or the AWS CLI — see
+[Inspecting the Table Directly](#inspecting-the-table-directly)) before the new code runs, so the
+initializer recreates it with the schema above. Until that's done, writes against the stale table
+fail validation and are swallowed by the best-effort catch (archiving silently stops working, logged
+as a warning) — the sync itself is unaffected either way. This is a one-time step tied to this
+schema change, not an ongoing operational concern; see [Where the Data Lives](#where-the-data-lives-and-that-nothing-backs-it-up)
+for why losing the old table's contents is acceptable.
+
 ## Versioning Model
 
-Every sighting of a transaction writes a **new** item, keyed by `syncedAt`. Re-seeing the same
-transaction never overwrites the previous version:
+Every connection-level fetch writes **new** items, keyed by provider and instant. A later sync never
+overwrites an earlier one's archived response:
 
 ```
-TXN#abc123#2026-08-01T06:00:00.000Z   {"pending": true,  ...}
-TXN#abc123#2026-08-02T06:00:00.000Z   {"pending": true,  ...}
-TXN#abc123#2026-08-03T06:00:00.000Z   {"pending": false, ...}   <- posted
+SimpleFIN#2026-08-01T06:00:00.000Z
+SimpleFIN#2026-08-02T06:00:00.000Z
+SimpleFIN#2026-08-03T06:00:00.000Z
 ```
 
-No TTL. Items live forever. One `syncRunId` and one `syncedAt` are generated per
-`BankSyncService.SyncConnectionAsync` invocation and shared by every account in that connection group,
-which is what lets the sync archive page group items back into "one sync run" rows.
+No TTL. Items live forever.
 
 Accepted cost: the sync window overlaps 7 days by design, and a full resync re-fetches 180 days, so
-most transactions get archived many times with identical payloads. That's the tradeoff of an
-append-every-sighting schema, and it's fine at this app's volume.
+most response bodies carry mostly-identical data across runs. That's the tradeoff of an
+append-every-fetch schema, and it's fine at this app's volume — the same tradeoff the previous
+per-transaction schema accepted, just now paid once per fetch instead of once per transaction.
 
-## Plaid vs. SimpleFIN: A Fidelity Difference Worth Knowing
+## Both Providers Capture the Same Way
 
-Both providers' archived `rawJson` is genuine wire JSON obtained via `JsonElement.GetRawText()` — but
-*how* each gets there differs, and it's the single most surprising property of the archive:
+Both providers hand back genuine wire JSON with no re-serialization involved:
 
-- **SimpleFIN** (`Providers/SimplefinProvider.cs`) fetches the response body as a plain string and
-  indexes it by transaction/account id with `JsonDocument`, pulling `.GetRawText()` for each object.
-  The archived payload is exactly the bytes SimpleFIN sent, including fields the app's typed DTOs
-  don't model.
+- **SimpleFIN** (`Providers/SimplefinProvider.cs`) reads the response body as a plain string and
+  archives it directly — it's already the exact bytes SimpleFIN sent, before any parsing happens.
 - **Plaid** (`Providers/PlaidProvider.cs`) uses the `Going.Plaid` SDK, whose response objects are
   typed C# models with no route back to their own JSON — *unless* `ShowRawJson = true` is set on the
-  request, which this app does. With that flag, `Going.Plaid` hands back the raw response body
-  alongside the typed one, and the provider splits it into per-transaction raw JSON, paired
-  **positionally** with the typed list (the page's `added[]`/`modified[]` arrays deserialize into
-  `response.Added`/`response.Modified` in document order). If the raw array's length doesn't match
-  the typed array's count, the provider logs a warning and archives empty strings rather than risk
-  pairing the wrong bytes with the wrong transaction id.
+  request, which this app does. With that flag, `Going.Plaid` hands back each page's response body on
+  `response.RawJson`, which is archived directly, one item per page.
 
-So Plaid's archive is not a re-serialization of `Going.Plaid`'s typed models (an earlier draft of this
-feature assumed it would have to be, and documented that as a known fidelity gap — that premise turned
-out to be wrong once `ShowRawJson` was found). Both providers store genuine wire bytes. The real
-distinction is architectural fragility, not data loss: SimpleFIN's raw text falls out of parsing its
-own response naturally, while Plaid's raw JSON exists only because of an explicit SDK opt-in and a
-positional pairing step that has to stay in sync with the typed deserialization it rides alongside.
+Neither provider slices, indexes, or re-pairs anything to build the archived payload — that
+per-transaction correlation step (and its attendant fragility, when a raw array's length disagreed
+with the typed one) existed only under the old per-transaction-item schema and was removed along
+with it.
 
 ## Best-Effort Writes
 
@@ -187,18 +172,22 @@ Archiving must never affect a sync. `BankSyncService.ArchiveBestEffortAsync` wra
 in an unfiltered try/catch:
 
 ```csharp
-private async Task ArchiveBestEffortAsync(Account account, ProviderSyncResult syncResult, Guid syncRunId, DateTime syncedAt, CancellationToken cancel)
+private async Task ArchiveBestEffortAsync(string sourceType, IReadOnlyList<Account> accounts, IReadOnlyList<string> rawResponseBodies, DateTime syncedAt, CancellationToken cancel)
 {
     try
     {
-        await _syncArchiveRepo.ArchiveAsync(account, syncResult, syncRunId, syncedAt, cancel);
+        await _syncArchiveRepo.ArchiveAsync(sourceType, rawResponseBodies, syncedAt, cancel);
     }
     catch (Exception ex)
     {
-        _logger.LogWarning(ex, "Could not archive sync payloads for account {AccountId} ({AccountName}) in sync run {SyncRunId}; the sync itself is unaffected", account.Id, account.Name, syncRunId);
+        _logger.LogWarning(ex, "Could not archive sync payloads for {SourceType} accounts {AccountIds}; the sync itself is unaffected", sourceType, string.Join(", ", accounts.Select(a => a.Id)));
     }
 }
 ```
+
+Called once per connection-level fetch (`BankSyncService.SyncConnectionAsync`), right after the
+provider call and before any account in the group is persisted — so a failed account still gets that
+run's raw response archived, which is precisely the case the archive exists to explain.
 
 A DynamoDB outage loses that run's payloads silently and never blocks, fails, or rolls back the sync —
 transactions still reach the budget. `SyncArchiveRepository.ArchiveAsync` itself *throws* on failure
@@ -210,22 +199,9 @@ The same posture applies at startup: `SyncArchiveTableInitializer` logs an error
 DynamoDB is unreachable when the app boots, rather than preventing the app from serving budgets.
 
 Writes go through `BatchWriteItemAsync` in chunks of 25 (DynamoDB's batch limit), retrying
-`UnprocessedItems` with backoff a bounded number of times before giving up.
-
-## Reading the Archive
-
-Two endpoints, both documented in full in `docs/backend.md`:
-
-- `GET /api/transactions/{id}/raw-history` — every archived sighting of one transaction, newest
-  first. Surfaced in the transaction edit dialog's **Raw History** tab (`docs/frontend.md`).
-- `GET /api/accounts/{id}/sync-archive?before=&limit=` — one account's archive, keyset-paged and
-  grouped into sync runs, newest first. The only read path that reaches account-metadata, removal,
-  provider-error, and skipped-transaction items, since they have no transaction to hang off. Surfaced
-  on the **Sync Archive** page (`docs/frontend.md`), reached from a synced account's transactions
-  page.
-
-Both reads return 503 `ARCHIVE_UNAVAILABLE` when DynamoDB can't be reached — unlike the best-effort
-write path, a failed read has no useful fallback to offer.
+`UnprocessedItems` with backoff a bounded number of times before giving up — though in practice a
+connection-level fetch rarely produces more than a handful of raw response bodies, so chunking is a
+safety margin more than a routine path.
 
 ## Inspecting the Table Directly
 
@@ -246,12 +222,11 @@ aws dynamodb scan \
   --endpoint-url http://localhost:8000 \
   --profile dynamodb-local
 
-aws dynamodb query \
+aws dynamodb get-item \
   --table-name Dollars2SyncArchive \
   --endpoint-url http://localhost:8000 \
   --profile dynamodb-local \
-  --key-condition-expression "pk = :pk" \
-  --expression-attribute-values '{":pk": {"S": "USER#1#ACCT#3"}}'
+  --key '{"pk": {"S": "SimpleFIN#2026-08-03T06:00:00.000Z"}}'
 ```
 
 ## Where the Data Lives, and That Nothing Backs It Up

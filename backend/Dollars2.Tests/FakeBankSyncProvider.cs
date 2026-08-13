@@ -21,7 +21,7 @@ public sealed class FakeBankSyncProvider : IBankSyncProvider
     public TimeSpan MinSyncInterval => TimeSpan.FromHours(6);
     public string GetConnectionKey(Account account) => account.ConnectionDetailsJson ?? "";
 
-    public Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
+    public Task<ProviderFetchResult> FetchTransactionsForConnectionAsync(
         IReadOnlyList<Account> accounts, DateTime? since, bool fullResync = false, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 

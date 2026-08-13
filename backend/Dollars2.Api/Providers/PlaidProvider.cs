@@ -58,7 +58,7 @@ public class PlaidProvider : IBankSyncProvider
             : details.AccessToken;
     }
 
-    public async Task<IReadOnlyDictionary<int, ProviderSyncResult>> FetchTransactionsForConnectionAsync(
+    public async Task<ProviderFetchResult> FetchTransactionsForConnectionAsync(
         IReadOnlyList<Account> accounts,
         DateTime? since,
         bool fullResync = false,
@@ -72,13 +72,14 @@ public class PlaidProvider : IBankSyncProvider
             _logger.LogError(
                 "Plaid sync skipped for accounts {AccountIds}: Plaid:ClientId / Plaid:Secret are not configured.",
                 string.Join(", ", accounts.Select(a => a.Id)));
-            return accounts.ToDictionary(
+            IReadOnlyDictionary<int, ProviderSyncResult> unconfigured = accounts.ToDictionary(
                 a => a.Id,
                 a => new ProviderSyncResult(
                     Array.Empty<SyncedTransaction>(),
                     Array.Empty<string>(),
                     null,
                     "Plaid:ClientId / Plaid:Secret are not configured."));
+            return new ProviderFetchResult(unconfigured, Array.Empty<string>());
         }
 
         // All accounts share one access token (that's the connection key), but each carries its own
@@ -133,18 +134,13 @@ public class PlaidProvider : IBankSyncProvider
                 string.Join(", ", accounts.Select(a => a.Id)));
         }
 
-        // Each typed transaction is carried alongside the raw JSON object it was deserialized from, so
-        // the sync archive can hold the bytes Plaid sent rather than a re-serialization of Going.Plaid's
-        // DTOs (which would silently drop every field the library does not model).
-        var added = new List<(PlaidTransaction Transaction, string RawJson)>();
-        var modified = new List<(PlaidTransaction Transaction, string RawJson)>();
+        var added = new List<PlaidTransaction>();
+        var modified = new List<PlaidTransaction>();
         var removed = new List<RemovedTransaction>();
         // Every /transactions/sync page carries the Item's current account snapshot (including balances);
-        // keep the latest so we can record each account's balance after the stream is drained. The raw
-        // snapshot is replaced in lockstep with the typed one, so AccountMetadataJson and Balance always
-        // describe the same page rather than being stitched together from two different ones.
+        // keep the latest so we can record each account's balance after the stream is drained.
         IReadOnlyList<PlaidAccount> accountSnapshot = Array.Empty<PlaidAccount>();
-        IReadOnlyList<RawPlaidAccount> rawAccountSnapshot = Array.Empty<RawPlaidAccount>();
+        var rawResponseBodies = new List<string>();
         bool hasMore;
 
         do
@@ -159,8 +155,7 @@ public class PlaidProvider : IBankSyncProvider
                 Cursor = string.IsNullOrEmpty(cursor) ? null : cursor,
                 Count = 500,
                 // Makes Going.Plaid hand back the response body verbatim on ResponseBase.RawJson, which
-                // is the only way to archive what Plaid actually sent — the typed entities expose no
-                // route back to their own JSON.
+                // is the only way to archive what Plaid actually sent.
                 ShowRawJson = true,
             });
 
@@ -171,19 +166,22 @@ public class PlaidProvider : IBankSyncProvider
                     $"Plaid /transactions/sync failed: {error?.ErrorCode} - {error?.ErrorMessage}");
             }
             _logger.LogTrace("Plaid raw response {response}", response.RawJson);
-            var rawPage = ReadRawPage(response.RawJson, response.Added.Count, response.Modified.Count, _logger);
 
-            // Zip rather than a lookup by transaction_id: a transaction can appear in `added` on one page
-            // and `modified` on another with different content, and an id-keyed map could only hold one of
-            // the two — pairing one typed entry with the other's bytes. ReadRawPage guarantees these lists
-            // are the same length as the typed ones, so no transaction is ever dropped by the zip.
-            added.AddRange(response.Added.Zip(rawPage.Added, (t, raw) => (Transaction: t, RawJson: raw)));
-            modified.AddRange(response.Modified.Zip(rawPage.Modified, (t, raw) => (Transaction: t, RawJson: raw)));
+            if (!string.IsNullOrEmpty(response.RawJson))
+            {
+                rawResponseBodies.Add(response.RawJson);
+            }
+            else
+            {
+                _logger.LogWarning("Plaid /transactions/sync returned no raw JSON despite ShowRawJson; archiving nothing for this page.");
+            }
+
+            added.AddRange(response.Added);
+            modified.AddRange(response.Modified);
             removed.AddRange(response.Removed);
             if (response.Accounts.Count > 0)
             {
                 accountSnapshot = response.Accounts;
-                rawAccountSnapshot = rawPage.Accounts;
             }
 
             cursor = response.NextCursor;
@@ -221,23 +219,17 @@ public class PlaidProvider : IBankSyncProvider
                 string.IsNullOrEmpty(details?.AccountId) || plaidAccountId == details.AccountId;
 
             var upserts = new List<SyncedTransaction>();
-            var skippedTransactionsJson = new List<string>();
-            foreach (var t in added.Concat(modified).Where(t => MatchesAccount(t.Transaction.AccountId)))
+            foreach (var t in added.Concat(modified).Where(t => MatchesAccount(t.AccountId)))
             {
-                if ((t.Transaction.TransactionId?.Length ?? 0) > TransactionText.MaxLength)
+                if ((t.TransactionId?.Length ?? 0) > TransactionText.MaxLength)
                 {
                     // ProviderTransactionId is the dedup key (UX_Transactions_Provider); truncating could
                     // collide two distinct transactions, so skip rather than clamp.
-                    _logger.LogWarning("Skipping transaction {TransactionId} for account {AccountId}: id exceeds {MaxLength} characters.", t.Transaction.TransactionId, account.Id, TransactionText.MaxLength);
-
-                    if (!string.IsNullOrEmpty(t.RawJson))
-                    {
-                        skippedTransactionsJson.Add(t.RawJson);
-                    }
+                    _logger.LogWarning("Skipping transaction {TransactionId} for account {AccountId}: id exceeds {MaxLength} characters.", t.TransactionId, account.Id, TransactionText.MaxLength);
                     continue;
                 }
 
-                upserts.Add(MapTransaction(t.Transaction, t.RawJson));
+                upserts.Add(MapTransaction(t));
             }
 
             var updatedJson = JsonSerializer.Serialize(new PlaidConnectionDetails
@@ -249,21 +241,14 @@ public class PlaidProvider : IBankSyncProvider
 
             var balance = ExtractCurrentBalance(accountSnapshot, details?.AccountId);
 
-            // ErrorsJson is deliberately left empty for Plaid rather than forgotten. A successful
-            // /transactions/sync response carries no errors collection to capture (there is no analogue to
-            // SimpleFIN's errlist), and the one failure path throws above, before any result exists to
-            // attach errors to. Filling it with our own text rewrapped as JSON is the opposite of what the
-            // field documents — provider-reported errors, verbatim.
             results[account.Id] = new ProviderSyncResult(
                 upserts,
                 removedIds,
                 updatedJson,
-                Balance: balance,
-                AccountMetadataJson: ExtractRawAccountMetadata(rawAccountSnapshot, details?.AccountId),
-                SkippedTransactionsJson: skippedTransactionsJson);
+                Balance: balance);
         }
 
-        return results;
+        return new ProviderFetchResult(results, rawResponseBodies);
     }
 
     /// <summary>
@@ -327,12 +312,6 @@ public class PlaidProvider : IBankSyncProvider
     /// (unambiguous on its token) falls back to the single snapshot entry. Returns null when there is no
     /// unambiguous match.
     /// </summary>
-    /// <remarks>
-    /// Shared by the balance and raw-metadata lookups rather than written out in each. Both read a
-    /// snapshot of the same accounts — one typed, one raw — so a rule that drifted between them could
-    /// pair one account's balance with another's archived metadata. Having a single implementation makes
-    /// that impossible by construction instead of by comment.
-    /// </remarks>
     private static T? MatchSnapshotEntry<T>(IReadOnlyList<T> snapshot, Func<T, string?> accountIdOf, string? accountId)
         where T : class
     {
@@ -352,128 +331,7 @@ public class PlaidProvider : IBankSyncProvider
     internal static decimal? ExtractCurrentBalance(IReadOnlyList<PlaidAccount> accounts, string? accountId) =>
         MatchSnapshotEntry(accounts, a => a.AccountId, accountId)?.Balances?.Current;
 
-    /// <summary>
-    /// Picks the raw JSON of a stored account's entry in the Item's account snapshot, through the same
-    /// <see cref="MatchSnapshotEntry"/> rule <see cref="ExtractCurrentBalance"/> uses, so the archived
-    /// account object and the recorded balance always describe the same account. Returns null when there
-    /// is no unambiguous match.
-    /// </summary>
-    internal static string? ExtractRawAccountMetadata(IReadOnlyList<RawPlaidAccount> accounts, string? accountId) =>
-        MatchSnapshotEntry(accounts, a => a.AccountId, accountId)?.Json;
-
-    /// <summary>
-    /// Splits one /transactions/sync page body into the raw JSON of its individual objects, so the sync
-    /// archive stores the bytes Plaid sent rather than a re-serialization of Going.Plaid's entities —
-    /// which would silently drop anything Plaid returns that the library does not model.
-    /// </summary>
-    /// <remarks>
-    /// The added/modified lists are correlated positionally with the deserialized ones, which is sound
-    /// because both views come from the same body and JSON preserves array order. To keep it sound the
-    /// invariant is checked rather than assumed: a raw array whose length disagrees with the typed one
-    /// yields empty strings for the whole page, so a skewed pairing can never file one transaction's
-    /// bytes under another's id. Archiving nothing is recoverable; archiving the wrong bytes is not.
-    /// Any failure here is logged and degrades to empty capture — the archive is best-effort and must
-    /// never be able to fail a sync that Plaid itself answered successfully.
-    /// </remarks>
-    internal static RawPage ReadRawPage(string? rawJson, int addedCount, int modifiedCount, ILogger logger)
-    {
-        if (string.IsNullOrEmpty(rawJson))
-        {
-            logger.LogWarning(
-                "Plaid /transactions/sync returned no raw JSON despite ShowRawJson; archiving nothing for this page.");
-            return RawPage.Empty(addedCount, modifiedCount);
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(rawJson);
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                logger.LogWarning("Plaid /transactions/sync raw JSON was not an object; archiving nothing for this page.");
-                return RawPage.Empty(addedCount, modifiedCount);
-            }
-
-            return new RawPage(
-                ReadRawTransactions(document.RootElement, "added", addedCount, logger),
-                ReadRawTransactions(document.RootElement, "modified", modifiedCount, logger),
-                ReadRawAccounts(document.RootElement));
-        }
-        catch (JsonException ex)
-        {
-            logger.LogWarning(ex, "Plaid /transactions/sync raw JSON could not be parsed; archiving nothing for this page.");
-            return RawPage.Empty(addedCount, modifiedCount);
-        }
-    }
-
-    /// <summary>
-    /// Reads one of the page's transaction arrays, returning exactly <paramref name="expectedCount"/>
-    /// entries so the caller's zip against the deserialized list can never drop a transaction. Entries
-    /// are empty strings when the array is missing or its length disagrees with the deserialized one.
-    /// </summary>
-    private static IReadOnlyList<string> ReadRawTransactions(
-        JsonElement root, string propertyName, int expectedCount, ILogger logger)
-    {
-        if (expectedCount == 0)
-        {
-            return Array.Empty<string>();
-        }
-
-        if (!root.TryGetProperty(propertyName, out var array)
-            || array.ValueKind != JsonValueKind.Array
-            || array.GetArrayLength() != expectedCount)
-        {
-            logger.LogWarning(
-                "Plaid raw '{Property}' array does not line up with the {ExpectedCount} deserialized transactions; archiving nothing for it rather than pairing by skew.",
-                propertyName,
-                expectedCount);
-            return Enumerable.Repeat("", expectedCount).ToList();
-        }
-
-        var raw = new List<string>(expectedCount);
-        foreach (var transaction in array.EnumerateArray())
-        {
-            raw.Add(transaction.GetRawText());
-        }
-
-        return raw;
-    }
-
-    /// <summary>
-    /// Reads the page's account snapshot, keeping each account object whole. Unlike SimpleFIN's, a Plaid
-    /// account carries no nested transactions array, so nothing has to be stripped to keep the archived
-    /// metadata from duplicating transactions that are already archived on their own.
-    /// </summary>
-    private static IReadOnlyList<RawPlaidAccount> ReadRawAccounts(JsonElement root)
-    {
-        if (!root.TryGetProperty("accounts", out var accounts) || accounts.ValueKind != JsonValueKind.Array)
-        {
-            return Array.Empty<RawPlaidAccount>();
-        }
-
-        var raw = new List<RawPlaidAccount>(accounts.GetArrayLength());
-        foreach (var account in accounts.EnumerateArray())
-        {
-            if (account.ValueKind != JsonValueKind.Object)
-            {
-                continue;
-            }
-
-            var accountId = account.TryGetProperty("account_id", out var id) && id.ValueKind == JsonValueKind.String
-                ? id.GetString()
-                : null;
-
-            raw.Add(new RawPlaidAccount(accountId, account.GetRawText()));
-        }
-
-        return raw;
-    }
-
-    /// <param name="rawJson">
-    /// The transaction object exactly as it appeared in the /transactions/sync body, or an empty string
-    /// when the page's raw JSON could not be correlated. Passed in rather than derived here because a
-    /// <see cref="PlaidTransaction"/> offers no route back to its own JSON.
-    /// </param>
-    internal static SyncedTransaction MapTransaction(PlaidTransaction t, string rawJson)
+    internal static SyncedTransaction MapTransaction(PlaidTransaction t)
     {
         // Plaid amounts are positive for outflow (money leaving the account); our
         // convention is negative for expenses, positive for income — so negate.
@@ -491,21 +349,6 @@ public class PlaidProvider : IBankSyncProvider
             payee,
             "",
             amount,
-            t.Pending ?? false,
-            rawJson);
-    }
-
-    /// <summary>One account object from a /transactions/sync page, kept verbatim alongside its id.</summary>
-    internal sealed record RawPlaidAccount(string? AccountId, string Json);
-
-    internal sealed record RawPage(
-        IReadOnlyList<string> Added,
-        IReadOnlyList<string> Modified,
-        IReadOnlyList<RawPlaidAccount> Accounts)
-    {
-        public static RawPage Empty(int addedCount, int modifiedCount) => new(
-            Enumerable.Repeat("", addedCount).ToList(),
-            Enumerable.Repeat("", modifiedCount).ToList(),
-            Array.Empty<RawPlaidAccount>());
+            t.Pending ?? false);
     }
 }
