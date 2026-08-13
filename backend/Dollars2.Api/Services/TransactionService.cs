@@ -85,6 +85,7 @@ public class TransactionService
         {
             AccountId = account.Id,
             AccountName = account.Name,
+            SourceType = account.SourceType,
             Transactions = responses,
             TotalCount = totalCount
         });

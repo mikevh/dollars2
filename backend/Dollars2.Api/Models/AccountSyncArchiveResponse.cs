@@ -5,6 +5,11 @@ namespace Dollars2.Api.Models;
 /// </summary>
 public class AccountSyncArchiveResponse
 {
+    public string AccountName { get; set; } = "";
+
+    /// <summary>The provider this account syncs from, e.g. <c>SimpleFIN</c>, <c>Plaid</c>, or <c>Manual</c>.</summary>
+    public string SourceType { get; set; } = "";
+
     public List<SyncArchiveRunResponse> Runs { get; set; } = new();
 
     /// <summary>

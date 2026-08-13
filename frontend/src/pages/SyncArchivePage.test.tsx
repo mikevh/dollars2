@@ -6,33 +6,17 @@ import toast from 'react-hot-toast'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import syncArchiveReducer from '../features/syncArchive/syncArchiveSlice'
 import accountsReducer from '../features/accounts/accountsSlice'
-import type { AccountGroup } from '../types/account'
 import type { AccountSyncArchive, SyncArchiveRun } from '../types/syncArchive'
 import SyncArchivePage from './SyncArchivePage'
 
 const getMock = vi.fn()
-// The page fetches both /api/accounts (for the name and sourceType) and the sync-archive endpoint;
-// routed separately so one test's mock of the archive page doesn't have to also shape an accounts
-// response, and vice versa.
-const accountsGetMock = vi.fn()
 vi.mock('../api/client', () => ({
-  api: {
-    get: (endpoint: string) => (endpoint === '/api/accounts' ? accountsGetMock(endpoint) : getMock(endpoint)),
-  },
+  api: { get: (endpoint: string) => getMock(endpoint) },
 }))
 
 vi.mock('react-hot-toast', () => ({
   default: { error: vi.fn(), success: vi.fn() },
 }))
-
-function accountGroup(overrides: Partial<AccountGroup> = {}): AccountGroup {
-  return {
-    connectionId: 'conn-1',
-    sourceType: 'SimpleFIN',
-    accounts: [{ id: 3, name: 'Chase Checking', lastSyncedAt: null, lastStatus: null, balance: null }],
-    ...overrides,
-  }
-}
 
 function run(overrides: Partial<SyncArchiveRun> = {}): SyncArchiveRun {
   return {
@@ -51,8 +35,13 @@ function run(overrides: Partial<SyncArchiveRun> = {}): SyncArchiveRun {
   }
 }
 
-function archivePage(runs: SyncArchiveRun[], nextBefore: string | null = null): AccountSyncArchive {
-  return { runs, nextBefore }
+function archivePage(
+  runs: SyncArchiveRun[],
+  nextBefore: string | null = null,
+  accountName = 'Chase Checking',
+  sourceType = 'SimpleFIN'
+): AccountSyncArchive {
+  return { accountName, sourceType, runs, nextBefore }
 }
 
 function buildStore() {
@@ -89,8 +78,6 @@ function renderPageWithSwitcher(accountId: string, nextAccountId: string) {
 describe('SyncArchivePage', () => {
   beforeEach(() => {
     getMock.mockReset()
-    accountsGetMock.mockReset()
-    accountsGetMock.mockResolvedValue({ data: [accountGroup()], error: null })
     vi.mocked(toast.error).mockClear()
   })
 
@@ -279,8 +266,7 @@ describe('SyncArchivePage', () => {
   })
 
   it('explains that a manual account does not sync, reached directly by URL', async () => {
-    getMock.mockResolvedValue({ data: archivePage([]), error: null })
-    accountsGetMock.mockResolvedValue({ data: [accountGroup({ sourceType: 'Manual' })], error: null })
+    getMock.mockResolvedValue({ data: archivePage([], null, 'Cash Envelope', 'Manual'), error: null })
     renderPage()
     expect(
       await screen.findByText("This account doesn't sync, so there is nothing archived for it."),

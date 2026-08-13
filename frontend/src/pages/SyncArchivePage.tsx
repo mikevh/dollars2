@@ -4,8 +4,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
 import toast from 'react-hot-toast'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
-import { useEnsureAccountsLoaded } from '../features/accounts/useEnsureAccountsLoaded'
-import { findAccount } from '../features/accounts/accountsSlice'
 import { fetchSyncArchive, clearSyncArchive } from '../features/syncArchive/syncArchiveSlice'
 import JsonDisclosure from '../components/JsonDisclosure'
 import { formatInstant } from '../utils/format'
@@ -23,17 +21,14 @@ function SyncArchive({ accountId }: { accountId: string | undefined }) {
   const id = Number(accountId)
   const {
     accountId: loadedFor,
+    accountName,
+    sourceType,
     runs,
     nextBefore,
     loading,
     loadingMore,
     error,
   } = useAppSelector((state) => state.syncArchive)
-  // The archive endpoint has no account name or sourceType of its own — both come from the
-  // accounts list, which a direct link into this page (rather than via AccountTransactionsPage)
-  // may not have loaded yet.
-  const groups = useEnsureAccountsLoaded()
-  const account = findAccount(groups, id)
 
   // Anything on screen before the mount effect below has dispatched belongs to some other
   // account (or nothing yet) — the id the slice recorded is what tells collapsed-vs-loading
@@ -91,7 +86,7 @@ function SyncArchive({ accountId }: { accountId: string | undefined }) {
           <span>Transactions</span>
         </Link>
         <h2 className="absolute left-1/2 -translate-x-1/2 text-[18px]">
-          {account ? `${account.info.name} — Sync Archive` : 'Sync Archive'}
+          {accountName ? `${accountName} — Sync Archive` : 'Sync Archive'}
         </h2>
       </div>
 
@@ -111,7 +106,7 @@ function SyncArchive({ accountId }: { accountId: string | undefined }) {
 
         {!loading && !notYetLoaded && !error && runs.length === 0 && (
           <div className="text-muted py-12 text-center">
-            {account?.sourceType === 'Manual'
+            {sourceType === 'Manual'
               ? "This account doesn't sync, so there is nothing archived for it."
               : 'This account has never synced.'}
           </div>

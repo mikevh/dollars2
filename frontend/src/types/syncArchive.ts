@@ -24,6 +24,9 @@ export interface SyncArchiveRun {
 
 /** One page of an account's sync archive, newest run first. */
 export interface AccountSyncArchive {
+  accountName: string
+  /** The provider this account syncs from, e.g. 'SimpleFIN', 'Plaid', or 'Manual'. */
+  sourceType: string
   runs: SyncArchiveRun[]
   /** Cursor for the next (older) page — pass back as `before`. Null when there is nothing older. */
   nextBefore: string | null

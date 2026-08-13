@@ -91,6 +91,8 @@ public class AccountSyncArchiveService
                 cursor,
                 runLimit,
                 cancellationToken);
+            page.AccountName = account.Name;
+            page.SourceType = account.SourceType;
 
             return DollarsApiResponse<AccountSyncArchiveResponse>.Success(page);
         }
