@@ -21,8 +21,8 @@ public record SyncedTransaction(
     // Clamped here rather than in each provider so that for these three free-text fields no provider —
     // and neither the create- nor the update-from-sync repository path — can route unbounded bank text at
     // the nvarchar(500) columns. ProviderTransactionId is deliberately not clamped: it is the dedup key
-    // behind UX_Transactions_Provider, so truncating could collide two distinct transactions. Bounding it
-    // means skipping the transaction instead, which is issue #154.
+    // behind UX_Transactions_Provider, so truncating could collide two distinct transactions. Providers
+    // skip an over-length id instead, before it ever reaches this record.
     public string Description { get; init; } = TransactionText.Truncate(Description);
 
     public string Payee { get; init; } = TransactionText.Truncate(Payee);
