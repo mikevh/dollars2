@@ -228,11 +228,14 @@ const budgetSlice = createSlice({
         state.currentRequestId = action.meta.requestId
       })
       .addCase(createBudget.fulfilled, (state, action) => {
-        if (action.meta.requestId !== state.currentRequestId) {
-          return
-        }
+        // Unlike fetchBudget, a successful create is never stale — it's the one thing
+        // that actually brought the budget into existence, so it must win even if a
+        // fetchBudget dispatched while it was in flight (e.g. a TransactionPane mutation)
+        // resolved first and claimed currentRequestId. Reclaim it here so a still-in-flight,
+        // now-stale fetchBudget response landing after this can't clobber it either.
         state.loading = false
         state.budget = action.payload
+        state.currentRequestId = action.meta.requestId
       })
       .addCase(createBudget.rejected, (state, action) => {
         if (action.meta.requestId !== state.currentRequestId) {
