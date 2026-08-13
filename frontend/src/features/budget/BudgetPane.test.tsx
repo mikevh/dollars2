@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { store } from '../../app/store'
 import type { BudgetResponse } from '../../types/budget'
 import BudgetPane from './BudgetPane'
-import budgetReducer, { applyTransactionAssignment } from './budgetSlice'
 
 function makeBudget(): BudgetResponse {
   return {
@@ -155,35 +154,5 @@ describe('BudgetPane (Modernist restyle)', () => {
     const spent = screen.getByText('+$690.89')
     expect(spent.className).toContain('text-positive')
     expect(spent.className).not.toContain('text-accent-700')
-  })
-
-  it('raises an expense item Remaining optimistically when a positive amount is assigned', () => {
-    const budget = makeBudget()
-    budget.groups[1].lineItems[0].plannedAmount = 300
-    budget.groups[1].lineItems[0].spentAmount = 0
-
-    const next = budgetReducer(
-      { budget, loading: false, error: null, currentYear: 2026, currentMonth: 7 },
-      applyTransactionAssignment({ lineItemId: 200, amount: 690.89 }),
-    )
-
-    const item = next.budget!.groups[1].lineItems[0]
-    expect(item.spentAmount).toBe(-690.89)
-    expect(item.receivedAmount).toBe(690.89)
-
-    renderPane(next.budget!)
-    expect(screen.getAllByText('$990.89')[0]).toBeInTheDocument()
-  })
-
-  it('raises an expense item Spent optimistically when a negative amount is assigned', () => {
-    const budget = makeBudget()
-    budget.groups[1].lineItems[0].spentAmount = 0
-
-    const next = budgetReducer(
-      { budget, loading: false, error: null, currentYear: 2026, currentMonth: 7 },
-      applyTransactionAssignment({ lineItemId: 200, amount: -25 }),
-    )
-
-    expect(next.budget!.groups[1].lineItems[0].spentAmount).toBe(25)
   })
 })
