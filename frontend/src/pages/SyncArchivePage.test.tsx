@@ -5,7 +5,6 @@ import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import syncArchiveReducer from '../features/syncArchive/syncArchiveSlice'
-import accountsReducer from '../features/accounts/accountsSlice'
 import type { AccountSyncArchive, SyncArchiveRun } from '../types/syncArchive'
 import SyncArchivePage from './SyncArchivePage'
 
@@ -45,7 +44,7 @@ function archivePage(
 }
 
 function buildStore() {
-  return configureStore({ reducer: { syncArchive: syncArchiveReducer, accounts: accountsReducer } })
+  return configureStore({ reducer: { syncArchive: syncArchiveReducer } })
 }
 
 function renderPage(accountId = '3') {

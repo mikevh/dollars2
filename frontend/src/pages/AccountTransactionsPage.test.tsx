@@ -4,7 +4,6 @@ import { configureStore } from '@reduxjs/toolkit'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import accountTransactionsReducer from '../features/accountTransactions/accountTransactionsSlice'
-import accountsReducer from '../features/accounts/accountsSlice'
 import type { AccountTransactions } from '../types/accountTransactions'
 import type { TransactionResponse } from '../types/transaction'
 import AccountTransactionsPage from './AccountTransactionsPage'
@@ -45,7 +44,7 @@ function page(
 
 function renderPage(accountId = '3') {
   const store = configureStore({
-    reducer: { accountTransactions: accountTransactionsReducer, accounts: accountsReducer },
+    reducer: { accountTransactions: accountTransactionsReducer },
   })
   render(
     <Provider store={store}>
@@ -61,7 +60,7 @@ function renderPage(accountId = '3') {
 // Same route, two account ids — the case React Router serves by reusing the component instance.
 function renderPageWithSwitcher(accountId: string, nextAccountId: string) {
   const store = configureStore({
-    reducer: { accountTransactions: accountTransactionsReducer, accounts: accountsReducer },
+    reducer: { accountTransactions: accountTransactionsReducer },
   })
   render(
     <Provider store={store}>
