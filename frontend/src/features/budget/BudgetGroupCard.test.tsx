@@ -128,7 +128,7 @@ describe('BudgetGroupCard add item', () => {
     // BudgetGroupCard renders lineItems from its `group` prop, not the store — in the real
     // app the parent re-supplies the prop once the store updates. Simulate that with setGroup,
     // same as the rename tests above; the assertion retries via waitFor until the component's
-    // internal editingNewItemId state (set after the dispatch resolves) has caught up.
+    // internal newItemWizard state (set after the dispatch resolves) has caught up.
     const { setGroup } = renderCard()
     fireEvent.click(screen.getByRole('button', { name: '+ Add item' }))
 

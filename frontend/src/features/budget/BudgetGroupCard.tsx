@@ -38,7 +38,7 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
   const dispatch = useAppDispatch()
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(group.name)
-  const [editingNewItemId, setEditingNewItemId] = useState<number | null>(null)
+  const [newItemWizard, setNewItemWizard] = useState<{ lineItemId: number; stage: 'name' | 'amount' } | null>(null)
   const [collapsed, setCollapsed] = useState(false)
   const [metric, setMetric] = useState<GroupMetric>('remaining')
   const [metricMenuOpen, setMetricMenuOpen] = useState(false)
@@ -113,7 +113,7 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
     if (createLineItem.rejected.match(result)) {
       toast.error(result.payload as string)
     } else {
-      setEditingNewItemId(result.payload.lineItem.id)
+      setNewItemWizard({ lineItemId: result.payload.lineItem.id, stage: 'name' })
     }
   }
 
@@ -238,8 +238,9 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
                     groupId={group.id}
                     metric={metric}
                     isSelected={item.id === selectedLineItemId}
-                    startEditing={item.id === editingNewItemId}
-                    onEditComplete={() => setEditingNewItemId(null)}
+                    wizardStage={newItemWizard?.lineItemId === item.id ? newItemWizard.stage : null}
+                    onWizardAdvance={() => setNewItemWizard({ lineItemId: item.id, stage: 'amount' })}
+                    onWizardComplete={() => setNewItemWizard((w) => (w?.lineItemId === item.id ? null : w))}
                     onSelect={() => onSelectLineItem?.(item.id)}
                   />
                 ))}

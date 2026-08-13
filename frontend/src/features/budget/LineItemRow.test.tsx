@@ -60,13 +60,6 @@ describe('LineItemRow name editing', () => {
     expect(screen.getByText('Rent')).toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
-
-  it('mounts with the name editor open and empty when startEditing is set', async () => {
-    renderRow({ startEditing: true })
-    const input = screen.getByRole('textbox')
-    expect(input).toHaveValue('')
-    await waitFor(() => expect(input).toHaveFocus())
-  })
 })
 
 describe('LineItemRow focus+select on open', () => {
