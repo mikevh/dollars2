@@ -11,8 +11,9 @@ namespace Dollars2.Api.Repositories;
 /// archive table, verbatim and unparsed — one item per raw HTTP response.
 /// </summary>
 /// <remarks>
-/// Append-only: every fetch writes new items, keyed by provider and instant, so re-fetching the same
-/// window on a later sync never overwrites an earlier archived response.
+/// Append-only: every fetch writes new items, keyed by provider, instant, and a per-fetch id (see
+/// <see cref="BuildItems"/>), so neither a later sync's re-fetch nor a concurrent one from another user
+/// ever overwrites an earlier archived response.
 ///
 /// Unlike every other repository here this one is not Dapper over <see cref="DbSession"/> and takes no
 /// part in its transaction: DynamoDB cannot join an MSSQL transaction, and enrolling a best-effort
@@ -74,7 +75,12 @@ public class SyncArchiveRepository
         DateTime syncedAt,
         CancellationToken cancellationToken = default)
     {
-        var items = BuildItems(sourceType, rawResponseBodies, syncedAt);
+        // A fresh id per call, not per process: two connection-level fetches of the same provider can
+        // land in the same millisecond (SyncLockService only serializes syncs per user, so concurrent
+        // "Sync Now" requests from different users race here), and without this the two would collide
+        // on an otherwise-identical {sourceType}#{instant} key — silently overwriting one archived
+        // response instead of appending both.
+        var items = BuildItems(sourceType, rawResponseBodies, syncedAt, Guid.NewGuid());
         if (items.Count == 0)
         {
             return;
@@ -97,26 +103,34 @@ public class SyncArchiveRepository
 
     /// <summary>
     /// The items one connection-level fetch becomes: one per raw response body, keyed
-    /// <c>{sourceType}#{instant}</c> when there is exactly one body, or
-    /// <c>{sourceType}#{instant}#{page}</c> (zero-padded) per body when there are several — a paginated
-    /// provider capturing more than one page in the same run needs the page segment to keep every item's
-    /// key unique, since the table has no sort key. Pure, and public so the key construction can be
-    /// asserted directly — the keys are the schema here, and they are far easier to get wrong than to
-    /// check.
+    /// <c>{sourceType}#{instant}#{fetchId}</c> when there is exactly one body, or
+    /// <c>{sourceType}#{instant}#{fetchId}#{page}</c> (zero-padded) per body when there are several.
+    /// Pure, and public so the key construction can be asserted directly — the keys are the schema
+    /// here, and they are far easier to get wrong than to check.
     /// </summary>
+    /// <param name="fetchId">
+    /// Identifies this one <see cref="ArchiveAsync"/> call — every item it produces shares it. The
+    /// table has no sort key, so <c>{sourceType}#{instant}</c> alone is not unique: two connection-level
+    /// fetches of the same provider landing in the same millisecond (different users' concurrent "Sync
+    /// Now" requests, say) would otherwise collide on the same key and one would silently overwrite the
+    /// other. A paginated provider capturing more than one page in the same fetch additionally needs the
+    /// page segment to keep those items distinct from each other.
+    /// </param>
     public static IReadOnlyList<Dictionary<string, AttributeValue>> BuildItems(
         string sourceType,
         IReadOnlyList<string> rawResponseBodies,
-        DateTime syncedAt)
+        DateTime syncedAt,
+        Guid fetchId)
     {
         var instant = FormatInstant(syncedAt);
+        var id = fetchId.ToString("N")[..8];
         var items = new List<Dictionary<string, AttributeValue>>(rawResponseBodies.Count);
 
         for (var i = 0; i < rawResponseBodies.Count; i++)
         {
             var key = rawResponseBodies.Count == 1
-                ? $"{sourceType}#{instant}"
-                : $"{sourceType}#{instant}#{i:D4}";
+                ? $"{sourceType}#{instant}#{id}"
+                : $"{sourceType}#{instant}#{id}#{i:D4}";
 
             items.Add(new Dictionary<string, AttributeValue>(StringComparer.Ordinal)
             {

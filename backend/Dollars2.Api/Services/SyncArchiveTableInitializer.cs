@@ -16,9 +16,12 @@ namespace Dollars2.Api.Services;
 public class SyncArchiveTableInitializer : IHostedService
 {
     /// <summary>
-    /// Partition key: <c>{sourceType}#{syncedAt}</c>, or <c>{sourceType}#{syncedAt}#{page}</c> when a
-    /// connection-level fetch captured more than one raw response (a paginated provider). The table has
-    /// no sort key — the whole item identity lives in this one attribute.
+    /// Partition key: <c>{sourceType}#{syncedAt}#{fetchId}</c>, or
+    /// <c>{sourceType}#{syncedAt}#{fetchId}#{page}</c> when a connection-level fetch captured more than
+    /// one raw response (a paginated provider). The table has no sort key — the whole item identity
+    /// lives in this one attribute; see
+    /// <see cref="Dollars2.Api.Repositories.SyncArchiveRepository.BuildItems"/> for why the fetch id is
+    /// there.
     /// </summary>
     public const string PartitionKeyAttribute = "pk";
 

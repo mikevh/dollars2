@@ -50,7 +50,7 @@ public sealed class SyncArchiveRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ArchiveAsync_writes_one_item_per_raw_response_body()
+    public async Task ArchiveAsync_writes_one_item_per_raw_response_body_sharing_one_fetch_id()
     {
         var repository = await RepositoryForAsync("archive-write");
         var syncedAt = new DateTime(2026, 8, 1, 6, 0, 0, DateTimeKind.Utc);
@@ -62,18 +62,18 @@ public sealed class SyncArchiveRepositoryTests : IAsyncLifetime
             TestContext.Current.CancellationToken);
 
         var items = await ScanAsync();
+        Assert.Equal(2, items.Count);
 
-        Assert.Equal(
-            [
-                "Plaid#2026-08-01T06:00:00.000Z#0000",
-                "Plaid#2026-08-01T06:00:00.000Z#0001",
-            ],
-            items.Select(i => i["pk"].S).Order().ToArray());
+        // Same prefix (provider + instant + fetch id) on both, distinguished only by the page suffix —
+        // proves one fetch id was generated and shared across every item the call produced.
+        var prefixes = items.Select(i => i["pk"].S[..i["pk"].S.LastIndexOf('#')]).Distinct().ToArray();
+        var prefix = Assert.Single(prefixes);
+        Assert.Matches(@"^Plaid#2026-08-01T06:00:00\.000Z#[0-9a-f]{8}$", prefix);
 
-        var first = Single(items, "Plaid#2026-08-01T06:00:00.000Z#0000");
+        var first = Single(items, $"{prefix}#0000");
         Assert.Equal("""{"page":1}""", first["rawJson"].S);
 
-        var second = Single(items, "Plaid#2026-08-01T06:00:00.000Z#0001");
+        var second = Single(items, $"{prefix}#0001");
         Assert.Equal("""{"page":2}""", second["rawJson"].S);
     }
 
@@ -86,8 +86,28 @@ public sealed class SyncArchiveRepositoryTests : IAsyncLifetime
         await repository.ArchiveAsync("SimpleFIN", ["""{"accounts":[]}"""], syncedAt, TestContext.Current.CancellationToken);
 
         var item = Assert.Single(await ScanAsync());
-        Assert.Equal("SimpleFIN#2026-08-01T06:00:00.000Z", item["pk"].S);
+        Assert.Matches(@"^SimpleFIN#2026-08-01T06:00:00\.000Z#[0-9a-f]{8}$", item["pk"].S);
         Assert.Equal("""{"accounts":[]}""", item["rawJson"].S);
+    }
+
+    [Fact]
+    public async Task ArchiveAsync_does_not_collide_when_two_fetches_share_a_provider_and_instant()
+    {
+        // The regression this guards: before the fetch id existed, two connection-level fetches of the
+        // same provider landing in the same millisecond (e.g. concurrent "Sync Now" requests from
+        // different users — SyncLockService only serializes syncs per user) collided on an identical
+        // {sourceType}#{instant} key and one silently overwrote the other.
+        var repository = await RepositoryForAsync("archive-concurrent");
+        var syncedAt = new DateTime(2026, 8, 1, 6, 0, 0, DateTimeKind.Utc);
+
+        await repository.ArchiveAsync("SimpleFIN", ["""{"user":1}"""], syncedAt, TestContext.Current.CancellationToken);
+        await repository.ArchiveAsync("SimpleFIN", ["""{"user":2}"""], syncedAt, TestContext.Current.CancellationToken);
+
+        var items = await ScanAsync();
+        Assert.Equal(2, items.Count);
+        Assert.Equal(
+            ["""{"user":1}""", """{"user":2}"""],
+            items.Select(i => i["rawJson"].S).Order().ToArray());
     }
 
     [Fact]
@@ -105,13 +125,35 @@ public sealed class SyncArchiveRepositoryTests : IAsyncLifetime
     {
         // ToUniversalTime would read an Unspecified DateTime as local time and move the key by the
         // machine's offset, so the same run would key differently depending on where it ran.
+        var fetchId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+
         var items = SyncArchiveRepository.BuildItems(
             "SimpleFIN",
             ["""{"accounts":[]}"""],
-            new DateTime(2026, 8, 1, 6, 0, 0, DateTimeKind.Unspecified));
+            new DateTime(2026, 8, 1, 6, 0, 0, DateTimeKind.Unspecified),
+            fetchId);
 
         var item = Assert.Single(items);
-        Assert.Equal("SimpleFIN#2026-08-01T06:00:00.000Z", item["pk"].S);
+        Assert.Equal("SimpleFIN#2026-08-01T06:00:00.000Z#11111111", item["pk"].S);
+    }
+
+    [Fact]
+    public void BuildItems_shares_one_fetch_id_across_every_item_and_still_orders_pages()
+    {
+        var fetchId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+
+        var items = SyncArchiveRepository.BuildItems(
+            "Plaid",
+            ["""{"page":1}""", """{"page":2}"""],
+            new DateTime(2026, 8, 1, 6, 0, 0, DateTimeKind.Utc),
+            fetchId);
+
+        Assert.Equal(
+            [
+                "Plaid#2026-08-01T06:00:00.000Z#aaaaaaaa#0000",
+                "Plaid#2026-08-01T06:00:00.000Z#aaaaaaaa#0001",
+            ],
+            items.Select(i => i["pk"].S).ToArray());
     }
 
     /// <summary>

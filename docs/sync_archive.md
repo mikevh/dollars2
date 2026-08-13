@@ -86,8 +86,8 @@ idempotently at startup by `SyncArchiveTableInitializer` (an `IHostedService` �
 beyond its key attributes, so there's nothing resembling the numbered SQL migration chain here).
 
 ```
-Partition key   pk  (S)   {sourceType}#{instant}
-                          {sourceType}#{instant}#{page}
+Partition key   pk  (S)   {sourceType}#{instant}#{fetchId}
+                          {sourceType}#{instant}#{fetchId}#{page}
 ```
 
 No sort key — the whole item identity lives in `pk`.
@@ -95,13 +95,18 @@ No sort key — the whole item identity lives in `pk`.
 - `{sourceType}` is `SimpleFIN` or `Plaid`.
 - `{instant}` is ISO-8601 UTC with a `Z` marker and millisecond precision
   (`2026-08-03T06:00:00.000Z`), stamped once per connection-level fetch (`BankSyncService.SyncConnectionAsync`).
+- `{fetchId}` is 8 hex characters, generated fresh per `SyncArchiveRepository.ArchiveAsync` call and
+  shared by every item that call produces. Without it, `{sourceType}#{instant}` alone is not unique:
+  `SyncLockService` only serializes syncs per user, so two connection-level fetches of the same
+  provider from *different* users' concurrent "Sync Now" requests can land in the same millisecond,
+  and without a sort key they'd otherwise collide on the same `pk` — silently overwriting one
+  archived response instead of appending both.
 - `{page}` is a zero-padded index (`0000`, `0001`, ...), present only when a fetch captured more
   than one raw response body. SimpleFIN always fetches in one call, so its key never carries a page
-  segment. Plaid pages through `/transactions/sync`, and without a sort key two pages sharing the
-  same `{instant}` would otherwise collide on the same `pk` — silently overwriting one page's
-  archive, or making DynamoDB reject the whole `BatchWriteItem` (it rejects a batch containing two
-  items with the same key rather than rejecting them individually). The page index makes every
-  item's key unique regardless.
+  segment. Plaid pages through `/transactions/sync`, and the fetch id alone doesn't distinguish one
+  page from another *within* the same fetch — the page index does. (DynamoDB rejects a whole
+  `BatchWriteItem` containing two items with the same key, rather than rejecting them individually,
+  so a collision here would have cost the entire fetch's archive, not just one page.)
 
 Every item carries just:
 
@@ -134,13 +139,14 @@ for why losing the old table's contents is acceptable.
 
 ## Versioning Model
 
-Every connection-level fetch writes **new** items, keyed by provider and instant. A later sync never
-overwrites an earlier one's archived response:
+Every connection-level fetch writes **new** items, keyed by provider, instant, and a per-fetch id. A
+later sync — or a concurrent one from another user — never overwrites an earlier one's archived
+response:
 
 ```
-SimpleFIN#2026-08-01T06:00:00.000Z
-SimpleFIN#2026-08-02T06:00:00.000Z
-SimpleFIN#2026-08-03T06:00:00.000Z
+SimpleFIN#2026-08-01T06:00:00.000Z#3f2a91c4
+SimpleFIN#2026-08-02T06:00:00.000Z#7bd410aa
+SimpleFIN#2026-08-03T06:00:00.000Z#0c88e2f1
 ```
 
 No TTL. Items live forever.
@@ -226,7 +232,7 @@ aws dynamodb get-item \
   --table-name Dollars2SyncArchive \
   --endpoint-url http://localhost:8000 \
   --profile dynamodb-local \
-  --key '{"pk": {"S": "SimpleFIN#2026-08-03T06:00:00.000Z"}}'
+  --key '{"pk": {"S": "SimpleFIN#2026-08-03T06:00:00.000Z#0c88e2f1"}}'
 ```
 
 ## Where the Data Lives, and That Nothing Backs It Up
