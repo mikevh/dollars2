@@ -220,10 +220,25 @@ public class PlaidProvider : IBankSyncProvider
             bool MatchesAccount(string? plaidAccountId) =>
                 string.IsNullOrEmpty(details?.AccountId) || plaidAccountId == details.AccountId;
 
-            var upserts = added.Concat(modified)
-                .Where(t => MatchesAccount(t.Transaction.AccountId))
-                .Select(t => MapTransaction(t.Transaction, t.RawJson))
-                .ToList();
+            var upserts = new List<SyncedTransaction>();
+            var skippedTransactionsJson = new List<string>();
+            foreach (var t in added.Concat(modified).Where(t => MatchesAccount(t.Transaction.AccountId)))
+            {
+                if ((t.Transaction.TransactionId?.Length ?? 0) > TransactionText.MaxLength)
+                {
+                    // ProviderTransactionId is the dedup key (UX_Transactions_Provider); truncating could
+                    // collide two distinct transactions, so skip rather than clamp.
+                    _logger.LogWarning("Skipping transaction {TransactionId} for account {AccountId}: id exceeds {MaxLength} characters.", t.Transaction.TransactionId, account.Id, TransactionText.MaxLength);
+
+                    if (!string.IsNullOrEmpty(t.RawJson))
+                    {
+                        skippedTransactionsJson.Add(t.RawJson);
+                    }
+                    continue;
+                }
+
+                upserts.Add(MapTransaction(t.Transaction, t.RawJson));
+            }
 
             var updatedJson = JsonSerializer.Serialize(new PlaidConnectionDetails
             {
@@ -244,7 +259,8 @@ public class PlaidProvider : IBankSyncProvider
                 removedIds,
                 updatedJson,
                 Balance: balance,
-                AccountMetadataJson: ExtractRawAccountMetadata(rawAccountSnapshot, details?.AccountId));
+                AccountMetadataJson: ExtractRawAccountMetadata(rawAccountSnapshot, details?.AccountId),
+                SkippedTransactionsJson: skippedTransactionsJson);
         }
 
         return results;

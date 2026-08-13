@@ -167,6 +167,19 @@ public class SimplefinProvider : IBankSyncProvider
                     continue;
                 }
 
+                if (t.Id.Length > TransactionText.MaxLength)
+                {
+                    // ProviderTransactionId is the dedup key (UX_Transactions_Provider); truncating could
+                    // collide two distinct transactions, so skip rather than clamp.
+                    _logger.LogWarning("Skipping transaction {TransactionId} for account {AccountId}: id exceeds {MaxLength} characters.", t.Id, account.Id, TransactionText.MaxLength);
+
+                    if (!string.IsNullOrEmpty(rawTransaction))
+                    {
+                        skippedTransactionsJson.Add(rawTransaction);
+                    }
+                    continue;
+                }
+
                 var date = t.Posted == 0
                     ? DateOnly.FromDateTime(DateTime.UtcNow)
                     : DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(t.Posted).UtcDateTime);
