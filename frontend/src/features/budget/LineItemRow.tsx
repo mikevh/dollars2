@@ -193,6 +193,9 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, wiz
               } else if (e.key === 'Escape') {
                 setEditingName(false)
                 setNameValue(lineItem.name)
+                if (wizardStage === 'name') {
+                  onWizardComplete?.()
+                }
               }
             }}
             className="border border-divider bg-surface px-2 py-0.5 text-sm text-text"
@@ -233,6 +236,9 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, wiz
               } else if (e.key === 'Escape') {
                 setEditingAmount(false)
                 setAmountValue(lineItem.plannedAmount.toString())
+                if (wizardStage === 'amount') {
+                  onWizardComplete?.()
+                }
               }
             }}
             className="w-full border border-divider bg-surface px-2 py-0.5 text-right text-sm text-text"
