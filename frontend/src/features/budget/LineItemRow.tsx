@@ -91,6 +91,12 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
     if (startEditing) {
       setEditingName(true)
       setNameValue('')
+    } else {
+      // The parent reassigns editingNewItemId to a different row (e.g. + Add Item clicked
+      // again) without waiting for this row's rename to resolve — close out whatever draft
+      // was left open here rather than leaving an orphaned editor with no owner.
+      setEditingName(false)
+      setNameValue(lineItem.name)
     }
   }
 
@@ -116,16 +122,19 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
       onEditComplete?.()
       return
     }
-    // A rejected save leaves the prop unchanged, so the re-seed above won't fire —
-    // drop the failed draft here or the next blur would silently re-submit it.
     if (!await saveUpdate(trimmed, lineItem.plannedAmount)) {
-      setNameValue(lineItem.name)
-      // A failed rename mid-new-item-flow must not advance to the amount editor — leave the
-      // name editor open so the rejected name stays correctable instead of proceeding as if
-      // the rename had landed.
       if (startEditing) {
+        // Leave the rejected draft in the input rather than reverting it to lineItem.name —
+        // reverting would make an unmodified next blur match lineItem.name and pass through
+        // saveUpdate's unchanged-value short-circuit, silently "succeeding" without ever
+        // retrying the save. Refocus since the blur that got us here already moved focus away.
+        nameInputRef.current?.focus()
+        nameInputRef.current?.select()
         return
       }
+      // A rejected save leaves the prop unchanged, so the re-seed above won't fire —
+      // drop the failed draft here or the next blur would silently re-submit it.
+      setNameValue(lineItem.name)
     }
     setEditingName(false)
     if (startEditing) {
