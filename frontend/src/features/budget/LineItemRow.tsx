@@ -17,17 +17,18 @@ interface LineItemRowProps {
   groupId: number
   metric: GroupMetric
   isSelected?: boolean
-  startEditing?: boolean
-  onEditComplete?: () => void
+  wizardStage?: 'name' | 'amount' | null
+  onWizardAdvance?: () => void
+  onWizardComplete?: () => void
   onSelect?: () => void
 }
 
-export default function LineItemRow({ lineItem, groupId, metric, isSelected, startEditing, onEditComplete, onSelect }: LineItemRowProps) {
+export default function LineItemRow({ lineItem, groupId, metric, isSelected, wizardStage, onWizardAdvance, onWizardComplete, onSelect }: LineItemRowProps) {
   const isIncome = lineItem.isIncome
   const dispatch = useAppDispatch()
-  // A freshly added item mounts with startEditing set, so seed the name editor open
+  // A freshly added item mounts with wizardStage 'name', so seed the name editor open
   // and empty rather than opening it from an effect after the first paint.
-  const [editingName, setEditingName] = useState(startEditing ?? false)
+  const [editingName, setEditingName] = useState(wizardStage === 'name')
   const [editingAmount, setEditingAmount] = useState(false)
   const editing = editingName || editingAmount
   // Same node doubles as the transaction-assignment drop target (isOver below) and the
@@ -60,7 +61,7 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
     activeData?.type === 'transaction' ||
     (activeData?.type === 'lineitem' && activeData?.groupId === groupId)
   )
-  const [nameValue, setNameValue] = useState(startEditing ? '' : lineItem.name)
+  const [nameValue, setNameValue] = useState(wizardStage === 'name' ? '' : lineItem.name)
   const [amountValue, setAmountValue] = useState(lineItem.plannedAmount.toString())
   const nameInputRef = useFocusSelectOnOpen<HTMLInputElement>(editingName)
   const amountInputRef = useFocusSelectOnOpen<HTMLInputElement>(editingAmount)
@@ -85,19 +86,21 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
   // Re-open the editor if the row is later flagged for editing. Adjusting state
   // during render (rather than in an effect) is React's recommended way to react
   // to a prop change and avoids a cascading re-render.
-  const [seededStartEditing, setSeededStartEditing] = useState(startEditing)
-  if (seededStartEditing !== startEditing) {
-    setSeededStartEditing(startEditing)
-    if (startEditing) {
+  const [seededWizardStage, setSeededWizardStage] = useState(wizardStage ?? null)
+  if (seededWizardStage !== (wizardStage ?? null)) {
+    setSeededWizardStage(wizardStage ?? null)
+    if (wizardStage === 'name') {
       setEditingName(true)
       setNameValue('')
-    } else {
-      // The parent reassigns editingNewItemId to a different row (e.g. + Add Item clicked
+    } else if (wizardStage == null) {
+      // The parent reassigns the wizard to a different row (e.g. + Add Item clicked
       // again) without waiting for this row's rename to resolve — close out whatever draft
       // was left open here rather than leaving an orphaned editor with no owner.
       setEditingName(false)
       setNameValue(lineItem.name)
     }
+    // wizardStage === 'amount' needs no action here — handleSaveName already opened the
+    // amount editor locally before telling the parent the wizard advanced.
   }
 
   const remaining = lineItemRemaining(lineItem)
@@ -119,11 +122,11 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
     if (!trimmed) {
       setNameValue(lineItem.name)
       setEditingName(false)
-      onEditComplete?.()
+      onWizardComplete?.()
       return
     }
     if (!await saveUpdate(trimmed, lineItem.plannedAmount)) {
-      if (startEditing) {
+      if (wizardStage === 'name') {
         // Leave the rejected draft in the input rather than reverting it to lineItem.name —
         // reverting would make an unmodified next blur match lineItem.name and pass through
         // saveUpdate's unchanged-value short-circuit, silently "succeeding" without ever
@@ -137,9 +140,9 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
       setNameValue(lineItem.name)
     }
     setEditingName(false)
-    if (startEditing) {
+    if (wizardStage === 'name') {
       setEditingAmount(true)
-      onEditComplete?.()
+      onWizardAdvance?.()
     }
   }
 
@@ -151,6 +154,9 @@ export default function LineItemRow({ lineItem, groupId, metric, isSelected, sta
       setAmountValue(lineItem.plannedAmount.toString())
     }
     setEditingAmount(false)
+    if (wizardStage === 'amount') {
+      onWizardComplete?.()
+    }
   }
 
   const handleDelete = async () => {
