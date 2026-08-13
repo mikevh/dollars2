@@ -49,7 +49,9 @@ Operational runbooks — not feature context, read only when doing that specific
   `UtcDateTimeConverter`); calendar dates are `DateOnly` and serialize bare (`2026-07-22`). Never model a
   calendar date as a `DateTime` — that's what keeps the global converter from shifting dates a day back
 - Business rule violations return error results, not exceptions
-- Frontend: fetch API into Redux thunks (no Axios, no React Query), toast for errors
+- Frontend: fetch API into Redux thunks for state the store models (no Axios, no React Query); a
+  component may call the `api` client directly for dialog-scoped/ephemeral state that isn't in the
+  store. Toast for errors either way
 - Inline editing pattern: click to edit, Enter/blur saves, Escape cancels
 - `onMouseDown preventDefault` on action buttons adjacent to inputs (prevents blur from hiding buttons before click)
 - Fixed height rows (`h-10`) with `border border-transparent px-2 py-0.5` on spans to match input dimensions
