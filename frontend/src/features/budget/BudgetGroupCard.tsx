@@ -117,6 +117,12 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
     }
   }
 
+  // Guarded on lineItemId so a row's stale wizard callback (e.g. firing after the parent has
+  // already moved the wizard to a different item) can't resurrect or clobber state it no longer owns.
+  const setWizardStage = (lineItemId: number, stage: 'amount' | null) => {
+    setNewItemWizard((w) => (w?.lineItemId === lineItemId ? (stage === null ? null : { lineItemId, stage }) : w))
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -239,8 +245,8 @@ export default function BudgetGroupCard({ group, selectedLineItemId, onSelectLin
                     metric={metric}
                     isSelected={item.id === selectedLineItemId}
                     wizardStage={newItemWizard?.lineItemId === item.id ? newItemWizard.stage : null}
-                    onWizardAdvance={() => setNewItemWizard({ lineItemId: item.id, stage: 'amount' })}
-                    onWizardComplete={() => setNewItemWizard((w) => (w?.lineItemId === item.id ? null : w))}
+                    onWizardAdvance={() => setWizardStage(item.id, 'amount')}
+                    onWizardComplete={() => setWizardStage(item.id, null)}
                     onSelect={() => onSelectLineItem?.(item.id)}
                   />
                 ))}
