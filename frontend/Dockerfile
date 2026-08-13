@@ -14,4 +14,5 @@ RUN VITE_BUILD_DATE=$(date -u +%Y-%m-%d) npm run build
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY security-headers.conf /etc/nginx/conf.d/security-headers.conf
 EXPOSE 80
