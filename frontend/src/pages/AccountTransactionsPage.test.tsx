@@ -386,7 +386,7 @@ describe('AccountTransactionsPage', () => {
     expect(screen.getByRole('heading', { name: 'Account' })).toBeInTheDocument()
 
     resolveNext({
-      data: { accountId: 7, accountName: 'Chase Savings', transactions: [tx({ id: 2, description: 'SHELL' })], totalCount: 1 },
+      data: { accountId: 7, accountName: 'Chase Savings', sourceType: 'SimpleFIN', transactions: [tx({ id: 2, description: 'SHELL' })], totalCount: 1 },
       error: null,
     })
     expect(await screen.findByRole('heading', { name: 'Chase Savings' })).toBeInTheDocument()
