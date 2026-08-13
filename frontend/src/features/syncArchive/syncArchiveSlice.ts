@@ -6,6 +6,8 @@ interface SyncArchiveState {
   /** Which account `runs` describes. Set the moment a fresh (non-paged) fetch starts, so a response
    * that lands after the viewer has switched accounts has somewhere to be recognized as stale. */
   accountId: number | null
+  accountName: string
+  sourceType: string
   runs: SyncArchiveRun[]
   nextBefore: string | null
   /** True only for the first page of an account — a full-page "Loading..." state. */
@@ -17,6 +19,8 @@ interface SyncArchiveState {
 
 const initialState: SyncArchiveState = {
   accountId: null,
+  accountName: '',
+  sourceType: '',
   runs: [],
   nextBefore: null,
   loading: false,
@@ -65,6 +69,8 @@ const syncArchiveSlice = createSlice({
           // A fresh load (no cursor) starts the account over, dropping whatever an in-flight
           // "load more" for a previous account left behind.
           state.accountId = action.meta.arg.accountId
+          state.accountName = ''
+          state.sourceType = ''
           state.runs = []
           state.nextBefore = null
           state.loading = true
@@ -79,6 +85,8 @@ const syncArchiveSlice = createSlice({
         }
         state.loading = false
         state.loadingMore = false
+        state.accountName = action.payload.accountName
+        state.sourceType = action.payload.sourceType
         state.runs = action.meta.arg.before ? [...state.runs, ...action.payload.runs] : action.payload.runs
         state.nextBefore = action.payload.nextBefore
       })

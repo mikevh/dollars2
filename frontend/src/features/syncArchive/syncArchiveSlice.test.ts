@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SyncArchiveRun } from '../../types/syncArchive'
+import type { AccountSyncArchive, SyncArchiveRun } from '../../types/syncArchive'
 import reducer, { clearSyncArchive, fetchSyncArchive } from './syncArchiveSlice'
 
 const run = (overrides: Partial<SyncArchiveRun> = {}): SyncArchiveRun => ({
@@ -15,6 +15,16 @@ const run = (overrides: Partial<SyncArchiveRun> = {}): SyncArchiveRun => ({
   ...overrides,
 })
 
+const archivePage = (
+  runs: SyncArchiveRun[],
+  nextBefore: string | null = null
+): AccountSyncArchive => ({
+  accountName: 'Chase Checking',
+  sourceType: 'SimpleFIN',
+  runs,
+  nextBefore,
+})
+
 const initialState = reducer(undefined, { type: '@@INIT' })
 
 describe('syncArchiveSlice', () => {
@@ -22,6 +32,8 @@ describe('syncArchiveSlice', () => {
     const state = reducer(initialState, fetchSyncArchive.pending('req-1', { accountId: 5 }))
     expect(state).toEqual({
       accountId: 5,
+      accountName: '',
+      sourceType: '',
       runs: [],
       nextBefore: null,
       loading: true,
@@ -33,7 +45,7 @@ describe('syncArchiveSlice', () => {
   it('marks loadingMore, not loading, when the page carries a cursor', () => {
     const loaded = reducer(
       reducer(initialState, fetchSyncArchive.pending('req-1', { accountId: 5 })),
-      fetchSyncArchive.fulfilled({ runs: [run()], nextBefore: '2026-08-02T06:00:00Z' }, 'req-1', { accountId: 5 }),
+      fetchSyncArchive.fulfilled(archivePage([run()], '2026-08-02T06:00:00Z'), 'req-1', { accountId: 5 }),
     )
     const state = reducer(
       loaded,
@@ -49,7 +61,7 @@ describe('syncArchiveSlice', () => {
     const first = reducer(
       reducer(initialState, fetchSyncArchive.pending('req-1', { accountId: 5 })),
       fetchSyncArchive.fulfilled(
-        { runs: [run({ syncRunId: 'run-2' })], nextBefore: '2026-08-02T06:00:00Z' },
+        archivePage([run({ syncRunId: 'run-2' })], '2026-08-02T06:00:00Z'),
         'req-1',
         { accountId: 5 },
       ),
@@ -57,7 +69,7 @@ describe('syncArchiveSlice', () => {
     const more = reducer(
       reducer(first, fetchSyncArchive.pending('req-2', { accountId: 5, before: '2026-08-02T06:00:00Z' })),
       fetchSyncArchive.fulfilled(
-        { runs: [run({ syncRunId: 'run-1' })], nextBefore: null },
+        archivePage([run({ syncRunId: 'run-1' })], null),
         'req-2',
         { accountId: 5, before: '2026-08-02T06:00:00Z' },
       ),
@@ -73,7 +85,7 @@ describe('syncArchiveSlice', () => {
     const switched = reducer(forFive, fetchSyncArchive.pending('req-2', { accountId: 7 }))
     const state = reducer(
       switched,
-      fetchSyncArchive.fulfilled({ runs: [run()], nextBefore: null }, 'req-1', { accountId: 5 }),
+      fetchSyncArchive.fulfilled(archivePage([run()], null), 'req-1', { accountId: 5 }),
     )
     expect(state.accountId).toBe(7)
     expect(state.runs).toEqual([])
@@ -103,7 +115,7 @@ describe('syncArchiveSlice', () => {
   it('resets everything on clear so switching back to this account starts blank', () => {
     const loaded = reducer(
       reducer(initialState, fetchSyncArchive.pending('req-1', { accountId: 5 })),
-      fetchSyncArchive.fulfilled({ runs: [run()], nextBefore: null }, 'req-1', { accountId: 5 }),
+      fetchSyncArchive.fulfilled(archivePage([run()], null), 'req-1', { accountId: 5 }),
     )
     expect(reducer(loaded, clearSyncArchive())).toEqual(initialState)
   })

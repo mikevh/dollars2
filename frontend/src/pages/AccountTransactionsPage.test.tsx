@@ -5,7 +5,6 @@ import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import accountTransactionsReducer from '../features/accountTransactions/accountTransactionsSlice'
 import accountsReducer from '../features/accounts/accountsSlice'
-import type { AccountGroup } from '../types/account'
 import type { AccountTransactions } from '../types/accountTransactions'
 import type { TransactionResponse } from '../types/transaction'
 import AccountTransactionsPage from './AccountTransactionsPage'
@@ -13,24 +12,9 @@ import AccountTransactionsPage from './AccountTransactionsPage'
 const SEARCH_DEBOUNCE_MS = 300
 
 const getMock = vi.fn()
-// The page also fetches /api/accounts (to gate the sync archive link on sourceType), which is
-// unrelated to the by-account transactions call every existing test here mocks — routed
-// separately so the two don't collide on one blanket mockResolvedValue.
-const accountsGetMock = vi.fn()
 vi.mock('../api/client', () => ({
-  api: {
-    get: (endpoint: string) => (endpoint === '/api/accounts' ? accountsGetMock(endpoint) : getMock(endpoint)),
-  },
+  api: { get: (endpoint: string) => getMock(endpoint) },
 }))
-
-function accountGroup(overrides: Partial<AccountGroup> = {}): AccountGroup {
-  return {
-    connectionId: 'conn-1',
-    sourceType: 'SimpleFIN',
-    accounts: [{ id: 3, name: 'Keybank Checking', lastSyncedAt: null, lastStatus: null, balance: null }],
-    ...overrides,
-  }
-}
 
 function tx(overrides: Partial<TransactionResponse>): TransactionResponse {
   return {
@@ -53,9 +37,10 @@ function tx(overrides: Partial<TransactionResponse>): TransactionResponse {
 
 function page(
   transactions: TransactionResponse[],
-  totalCount = transactions.length
+  totalCount = transactions.length,
+  sourceType = 'SimpleFIN'
 ): AccountTransactions {
-  return { accountId: 3, accountName: 'Keybank Checking', transactions, totalCount }
+  return { accountId: 3, accountName: 'Keybank Checking', sourceType, transactions, totalCount }
 }
 
 function renderPage(accountId = '3') {
@@ -117,8 +102,6 @@ function includeDeletedOf(url: string): string | null {
 describe('AccountTransactionsPage', () => {
   beforeEach(() => {
     getMock.mockReset()
-    accountsGetMock.mockReset()
-    accountsGetMock.mockResolvedValue({ data: [], error: null })
     localStorage.clear()
   })
 
@@ -442,8 +425,7 @@ describe('AccountTransactionsPage', () => {
   })
 
   it('links to the sync archive for a synced account', async () => {
-    getMock.mockResolvedValue({ data: page([]), error: null })
-    accountsGetMock.mockResolvedValue({ data: [accountGroup()], error: null })
+    getMock.mockResolvedValue({ data: page([], 0, 'SimpleFIN'), error: null })
     renderPage('3')
 
     const link = await screen.findByRole('link', { name: 'Sync archive' })
@@ -451,20 +433,7 @@ describe('AccountTransactionsPage', () => {
   })
 
   it('does not link to the sync archive for a manual account', async () => {
-    getMock.mockResolvedValue({ data: page([]), error: null })
-    accountsGetMock.mockResolvedValue({
-      data: [accountGroup({ sourceType: 'Manual' })],
-      error: null,
-    })
-    renderPage('3')
-
-    await screen.findByText('No transactions for this account.')
-    expect(screen.queryByRole('link', { name: 'Sync archive' })).toBeNull()
-  })
-
-  it('does not show the sync archive link before the account is known', async () => {
-    getMock.mockResolvedValue({ data: page([]), error: null })
-    accountsGetMock.mockReturnValue(new Promise(() => {}))
+    getMock.mockResolvedValue({ data: page([], 0, 'Manual'), error: null })
     renderPage('3')
 
     await screen.findByText('No transactions for this account.')

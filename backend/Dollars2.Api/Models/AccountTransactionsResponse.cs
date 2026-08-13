@@ -4,6 +4,7 @@ public class AccountTransactionsResponse
 {
     public int AccountId { get; set; }
     public string AccountName { get; set; } = "";
+    public string SourceType { get; set; } = "";
     public List<TransactionResponse> Transactions { get; set; } = new();
     public int TotalCount { get; set; }
 }
