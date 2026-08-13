@@ -23,7 +23,8 @@ export default function TransactionRow({ transaction, actions, draggable, onClic
   })
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (!onClick || e.target !== e.currentTarget) {
+    listeners?.onKeyDown?.(e)
+    if (!onClick || e.target !== e.currentTarget || e.defaultPrevented) {
       return
     }
     if (e.key === 'Enter' || e.key === ' ') {
@@ -32,11 +33,15 @@ export default function TransactionRow({ transaction, actions, draggable, onClic
     }
   }
 
+  // tabIndex only, no role="button": Deleted-tab rows nest real Restore/Delete buttons
+  // in `actions`, and role="button" here would wrap them in a fake button — the same
+  // nested-interactive-control problem LineItemRow/BudgetGroupCard avoid by dropping
+  // dnd-kit's `attributes`.
   return (
     <div
       ref={setNodeRef}
       {...(draggable ? { ...listeners, ...attributes } : {})}
-      {...(!draggable && onClick ? { tabIndex: 0, role: 'button' } : {})}
+      {...(!draggable && onClick ? { tabIndex: 0 } : {})}
       onClick={onClick}
       onKeyDown={handleKeyDown}
       className={`flex items-center justify-between border-b border-divider px-4 py-2 last:border-b-0 ${
