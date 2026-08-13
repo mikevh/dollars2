@@ -24,7 +24,7 @@ backend/
   Dollars2.Api/         .NET 10 Web API
   Dollars2.Tests/       Backend unit + integration tests
 docs/                   Detailed product and technical specs
-docker-compose.yml      Self-host deployment (frontend + backend)
+docker-compose.yml      Self-host deployment (app, logging, and sync-archive services)
 ```
 
 ## Development
@@ -91,4 +91,5 @@ Detailed product and technical specs live in [`docs/`](docs/):
 - [`database.md`](docs/database.md) — full schema
 - [`sync_archive.md`](docs/sync_archive.md) — append-only DynamoDB record of raw provider payloads
 - [`out_of_scope.md`](docs/out_of_scope.md) — explicitly excluded/deferred features
+- [`deployment.md`](docs/deployment.md) — compose stack topology, configuration, and the deploy path
 - [`backups.md`](docs/backups.md) — MSSQL backup schedule, retention, and restore runbook

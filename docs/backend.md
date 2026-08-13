@@ -90,10 +90,8 @@
     `logs-dollars2` data stream. Absent in local dev / tests / CI, so no Elasticsearch is required
     to run or test the app. An unreachable Elasticsearch never takes the app down — console + file
     logging continue regardless.
-- In the home-server deployment (`docker-compose.yml`), `Elasticsearch` and `Kibana` run as services
-  on the same host. The backend points at `http://elasticsearch:9200`; browse logs in Kibana on port
-  `5601`. Elasticsearch runs single-node with security disabled — the stack is only reachable on the
-  LAN / Tailscale network, so TLS and auth are out of scope.
+- In the home-server deployment, `Elasticsearch` and `Kibana` run as compose services on the same
+  host; see `docs/deployment.md` for the full stack topology.
 
 ## Bank Sync
 

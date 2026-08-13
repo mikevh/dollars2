@@ -37,6 +37,7 @@ Detailed product specs live in `docs/`. Read these before building new features:
 
 Operational runbooks — not feature context, read only when doing that specific job:
 
+- `docs/deployment.md` — Compose stack topology (six services), config, deploy path, log/backup pointers
 - `docs/backups.md` — MSSQL backup job on claw, schedule/retention, and restore procedures
 
 ## Conventions
