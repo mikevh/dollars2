@@ -339,6 +339,7 @@ export default function TransactionEditDialog({ transaction, onClose, onMutate }
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                maxLength={500}
                 className="input"
               />
             ) : (
