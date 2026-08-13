@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import type { TransactionResponse } from '../../types/transaction'
 import { formatCurrency } from '../../utils/format'
@@ -21,11 +22,23 @@ export default function TransactionRow({ transaction, actions, draggable, onClic
     disabled: !draggable,
   })
 
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!onClick || e.target !== e.currentTarget) {
+      return
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onClick()
+    }
+  }
+
   return (
     <div
       ref={setNodeRef}
       {...(draggable ? { ...listeners, ...attributes } : {})}
+      {...(!draggable && onClick ? { tabIndex: 0, role: 'button' } : {})}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
       className={`flex items-center justify-between border-b border-divider px-4 py-2 last:border-b-0 ${
         draggable ? 'cursor-grab active:cursor-grabbing' : onClick ? 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text)_6%,transparent)]' : ''
       } ${isDragging ? 'opacity-50' : ''}`}
