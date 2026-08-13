@@ -222,15 +222,22 @@ const budgetSlice = createSlice({
         state.loading = false
         state.error = action.payload as string
       })
-      .addCase(createBudget.pending, (state) => {
+      .addCase(createBudget.pending, (state, action) => {
         state.loading = true
         state.error = null
+        state.currentRequestId = action.meta.requestId
       })
       .addCase(createBudget.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.currentRequestId) {
+          return
+        }
         state.loading = false
         state.budget = action.payload
       })
       .addCase(createBudget.rejected, (state, action) => {
+        if (action.meta.requestId !== state.currentRequestId) {
+          return
+        }
         state.loading = false
         state.error = action.payload as string
       })
