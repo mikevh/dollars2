@@ -15,48 +15,44 @@ public class UserRepository
 
     public async Task<User?> GetByEmailAsync(string email)
     {
-        return await _db.Connection.QuerySingleOrDefaultAsync<User>(
-            "SELECT Id, Email, CreatedAt, UpdatedAt FROM Users WHERE Email = @email",
-            new { email },
-            _db.CurrentTransaction);
+        var sql = "SELECT Id, Email, CreatedAt, UpdatedAt FROM Users WHERE Email = @email";
+        var rv = await _db.Connection.QuerySingleOrDefaultAsync<User>(sql, new { email }, _db.CurrentTransaction);
+
+        return rv;
     }
 
     public async Task<User?> GetByIdAsync(int id)
     {
-        return await _db.Connection.QuerySingleOrDefaultAsync<User>(
-            "SELECT Id, Email, CreatedAt, UpdatedAt FROM Users WHERE Id = @id",
-            new { id },
-            _db.CurrentTransaction);
+        var sql = "SELECT Id, Email, CreatedAt, UpdatedAt FROM Users WHERE Id = @id";
+        var rv = await _db.Connection.QuerySingleOrDefaultAsync<User>(sql, new { id }, _db.CurrentTransaction);
+        
+        return rv;
     }
 
     public async Task<IEnumerable<int>> GetAllIdsAsync()
     {
-        return await _db.Connection.QueryAsync<int>(
-            "SELECT Id FROM Users",
-            transaction: _db.CurrentTransaction);
+        var rv = await _db.Connection.QueryAsync<int>("SELECT Id FROM Users", null, _db.CurrentTransaction);
+        
+        return rv;
     }
 
     public async Task<int> CreateAsync(string email)
     {
-        return await _db.Connection.ExecuteScalarAsync<int>(
-            "INSERT INTO Users (Email, CreatedAt, UpdatedAt) OUTPUT INSERTED.Id VALUES (@email, SYSUTCDATETIME(), SYSUTCDATETIME())",
-            new { email },
-            _db.CurrentTransaction);
+        var sql = "INSERT INTO Users (Email, CreatedAt, UpdatedAt) OUTPUT INSERTED.Id VALUES (@email, SYSUTCDATETIME(), SYSUTCDATETIME())";
+        var rv = await _db.Connection.ExecuteScalarAsync<int>(sql, new { email }, _db.CurrentTransaction);
+
+        return rv;
     }
 
     public async Task UpdateEmailAsync(int id, string email)
     {
-        await _db.Connection.ExecuteAsync(
-            "UPDATE Users SET Email = @email, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id",
-            new { id, email },
-            _db.CurrentTransaction);
+        var sql = "UPDATE Users SET Email = @email, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id";
+        await _db.Connection.ExecuteAsync(sql, new { id, email }, _db.CurrentTransaction);
     }
 
     public async Task DeleteAsync(int id)
     {
-        await _db.Connection.ExecuteAsync(
-            "DELETE FROM Users WHERE Id = @id",
-            new { id },
-            _db.CurrentTransaction);
+        var sql = "DELETE FROM Users WHERE Id = @id";
+        await _db.Connection.ExecuteAsync(sql, new { id }, _db.CurrentTransaction);
     }
 }
