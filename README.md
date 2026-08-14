@@ -35,7 +35,7 @@ docker-compose.yml      Self-host deployment (app, logging, and sync-archive ser
 cd frontend
 npm install
 npm run dev              # Vite dev server
-npx tsc --noEmit         # type check
+npx tsc -b --force       # type check
 npm test                 # Vitest (single run)
 ```
 
