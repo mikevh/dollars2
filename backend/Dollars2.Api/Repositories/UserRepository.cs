@@ -15,7 +15,7 @@ public class UserRepository
 
     public async Task<User?> GetByEmailAsync(string email)
     {
-        var sql = "SELECT Id, Email, CreatedAt, UpdatedAt FROM Users WHERE Email = @email";
+        var sql = "SELECT Id, Email, RegistrationKey, CreatedAt, UpdatedAt FROM Users WHERE Email = @email";
         var rv = await _db.Connection.QuerySingleOrDefaultAsync<User>(sql, new { email }, _db.CurrentTransaction);
 
         return rv;
@@ -23,9 +23,9 @@ public class UserRepository
 
     public async Task<User?> GetByIdAsync(int id)
     {
-        var sql = "SELECT Id, Email, CreatedAt, UpdatedAt FROM Users WHERE Id = @id";
+        var sql = "SELECT Id, Email, RegistrationKey, CreatedAt, UpdatedAt FROM Users WHERE Id = @id";
         var rv = await _db.Connection.QuerySingleOrDefaultAsync<User>(sql, new { id }, _db.CurrentTransaction);
-        
+
         return rv;
     }
 
@@ -53,6 +53,12 @@ public class UserRepository
     public async Task DeleteAsync(int id)
     {
         var sql = "DELETE FROM Users WHERE Id = @id";
+        await _db.Connection.ExecuteAsync(sql, new { id }, _db.CurrentTransaction);
+    }
+
+    public async Task ClearRegistrationKeyAsync(int id)
+    {
+        var sql = "UPDATE Users SET RegistrationKey = NULL, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id";
         await _db.Connection.ExecuteAsync(sql, new { id }, _db.CurrentTransaction);
     }
 }

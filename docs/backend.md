@@ -40,12 +40,15 @@
 
 ## Authentication
 
-- Email-only login for v1 (no password)
+- Passkey-only login (no passwords) — WebAuthn ceremony driven directly through ASP.NET Core
+  Identity's `IPasskeyHandler<User>` (a Dapper-backed `IUserStore`/`IUserPasskeyStore`, not EF
+  Core), never through `SignInManager`'s cookie-based sign-in
 - JWT with 30-day expiration
 - Refresh tokens
 - JWT secret via `dotnet user-secrets` locally / environment variable in the container deploy —
   `appsettings.json` holds only the `<dotnet user secret>` placeholder
-- Users created directly in the database
+- Users created directly in the database; an admin sets `Users.RegistrationKey` (direct SQL
+  `UPDATE`) to authorize a passkey registration
 - **Retention:** a login or refresh mints a new refresh-token row, and a token that is never used
   again (cleared browser, second device, failed refresh) would otherwise linger forever. Both auth
   paths delete the acting user's already-expired rows as part of the same transaction, so the table
@@ -134,7 +137,13 @@
 ## API Endpoints
 
 ### Auth
-- `POST /api/auth/login` — email in, JWT + refresh token out
+- `POST /api/auth/passkey/register/options` — email + registration key in, WebAuthn creation
+  options out; stashes attestation state in a short-lived Data-Protected cookie
+- `POST /api/auth/passkey/register/complete` — signed credential in, credential stored and
+  registration key cleared
+- `POST /api/auth/passkey/login/options` — email in, WebAuthn request options out; stashes
+  assertion state in the same cookie
+- `POST /api/auth/passkey/login/complete` — signed assertion in, JWT + refresh token out
 - `POST /api/auth/refresh` — refresh token in, new JWT out
 
 ### Budgets

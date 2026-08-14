@@ -2,10 +2,25 @@
 
 ## V1 Authentication
 
-- No passwords in v1 — login succeeds with a matching email address found in the database
-- User records are manually added to the database
+- Passkey-only — no passwords, ever. Login requires a WebAuthn passkey registered against the
+  user's account
+- User records are manually added to the database; an admin sets `Users.RegistrationKey` (a
+  one-time shared secret, direct SQL `UPDATE`) to authorize that user to register a passkey
 - No open self-registration
-- Proper auth with passkeys planned for a later version
+- **Registration** (`POST api/auth/passkey/register/options` then `POST
+  api/auth/passkey/register/complete`): client submits the email + registration key it was given
+  out-of-band; server validates the key, runs the WebAuthn attestation ceremony via ASP.NET Core
+  Identity's `IPasskeyHandler<User>` (called directly, not through `SignInManager`'s cookie-based
+  sign-in), stores the resulting credential, and blanks `RegistrationKey`. Re-registering with a
+  new key deletes any prior credentials for that user first — lost-passkey recovery presumes the
+  old credential is compromised
+- **Login** (`POST api/auth/passkey/login/options` then `POST api/auth/passkey/login/complete`):
+  client submits its email, server runs the WebAuthn assertion ceremony scoped to that user's
+  credentials, and on success issues a JWT + refresh token exactly as before — passkey login is a
+  drop-in replacement for the old email-only credential check, not a new token scheme
+- Ceremony state (WebAuthn's attestation/assertion state) round-trips in a short-lived,
+  Data-Protected, HttpOnly cookie between the options and completion calls — never returned to the
+  client in the response body
 
 ## JWT
 
