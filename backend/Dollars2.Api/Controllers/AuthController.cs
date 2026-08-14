@@ -99,7 +99,10 @@ public class AuthController : DollarsControllerBase
         Response.Cookies.Append(cookieName, protectedState, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
+            // Deployment never terminates TLS (see docs/deployment.md) — a hardcoded Secure=true
+            // would make the browser silently drop this cookie over plain HTTP, breaking every
+            // ceremony. Match the scheme the request actually arrived on instead.
+            Secure = Request.IsHttps,
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddMinutes(5),
         });
