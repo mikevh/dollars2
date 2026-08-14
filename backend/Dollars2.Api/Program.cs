@@ -107,7 +107,10 @@ builder.Services.AddCors(options =>
         // localhost branch reflects the request origin instead of using the wildcard.
         if(frontendUrl.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase))
         {
-            policy.SetIsOriginAllowed(_ => true).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+            policy.SetIsOriginAllowed(origin =>
+                    origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase) ||
+                    origin.StartsWith("http://127.0.0.1:", StringComparison.OrdinalIgnoreCase))
+                .AllowAnyHeader().AllowAnyMethod().AllowCredentials();
         }
         else
         {
