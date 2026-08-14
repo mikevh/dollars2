@@ -34,6 +34,7 @@ migrated and freshly-created databases carry identical names.
 |--------|------|-------|
 | Id | int | PK, identity |
 | Email | nvarchar(256) | unique |
+| RegistrationKey | nvarchar(200) | null. Set (via direct DB update) by an admin to enroll or re-enroll a passkey; blanked back to null once registration completes (migration 023) |
 | CreatedAt | datetime2 | |
 | UpdatedAt | datetime2 | |
 
@@ -47,6 +48,29 @@ migrated and freshly-created databases carry identical names.
 | ExpiresAt | datetime2 | |
 | CreatedAt | datetime2 | |
 | UpdatedAt | datetime2 | |
+
+### PasskeyCredentials
+
+| Column | Type | Notes |
+|--------|------|-------|
+| Id | int | PK, identity |
+| UserId | int | FK → Users |
+| CredentialId | varbinary(900) | unique. WebAuthn credential ID; sized to fit within MSSQL's 900-byte index key limit |
+| PublicKey | varbinary(max) | |
+| AttestationObject | varbinary(max) | |
+| ClientDataJson | varbinary(max) | |
+| SignCount | bigint | replay-protection counter; framework type is `uint`, stored as bigint to avoid overflow |
+| Transports | nvarchar(200) | null |
+| IsUserVerified | bit | |
+| IsBackupEligible | bit | |
+| IsBackedUp | bit | |
+| Name | nvarchar(256) | null. User-friendly passkey name |
+| CreatedAt | datetime2 | framework-supplied value, not a default |
+| UpdatedAt | datetime2 | |
+
+Backs ASP.NET Core Identity's `IUserPasskeyStore<TUser>` (migration 023). One row per registered
+WebAuthn credential; a lost-passkey re-registration deletes the user's prior rows rather than
+accumulating them.
 
 ### Accounts
 
@@ -169,6 +193,7 @@ CreatedOn DESC)`.
 - Users → Budgets (1:many)
 - Users → Accounts (1:many)
 - Users → RefreshTokens (1:many)
+- Users → PasskeyCredentials (1:many)
 - Budgets → BudgetGroups (1:many)
 - BudgetGroups → LineItems (1:many)
 - LineItems → LineItems (self, via `PreviousLineItemId` — the month-over-month rollover chain)

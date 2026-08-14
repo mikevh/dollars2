@@ -35,4 +35,28 @@ public class UserRepository
             "SELECT Id FROM Users",
             transaction: _db.CurrentTransaction);
     }
+
+    public async Task<int> CreateAsync(string email)
+    {
+        return await _db.Connection.ExecuteScalarAsync<int>(
+            "INSERT INTO Users (Email, CreatedAt, UpdatedAt) OUTPUT INSERTED.Id VALUES (@email, SYSUTCDATETIME(), SYSUTCDATETIME())",
+            new { email },
+            _db.CurrentTransaction);
+    }
+
+    public async Task UpdateEmailAsync(int id, string email)
+    {
+        await _db.Connection.ExecuteAsync(
+            "UPDATE Users SET Email = @email, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id",
+            new { id, email },
+            _db.CurrentTransaction);
+    }
+
+    public async Task DeleteAsync(int id)
+    {
+        await _db.Connection.ExecuteAsync(
+            "DELETE FROM Users WHERE Id = @id",
+            new { id },
+            _db.CurrentTransaction);
+    }
 }
