@@ -2,6 +2,7 @@ using System.Text;
 using Amazon.DynamoDBv2;
 using Amazon.Runtime;
 using Dollars2.Api.Data;
+using Dollars2.Api.Identity;
 using Dollars2.Api.Json;
 using Dollars2.Api.Logging;
 using Dollars2.Api.Middleware;
@@ -10,6 +11,7 @@ using Dollars2.Api.Providers;
 using Dollars2.Api.Repositories;
 using Dollars2.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
@@ -48,6 +50,7 @@ if (string.IsNullOrWhiteSpace(cs) || cs == "<dotnet user secret>")
 builder.Services.AddScoped(sp => new DbSession(new SqlConnection(cs)));
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<RefreshTokenRepository>();
+builder.Services.AddScoped<PasskeyCredentialRepository>();
 builder.Services.AddScoped<BudgetRepository>();
 builder.Services.AddScoped<BudgetGroupRepository>();
 builder.Services.AddScoped<LineItemRepository>();
@@ -121,6 +124,18 @@ if (builder.Configuration.GetValue<int>("Jwt:ExpirationDays") <= 0)
 {
     throw new InvalidOperationException("Jwt:ExpirationDays is not configured.");
 }
+
+// Identity is used only to drive the passkey (WebAuthn) attestation/assertion ceremony via
+// IPasskeyHandler<User>, called directly rather than through SignInManager's cookie-based sign-in.
+// This app's own JWT + refresh token issuance (below) remains the actual authentication mechanism.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddIdentityCore<User>()
+    .AddSignInManager();
+builder.Services.AddScoped<IUserStore<User>, DapperUserStore>();
+builder.Services.Configure<IdentityPasskeyOptions>(options =>
+{
+    options.ServerDomain = builder.Configuration["Identity:ServerDomain"];
+});
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
