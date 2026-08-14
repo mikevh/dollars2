@@ -21,57 +21,49 @@ public class DapperUserStore : IUserPasskeyStore<User>
         _passkeys = passkeys;
     }
 
-    public void Dispose()
+    public Task<string> GetUserIdAsync(User u, CancellationToken ct) => Task.FromResult(u.Id.ToString());
+
+    public Task<string?> GetUserNameAsync(User u, CancellationToken ct) => Task.FromResult<string?>(u.Email);
+
+    public Task SetUserNameAsync(User u, string? userName, CancellationToken ct)
     {
-    }
-
-    public Task<string> GetUserIdAsync(User user, CancellationToken cancellationToken)
-        => Task.FromResult(user.Id.ToString());
-
-    public Task<string?> GetUserNameAsync(User user, CancellationToken cancellationToken)
-        => Task.FromResult<string?>(user.Email);
-
-    public Task SetUserNameAsync(User user, string? userName, CancellationToken cancellationToken)
-    {
-        user.Email = userName ?? user.Email;
+        u.Email = userName ?? u.Email;
         return Task.CompletedTask;
     }
 
-    public Task<string?> GetNormalizedUserNameAsync(User user, CancellationToken cancellationToken)
-        => Task.FromResult<string?>(user.Email.ToUpperInvariant());
+    public Task<string?> GetNormalizedUserNameAsync(User u, CancellationToken ct) => Task.FromResult<string?>(u.Email.ToUpperInvariant());
 
-    public Task SetNormalizedUserNameAsync(User user, string? normalizedName, CancellationToken cancellationToken)
-        => Task.CompletedTask;
+    public Task SetNormalizedUserNameAsync(User u, string? normalizedName, CancellationToken ct) => Task.CompletedTask;
 
-    public async Task<IdentityResult> CreateAsync(User user, CancellationToken cancellationToken)
+    public async Task<IdentityResult> CreateAsync(User u, CancellationToken ct)
     {
-        if (await _users.GetByEmailAsync(user.Email) is not null)
+        if (await _users.GetByEmailAsync(u.Email) is not null)
         {
-            return IdentityResult.Failed(DuplicateEmailError(user.Email));
+            return IdentityResult.Failed(DuplicateEmailError(u.Email));
         }
 
-        user.Id = await _users.CreateAsync(user.Email);
+        u.Id = await _users.CreateAsync(u.Email);
         return IdentityResult.Success;
     }
 
-    public async Task<IdentityResult> UpdateAsync(User user, CancellationToken cancellationToken)
+    public async Task<IdentityResult> UpdateAsync(User u, CancellationToken ct)
     {
-        var existing = await _users.GetByEmailAsync(user.Email);
-        if (existing is not null && existing.Id != user.Id)
+        var existing = await _users.GetByEmailAsync(u.Email);
+        if (existing is not null && existing.Id != u.Id)
         {
-            return IdentityResult.Failed(DuplicateEmailError(user.Email));
+            return IdentityResult.Failed(DuplicateEmailError(u.Email));
         }
 
-        await _users.UpdateEmailAsync(user.Id, user.Email);
+        await _users.UpdateEmailAsync(u.Id, u.Email);
         return IdentityResult.Success;
     }
 
-    public async Task<IdentityResult> DeleteAsync(User user, CancellationToken cancellationToken)
+    public async Task<IdentityResult> DeleteAsync(User u, CancellationToken ct)
     {
         // No ON DELETE CASCADE on FK_PasskeyCredentials_Users — clear the user's credentials first
         // so the delete doesn't fail on the foreign key.
-        await _passkeys.DeleteAllForUserAsync(user.Id);
-        await _users.DeleteAsync(user.Id);
+        await _passkeys.DeleteAllForUserAsync(u.Id);
+        await _users.DeleteAsync(u.Id);
         return IdentityResult.Success;
     }
 
@@ -81,17 +73,15 @@ public class DapperUserStore : IUserPasskeyStore<User>
         Description = $"Email '{email}' is already in use.",
     };
 
-    public async Task<User?> FindByIdAsync(string userId, CancellationToken cancellationToken)
-        => int.TryParse(userId, out var id) ? await _users.GetByIdAsync(id) : null;
+    public async Task<User?> FindByIdAsync(string userId, CancellationToken ct) => int.TryParse(userId, out var id) ? await _users.GetByIdAsync(id) : null;
 
-    public async Task<User?> FindByNameAsync(string normalizedUserName, CancellationToken cancellationToken)
-        => await _users.GetByEmailAsync(normalizedUserName);
+    public async Task<User?> FindByNameAsync(string normalizedUserName, CancellationToken ct) => await _users.GetByEmailAsync(normalizedUserName);
 
-    public async Task AddOrUpdatePasskeyAsync(User user, UserPasskeyInfo passkey, CancellationToken cancellationToken)
+    public async Task AddOrUpdatePasskeyAsync(User u, UserPasskeyInfo passkey, CancellationToken ct)
     {
         await _passkeys.UpsertAsync(new PasskeyCredential
         {
-            UserId = user.Id,
+            UserId = u.Id,
             CredentialId = passkey.CredentialId,
             PublicKey = passkey.PublicKey,
             AttestationObject = passkey.AttestationObject,
@@ -106,46 +96,47 @@ public class DapperUserStore : IUserPasskeyStore<User>
         });
     }
 
-    public async Task<User?> FindByPasskeyIdAsync(byte[] credentialId, CancellationToken cancellationToken)
+    public async Task<User?> FindByPasskeyIdAsync(byte[] credentialId, CancellationToken ct)
     {
-        var credential = await _passkeys.FindByCredentialIdAsync(credentialId);
-        return credential is null ? null : await _users.GetByIdAsync(credential.UserId);
+        var cred = await _passkeys.FindByCredentialIdAsync(credentialId);
+        return cred is null ? null : await _users.GetByIdAsync(cred.UserId);
     }
 
-    public async Task<UserPasskeyInfo?> FindPasskeyAsync(User user, byte[] credentialId, CancellationToken cancellationToken)
+    public async Task<UserPasskeyInfo?> FindPasskeyAsync(User u, byte[] credentialId, CancellationToken ct)
     {
-        var credential = await _passkeys.FindByUserAndCredentialIdAsync(user.Id, credentialId);
-        return credential is null ? null : ToPasskeyInfo(credential);
+        var cred = await _passkeys.FindByUserAndCredentialIdAsync(u.Id, credentialId);
+        return cred is null ? null : ToPasskeyInfo(cred);
     }
 
-    public async Task<IList<UserPasskeyInfo>> GetPasskeysAsync(User user, CancellationToken cancellationToken)
+    public async Task<IList<UserPasskeyInfo>> GetPasskeysAsync(User u, CancellationToken ct)
     {
-        var credentials = await _passkeys.GetByUserIdAsync(user.Id);
-        return credentials.Select(ToPasskeyInfo).ToList();
+        var creds = await _passkeys.GetByUserIdAsync(u.Id);
+        return creds.Select(ToPasskeyInfo).ToList();
     }
 
-    public async Task RemovePasskeyAsync(User user, byte[] credentialId, CancellationToken cancellationToken)
-        => await _passkeys.DeleteAsync(user.Id, credentialId);
+    public async Task RemovePasskeyAsync(User u, byte[] credId, CancellationToken ct) => await _passkeys.DeleteAsync(u.Id, credId);
 
-    private static UserPasskeyInfo ToPasskeyInfo(PasskeyCredential credential)
+    private static UserPasskeyInfo ToPasskeyInfo(PasskeyCredential cred)
     {
-        var transports = credential.Transports is { Length: > 0 }
-            ? credential.Transports.Split(',')
+        var transports = cred.Transports is { Length: > 0 }
+            ? cred.Transports.Split(',')
             : [];
 
         return new UserPasskeyInfo(
-            credentialId: credential.CredentialId,
-            publicKey: credential.PublicKey,
-            createdAt: new DateTimeOffset(credential.CreatedAt, TimeSpan.Zero),
-            signCount: (uint)credential.SignCount,
+            credentialId: cred.CredentialId,
+            publicKey: cred.PublicKey,
+            createdAt: new DateTimeOffset(cred.CreatedAt, TimeSpan.Zero),
+            signCount: (uint)cred.SignCount,
             transports: transports,
-            isUserVerified: credential.IsUserVerified,
-            isBackupEligible: credential.IsBackupEligible,
-            isBackedUp: credential.IsBackedUp,
-            attestationObject: credential.AttestationObject,
-            clientDataJson: credential.ClientDataJson)
+            isUserVerified: cred.IsUserVerified,
+            isBackupEligible: cred.IsBackupEligible,
+            isBackedUp: cred.IsBackedUp,
+            attestationObject: cred.AttestationObject,
+            clientDataJson: cred.ClientDataJson)
         {
-            Name = credential.Name,
+            Name = cred.Name,
         };
     }
+
+    public void Dispose() { }
 }
