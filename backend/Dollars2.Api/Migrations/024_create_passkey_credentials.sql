@@ -1,7 +1,5 @@
-IF NOT EXISTS (SELECT * FROM Migrations WHERE ScriptName = '023_add_registration_key_and_passkey_credentials')
+IF NOT EXISTS (SELECT * FROM Migrations WHERE ScriptName = '024_create_passkey_credentials')
 BEGIN
-    ALTER TABLE Users ADD RegistrationKey NVARCHAR(200) NULL;
-
     CREATE TABLE PasskeyCredentials (
         Id INT IDENTITY(1,1) NOT NULL,
         UserId INT NOT NULL,
@@ -22,5 +20,5 @@ BEGIN
         CONSTRAINT UQ_PasskeyCredentials_CredentialId UNIQUE (CredentialId)
     );
 
-    INSERT INTO Migrations (ScriptName) VALUES ('023_add_registration_key_and_passkey_credentials');
+    INSERT INTO Migrations (ScriptName) VALUES ('024_create_passkey_credentials');
 END
