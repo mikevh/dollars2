@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text.Json;
 using Dollars2.Api.Models;
 using Dollars2.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -10,7 +11,8 @@ namespace Dollars2.Api.Controllers;
 [Route("api/auth")]
 public class AuthController : DollarsControllerBase
 {
-    private const string CeremonyCookieName = "dollars2_passkey_ceremony";
+    private const string RegistrationCookieName = "dollars2_passkey_register_ceremony";
+    private const string LoginCookieName = "dollars2_passkey_login_ceremony";
     private const string CeremonyProtectorPurpose = "Dollars2.PasskeyCeremony";
 
     private readonly AuthService _authService;
@@ -31,7 +33,10 @@ public class AuthController : DollarsControllerBase
         {
             return Unauthorized(result);
         }
-        SetCeremonyCookie(attestationState!);
+        // Binds the registration key that was validated at this step into the cookie, so
+        // completion can confirm it hasn't been rotated mid-ceremony rather than just checking
+        // a key is still set at all.
+        SetCeremonyCookie(RegistrationCookieName, new RegistrationCeremonyState(request.RegistrationKey, attestationState!));
         return Ok(result);
     }
 
@@ -39,9 +44,9 @@ public class AuthController : DollarsControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> PasskeyRegisterComplete([FromBody] PasskeyRegistrationCompleteRequest request)
     {
-        var attestationState = ReadCeremonyCookie();
-        var result = await _authService.CompletePasskeyRegistrationAsync(request.CredentialJson, attestationState, HttpContext);
-        ClearCeremonyCookie();
+        var state = ReadCeremonyCookie<RegistrationCeremonyState>(RegistrationCookieName);
+        var result = await _authService.CompletePasskeyRegistrationAsync(request.CredentialJson, state?.RegistrationKey, state?.AttestationState, HttpContext);
+        ClearCeremonyCookie(RegistrationCookieName);
         if (result.Error is not null)
         {
             return Unauthorized(result);
@@ -58,7 +63,7 @@ public class AuthController : DollarsControllerBase
         {
             return Unauthorized(result);
         }
-        SetCeremonyCookie(assertionState!);
+        SetCeremonyCookie(LoginCookieName, new LoginCeremonyState(assertionState!));
         return Ok(result);
     }
 
@@ -66,9 +71,9 @@ public class AuthController : DollarsControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> PasskeyLoginComplete([FromBody] PasskeyLoginCompleteRequest request)
     {
-        var assertionState = ReadCeremonyCookie();
-        var result = await _authService.CompletePasskeyLoginAsync(request.CredentialJson, assertionState, HttpContext);
-        ClearCeremonyCookie();
+        var state = ReadCeremonyCookie<LoginCeremonyState>(LoginCookieName);
+        var result = await _authService.CompletePasskeyLoginAsync(request.CredentialJson, state?.AssertionState, HttpContext);
+        ClearCeremonyCookie(LoginCookieName);
         if (result.Error is not null)
         {
             return Unauthorized(result);
@@ -88,9 +93,10 @@ public class AuthController : DollarsControllerBase
         return Ok(result);
     }
 
-    private void SetCeremonyCookie(string state)
+    private void SetCeremonyCookie<T>(string cookieName, T state)
     {
-        Response.Cookies.Append(CeremonyCookieName, _ceremonyProtector.Protect(state), new CookieOptions
+        var protectedState = _ceremonyProtector.Protect(JsonSerializer.Serialize(state));
+        Response.Cookies.Append(cookieName, protectedState, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
@@ -99,22 +105,26 @@ public class AuthController : DollarsControllerBase
         });
     }
 
-    private string? ReadCeremonyCookie()
+    private T? ReadCeremonyCookie<T>(string cookieName) where T : class
     {
-        if (!Request.Cookies.TryGetValue(CeremonyCookieName, out var protectedState))
+        if (!Request.Cookies.TryGetValue(cookieName, out var protectedState))
         {
             return null;
         }
 
         try
         {
-            return _ceremonyProtector.Unprotect(protectedState);
+            return JsonSerializer.Deserialize<T>(_ceremonyProtector.Unprotect(protectedState));
         }
-        catch (CryptographicException)
+        catch (Exception ex) when (ex is CryptographicException or JsonException)
         {
             return null;
         }
     }
 
-    private void ClearCeremonyCookie() => Response.Cookies.Delete(CeremonyCookieName);
+    private void ClearCeremonyCookie(string cookieName) => Response.Cookies.Delete(cookieName);
+
+    private sealed record RegistrationCeremonyState(string RegistrationKey, string AttestationState);
+
+    private sealed record LoginCeremonyState(string AssertionState);
 }

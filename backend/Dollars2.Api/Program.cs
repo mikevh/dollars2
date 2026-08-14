@@ -102,13 +102,16 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
+        // AllowCredentials is required so the browser sends the passkey ceremony cookie
+        // (AuthController) cross-origin; it cannot be combined with AllowAnyOrigin, so the
+        // localhost branch reflects the request origin instead of using the wildcard.
         if(frontendUrl.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase))
         {
-            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+            policy.SetIsOriginAllowed(_ => true).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
         }
         else
-        {   
-            policy.WithOrigins(frontendUrl).AllowAnyHeader().AllowAnyMethod();
+        {
+            policy.WithOrigins(frontendUrl).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
         }
     });
 });

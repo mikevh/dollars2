@@ -42,7 +42,7 @@ public class AuthService
     {
         var user = await _userRepo.GetByEmailAsync(email);
 
-        if (user is null || user.RegistrationKey is null || user.RegistrationKey != registrationKey)
+        if (user is null || !SecureEquals(user.RegistrationKey, registrationKey))
         {
             return (DollarsApiResponse<PasskeyOptionsResponse>.Fail("Invalid registration key.", "INVALID_REGISTRATION_KEY"), null);
         }
@@ -59,9 +59,9 @@ public class AuthService
         return (response, options.AttestationState);
     }
 
-    public async Task<DollarsApiResponse<object>> CompletePasskeyRegistrationAsync(string credentialJson, string? attestationState, HttpContext httpContext)
+    public async Task<DollarsApiResponse<object>> CompletePasskeyRegistrationAsync(string credentialJson, string? expectedRegistrationKey, string? attestationState, HttpContext httpContext)
     {
-        if (attestationState is null)
+        if (attestationState is null || expectedRegistrationKey is null)
         {
             return DollarsApiResponse<object>.Fail("Registration ceremony expired or missing.", "CEREMONY_STATE_MISSING");
         }
@@ -73,7 +73,7 @@ public class AuthService
             AttestationState = attestationState,
         });
 
-        if (!attestation.Succeeded)
+        if (!attestation.Succeeded || attestation.UserEntity is null)
         {
             return DollarsApiResponse<object>.Fail(attestation.Failure?.Message ?? "Passkey registration failed.", "PASSKEY_ATTESTATION_FAILED");
         }
@@ -85,10 +85,11 @@ public class AuthService
 
         var user = await _userRepo.GetByIdAsync(userId);
 
-        // Defense in depth: the registration key must still be set at completion time, even though
-        // the options step already validated it — closes the window where it was cleared or changed
-        // mid-ceremony.
-        if (user is null || user.RegistrationKey is null)
+        // Defense in depth: re-validates against the exact key bound to this ceremony at the
+        // options step (not just "some key is set") — closes the window where the key was
+        // rotated to a new value mid-ceremony, which would otherwise let a stale ceremony
+        // complete under credentials issued for a key that's no longer current.
+        if (user is null || !SecureEquals(user.RegistrationKey, expectedRegistrationKey))
         {
             return DollarsApiResponse<object>.Fail("Registration key is no longer valid.", "INVALID_REGISTRATION_KEY");
         }
@@ -242,5 +243,17 @@ public class AuthService
     {
         var bytes = RandomNumberGenerator.GetBytes(64);
         return Convert.ToBase64String(bytes);
+    }
+
+    // The registration key is a secret, single-use credential — a plain string compare would let
+    // an attacker who can measure response timing brute-force it one character at a time.
+    private static bool SecureEquals(string? actual, string? candidate)
+    {
+        if (actual is null || candidate is null)
+        {
+            return false;
+        }
+
+        return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(actual), Encoding.UTF8.GetBytes(candidate));
     }
 }
