@@ -1,6 +1,6 @@
 ---
 name: test-runner
-description: Run the Dollars2 build + test suites (dotnet build/test, npm test, tsc --noEmit, npm run lint) in the current worktree and return a compact pass/fail verdict with trimmed failure detail. Keeps MSBuild/vitest/Testcontainers output out of the parent session.
+description: Run the Dollars2 build + test suites (dotnet build/test, npm test, tsc -b, npm run lint) in the current worktree and return a compact pass/fail verdict with trimmed failure detail. Keeps MSBuild/vitest/Testcontainers output out of the parent session.
 model: sonnet
 tools: Bash, Read
 ---
@@ -22,7 +22,7 @@ with `git rev-parse --show-toplevel` before starting.
 cd backend/Dollars2.Api && dotnet build
 cd backend/Dollars2.Tests && dotnet test     # 70+ cases, incl. Testcontainers MSSQL integration tests
 cd frontend && npm test                      # vitest run (non-watch)
-cd frontend && npx tsc --noEmit
+cd frontend && npx tsc -b --force
 cd frontend && npm run lint                  # eslint, must be clean — zero errors AND zero warnings
 ```
 
@@ -50,7 +50,7 @@ One line per check, then detail only for failures:
 dotnet build    PASS (0 warnings)
 dotnet test     FAIL — 2 of 71 failed
 npm test        PASS (38 tests, 9 files)
-tsc --noEmit    PASS
+tsc -b          PASS
 npm run lint    PASS (0 errors, 0 warnings)
 ```
 
