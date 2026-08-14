@@ -132,6 +132,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddIdentityCore<User>()
     .AddSignInManager();
 builder.Services.AddScoped<IUserStore<User>, DapperUserStore>();
+builder.Services.AddScoped<IUserPasskeyStore<User>, DapperUserStore>();
 builder.Services.Configure<IdentityPasskeyOptions>(options =>
 {
     options.ServerDomain = builder.Configuration["Identity:ServerDomain"];

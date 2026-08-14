@@ -2,9 +2,8 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Dollars2.Api.Models;
 
-public class AuthRequest
+public class PasskeyLoginCompleteRequest
 {
     [Required]
-    [EmailAddress]
-    public required string Email { get; set; }
+    public required string CredentialJson { get; set; }
 }
