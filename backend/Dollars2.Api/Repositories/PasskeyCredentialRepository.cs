@@ -6,8 +6,7 @@ namespace Dollars2.Api.Repositories;
 
 public class PasskeyCredentialRepository
 {
-    private const string SelectColumns =
-        "Id, UserId, CredentialId, PublicKey, AttestationObject, ClientDataJson, SignCount, Transports, IsUserVerified, IsBackupEligible, IsBackedUp, Name, CreatedAt, UpdatedAt";
+    private const string SelectColumns = "Id, UserId, CredentialId, PublicKey, AttestationObject, ClientDataJson, SignCount, Transports, IsUserVerified, IsBackupEligible, IsBackedUp, Name, CreatedAt, UpdatedAt";
 
     private readonly DbSession _db;
 
@@ -18,26 +17,26 @@ public class PasskeyCredentialRepository
 
     public async Task<PasskeyCredential?> FindByCredentialIdAsync(byte[] credentialId)
     {
-        return await _db.Connection.QuerySingleOrDefaultAsync<PasskeyCredential>(
-            $"SELECT {SelectColumns} FROM PasskeyCredentials WHERE CredentialId = @credentialId",
-            new { credentialId },
-            _db.CurrentTransaction);
+        var sql = $"SELECT {SelectColumns} FROM PasskeyCredentials WHERE CredentialId = @credentialId";
+        var rv = await _db.Connection.QuerySingleOrDefaultAsync<PasskeyCredential>(sql, new { credentialId }, _db.CurrentTransaction);
+        
+        return rv;
     }
 
     public async Task<PasskeyCredential?> FindByUserAndCredentialIdAsync(int userId, byte[] credentialId)
     {
-        return await _db.Connection.QuerySingleOrDefaultAsync<PasskeyCredential>(
-            $"SELECT {SelectColumns} FROM PasskeyCredentials WHERE UserId = @userId AND CredentialId = @credentialId",
-            new { userId, credentialId },
-            _db.CurrentTransaction);
+        var sql = $"SELECT {SelectColumns} FROM PasskeyCredentials WHERE UserId = @userId AND CredentialId = @credentialId";
+        var rv = await _db.Connection.QuerySingleOrDefaultAsync<PasskeyCredential>(sql, new { userId, credentialId }, _db.CurrentTransaction);
+
+        return rv;
     }
 
     public async Task<IEnumerable<PasskeyCredential>> GetByUserIdAsync(int userId)
     {
-        return await _db.Connection.QueryAsync<PasskeyCredential>(
-            $"SELECT {SelectColumns} FROM PasskeyCredentials WHERE UserId = @userId",
-            new { userId },
-            _db.CurrentTransaction);
+        var sql = $"SELECT {SelectColumns} FROM PasskeyCredentials WHERE UserId = @userId";
+        var rv = await _db.Connection.QueryAsync<PasskeyCredential>(sql, new { userId }, _db.CurrentTransaction);
+
+        return rv;
     }
 
     /// <summary>
@@ -73,10 +72,8 @@ public class PasskeyCredentialRepository
 
     public async Task DeleteAsync(int userId, byte[] credentialId)
     {
-        await _db.Connection.ExecuteAsync(
-            "DELETE FROM PasskeyCredentials WHERE UserId = @userId AND CredentialId = @credentialId",
-            new { userId, credentialId },
-            _db.CurrentTransaction);
+        var sql = "DELETE FROM PasskeyCredentials WHERE UserId = @userId AND CredentialId = @credentialId";
+        await _db.Connection.ExecuteAsync(sql, new { userId, credentialId }, _db.CurrentTransaction);
     }
 
     /// <summary>
@@ -86,9 +83,9 @@ public class PasskeyCredentialRepository
     /// </summary>
     public async Task<int> DeleteAllForUserAsync(int userId)
     {
-        return await _db.Connection.ExecuteAsync(
-            "DELETE FROM PasskeyCredentials WHERE UserId = @userId",
-            new { userId },
-            _db.CurrentTransaction);
+        var sql = "DELETE FROM PasskeyCredentials WHERE UserId = @userId";
+        var rv = await _db.Connection.ExecuteAsync(sql, new { userId }, _db.CurrentTransaction);
+
+        return rv;
     }
 }
