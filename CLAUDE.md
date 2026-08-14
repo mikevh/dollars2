@@ -76,7 +76,7 @@ cd frontend && npm run dev
 cd backend/Dollars2.Api && dotnet run
 
 # Type check
-cd frontend && npx tsc --noEmit
+cd frontend && npx tsc -b --force
 
 # Lint (must stay clean — zero errors, zero warnings)
 cd frontend && npm run lint
@@ -90,7 +90,7 @@ cd backend/Dollars2.Api && dotnet build
 Pinned to `model: sonnet` and reports back as condensed text.
 
 - **`test-runner`** (`.claude/agents/test-runner.md`) — runs `dotnet build`,
-  `dotnet test`, `npm test`, `npx tsc --noEmit`, and `npm run lint` in the current
+  `dotnet test`, `npm test`, `npx tsc -b --force`, and `npm run lint` in the current
   worktree and returns pass/fail per check with trimmed failure detail (test name, assertion,
   `file:line`), keeping MSBuild/vitest/Testcontainers output out of context.
 

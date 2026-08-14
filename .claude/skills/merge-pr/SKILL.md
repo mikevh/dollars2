@@ -32,7 +32,7 @@ CI configured in `.github/workflows`, step 2 here is the only automated test gat
 - Run the full suite from that worktree:
   ```
   cd backend && dotnet build && dotnet test
-  cd ../frontend && npx tsc --noEmit && npm test   # npm test == vitest run (non-watch)
+  cd ../frontend && npx tsc -b --force && npm test   # npm test == vitest run (non-watch)
   ```
 - **If build, typecheck, or any test fails, stop and report the failure. Do not merge.**
 
