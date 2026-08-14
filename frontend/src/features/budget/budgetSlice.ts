@@ -10,6 +10,7 @@ interface BudgetState {
   currentYear: number
   currentMonth: number
   currentRequestId: string | null
+  createRequestId: string | null
 }
 
 function currentYearMonth() {
@@ -26,6 +27,7 @@ const initialState: BudgetState = {
   currentYear: initYear,
   currentMonth: initMonth,
   currentRequestId: null,
+  createRequestId: null,
 }
 
 export const fetchBudget = createAsyncThunk(
@@ -208,19 +210,29 @@ const budgetSlice = createSlice({
         state.budget = payload
       },
     })
-    // Unlike fetchBudget, a successful create is never stale — it's the one thing
-    // that actually brought the budget into existence, so it must win even if a
-    // fetchBudget dispatched while it was in flight (e.g. a TransactionPane mutation)
-    // resolved first and claimed currentRequestId. unconditionalFulfilled (see
-    // asyncThunkHelpers.ts) applies onFulfilled unconditionally and reclaims
-    // currentRequestId so a still-in-flight, now-stale fetchBudget response landing
-    // after this can't clobber it either.
-    addStaleGuardedThunkCases(builder, createBudget, {
-      onFulfilled: (state, payload) => {
-        state.budget = payload
-      },
-      unconditionalFulfilled: true,
-    })
+    // createBudget tracks its own request id (createRequestId) rather than sharing
+    // fetchBudget's currentRequestId/loading/error — a fetchBudget dispatched while a
+    // create is in flight (e.g. a TransactionPane mutation) can no longer steal
+    // ownership of the fields a stale-guard checks, so it can't falsely flip loading/error
+    // and re-show the "Create Budget" button mid-create. See issue #275.
+    builder
+      .addCase(createBudget.pending, (state, action) => {
+        state.createRequestId = action.meta.requestId
+      })
+      .addCase(createBudget.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.createRequestId) {
+          return
+        }
+        state.budget = action.payload
+        state.error = null
+      })
+      .addCase(createBudget.rejected, (state, action) => {
+        if (action.meta.requestId !== state.createRequestId) {
+          return
+        }
+        // No store-level error write — BudgetPage.handleCreateBudget toasts from the
+        // dispatch result directly and doesn't read state.error for create failures.
+      })
     builder
       .addCase(createGroup.fulfilled, (state, action) => {
         if (state.budget) {
