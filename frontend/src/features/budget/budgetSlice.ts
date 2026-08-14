@@ -10,6 +10,7 @@ interface BudgetState {
   currentYear: number
   currentMonth: number
   currentRequestId: string | null
+  creating: boolean
   createRequestId: string | null
 }
 
@@ -27,6 +28,7 @@ const initialState: BudgetState = {
   currentYear: initYear,
   currentMonth: initMonth,
   currentRequestId: null,
+  creating: false,
   createRequestId: null,
 }
 
@@ -210,14 +212,16 @@ const budgetSlice = createSlice({
         state.budget = payload
       },
     })
-    // createBudget tracks its own request id (createRequestId) rather than sharing
-    // fetchBudget's currentRequestId/loading/error — a fetchBudget dispatched while a
-    // create is in flight (e.g. a TransactionPane mutation) can no longer steal
-    // ownership of the fields a stale-guard checks, so it can't falsely flip loading/error
-    // and re-show the "Create Budget" button mid-create. See issue #275.
+    // createBudget tracks its own createRequestId/creating pair, fully separate from
+    // fetchBudget's currentRequestId/loading/error. A concurrent fetchBudget (e.g. a
+    // TransactionPane mutation) still legitimately updates its own loading/error when
+    // it settles — that alone would re-show the "Create Budget" empty state mid-create,
+    // so BudgetPage must also gate that render on `creating`, not just `loading`.
+    // See issue #275.
     builder
       .addCase(createBudget.pending, (state, action) => {
         state.createRequestId = action.meta.requestId
+        state.creating = true
       })
       .addCase(createBudget.fulfilled, (state, action) => {
         if (action.meta.requestId !== state.createRequestId) {
@@ -225,11 +229,13 @@ const budgetSlice = createSlice({
         }
         state.budget = action.payload
         state.error = null
+        state.creating = false
       })
       .addCase(createBudget.rejected, (state, action) => {
         if (action.meta.requestId !== state.createRequestId) {
           return
         }
+        state.creating = false
         // No store-level error write — BudgetPage.handleCreateBudget toasts from the
         // dispatch result directly and doesn't read state.error for create failures.
       })
