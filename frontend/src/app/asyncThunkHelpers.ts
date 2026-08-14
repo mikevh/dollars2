@@ -12,7 +12,6 @@ export function addStaleGuardedThunkCases<State extends StaleGuardedState, Retur
   options: {
     onFulfilled: (state: Draft<State>, payload: Returned) => void
     onRejected?: (state: Draft<State>) => void
-    unconditionalFulfilled?: boolean
   }
 ): void {
   builder
@@ -22,15 +21,11 @@ export function addStaleGuardedThunkCases<State extends StaleGuardedState, Retur
       state.currentRequestId = action.meta.requestId
     })
     .addCase(thunk.fulfilled, (state, action) => {
-      const isCurrent = options.unconditionalFulfilled || action.meta.requestId === state.currentRequestId
-      if (!isCurrent) {
+      if (action.meta.requestId !== state.currentRequestId) {
         return
       }
       state.loading = false
       options.onFulfilled(state, action.payload)
-      if (options.unconditionalFulfilled) {
-        state.currentRequestId = action.meta.requestId
-      }
     })
     .addCase(thunk.rejected, (state, action) => {
       if (action.meta.requestId !== state.currentRequestId) {
