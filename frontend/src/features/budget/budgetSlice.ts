@@ -211,9 +211,10 @@ const budgetSlice = createSlice({
     // Unlike fetchBudget, a successful create is never stale — it's the one thing
     // that actually brought the budget into existence, so it must win even if a
     // fetchBudget dispatched while it was in flight (e.g. a TransactionPane mutation)
-    // resolved first and claimed currentRequestId. unconditionalFulfilled reclaims
-    // currentRequestId here so a still-in-flight, now-stale fetchBudget response
-    // landing after this can't clobber it either.
+    // resolved first and claimed currentRequestId. unconditionalFulfilled (see
+    // asyncThunkHelpers.ts) applies onFulfilled unconditionally and reclaims
+    // currentRequestId so a still-in-flight, now-stale fetchBudget response landing
+    // after this can't clobber it either.
     addStaleGuardedThunkCases(builder, createBudget, {
       onFulfilled: (state, payload) => {
         state.budget = payload

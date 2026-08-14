@@ -1,4 +1,4 @@
-import type { ActionReducerMapBuilder, AsyncThunk } from '@reduxjs/toolkit'
+import type { ActionReducerMapBuilder, AsyncThunk, Draft } from '@reduxjs/toolkit'
 
 interface StaleGuardedState {
   loading: boolean
@@ -10,8 +10,8 @@ export function addStaleGuardedThunkCases<State extends StaleGuardedState, Retur
   builder: ActionReducerMapBuilder<State>,
   thunk: AsyncThunk<Returned, ThunkArg, object>,
   options: {
-    onFulfilled: (state: State, payload: Returned) => void
-    onRejected?: (state: State) => void
+    onFulfilled: (state: Draft<State>, payload: Returned) => void
+    onRejected?: (state: Draft<State>) => void
     unconditionalFulfilled?: boolean
   }
 ): void {
@@ -22,7 +22,8 @@ export function addStaleGuardedThunkCases<State extends StaleGuardedState, Retur
       state.currentRequestId = action.meta.requestId
     })
     .addCase(thunk.fulfilled, (state, action) => {
-      if (!options.unconditionalFulfilled && action.meta.requestId !== state.currentRequestId) {
+      const isCurrent = options.unconditionalFulfilled || action.meta.requestId === state.currentRequestId
+      if (!isCurrent) {
         return
       }
       state.loading = false
