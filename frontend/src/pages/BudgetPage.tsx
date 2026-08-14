@@ -24,12 +24,13 @@ import type { TransactionResponse } from '../types/transaction'
 export default function BudgetPage() 
 {
   const dispatch = useAppDispatch();
-  const { 
-    budget, 
-    loading, 
-    error, 
-    currentYear, 
-    currentMonth
+  const {
+    budget,
+    loading,
+    error,
+    currentYear,
+    currentMonth,
+    creating
   } = useAppSelector(s => s.budget);
   
   const [draggingTransaction, setDraggingTransaction] = useState<TransactionResponse | null>(null);
@@ -203,11 +204,11 @@ export default function BudgetPage()
 
         <div className="mx-auto flex w-full max-w-295 items-start gap-6 px-4 py-6">
           <div className="min-w-0 flex-1">
-            {loading && !currentMonthBudget && (
+            {(loading || creating) && !currentMonthBudget && (
               <div className="text-muted py-12 text-center">Loading...</div>
             )}
 
-            {!loading && !currentMonthBudget && error === 'BUDGET_NOT_FOUND' && (
+            {!loading && !creating && !currentMonthBudget && error === 'BUDGET_NOT_FOUND' && (
               <div className="py-12 text-center">
                 <p className="text-muted mb-4">No budget for this month.</p>
                 {!isPastMonth && (
@@ -216,9 +217,10 @@ export default function BudgetPage()
               </div>
             )}
 
-            {!loading && 
-              !currentMonthBudget && 
-              error && 
+            {!loading &&
+              !creating &&
+              !currentMonthBudget &&
+              error &&
               error !== 'BUDGET_NOT_FOUND' && (
                 <div className="py-12 text-center text-accent-700">{error}</div>
             )}
