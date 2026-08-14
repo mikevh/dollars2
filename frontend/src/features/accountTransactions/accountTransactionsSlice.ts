@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { api } from '../../api/client'
+import { addStaleGuardedThunkCases } from '../../app/asyncThunkHelpers'
 import type { AccountTransactions } from '../../types/accountTransactions'
 
 interface AccountTransactionsState {
@@ -67,27 +68,14 @@ const accountTransactionsSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder
-      .addCase(fetchAccountTransactions.pending, (state, action) => {
-        state.loading = true
-        state.error = null
-        state.currentRequestId = action.meta.requestId
-      })
-      .addCase(fetchAccountTransactions.fulfilled, (state, action) => {
-        if (action.meta.requestId !== state.currentRequestId) {
-          return
-        }
-        state.loading = false
-        state.data = action.payload
-      })
-      .addCase(fetchAccountTransactions.rejected, (state, action) => {
-        if (action.meta.requestId !== state.currentRequestId) {
-          return
-        }
-        state.loading = false
+    addStaleGuardedThunkCases(builder, fetchAccountTransactions, {
+      onFulfilled: (state, payload) => {
+        state.data = payload
+      },
+      onRejected: (state) => {
         state.data = null
-        state.error = action.payload as string
-      })
+      },
+    })
   },
 })
 

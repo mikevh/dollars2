@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { api } from '../../api/client'
+import { addStaleGuardedThunkCases } from '../../app/asyncThunkHelpers'
 import type { BudgetResponse, BudgetGroupResponse, LineItemResponse } from '../../types/budget'
 
 interface BudgetState {
@@ -202,48 +203,24 @@ const budgetSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    addStaleGuardedThunkCases(builder, fetchBudget, {
+      onFulfilled: (state, payload) => {
+        state.budget = payload
+      },
+    })
+    // Unlike fetchBudget, a successful create is never stale — it's the one thing
+    // that actually brought the budget into existence, so it must win even if a
+    // fetchBudget dispatched while it was in flight (e.g. a TransactionPane mutation)
+    // resolved first and claimed currentRequestId. unconditionalFulfilled reclaims
+    // currentRequestId here so a still-in-flight, now-stale fetchBudget response
+    // landing after this can't clobber it either.
+    addStaleGuardedThunkCases(builder, createBudget, {
+      onFulfilled: (state, payload) => {
+        state.budget = payload
+      },
+      unconditionalFulfilled: true,
+    })
     builder
-      .addCase(fetchBudget.pending, (state, action) => {
-        state.loading = true
-        state.error = null
-        state.currentRequestId = action.meta.requestId
-      })
-      .addCase(fetchBudget.fulfilled, (state, action) => {
-        if (action.meta.requestId !== state.currentRequestId) {
-          return
-        }
-        state.loading = false
-        state.budget = action.payload
-      })
-      .addCase(fetchBudget.rejected, (state, action) => {
-        if (action.meta.requestId !== state.currentRequestId) {
-          return
-        }
-        state.loading = false
-        state.error = action.payload as string
-      })
-      .addCase(createBudget.pending, (state, action) => {
-        state.loading = true
-        state.error = null
-        state.currentRequestId = action.meta.requestId
-      })
-      .addCase(createBudget.fulfilled, (state, action) => {
-        // Unlike fetchBudget, a successful create is never stale — it's the one thing
-        // that actually brought the budget into existence, so it must win even if a
-        // fetchBudget dispatched while it was in flight (e.g. a TransactionPane mutation)
-        // resolved first and claimed currentRequestId. Reclaim it here so a still-in-flight,
-        // now-stale fetchBudget response landing after this can't clobber it either.
-        state.loading = false
-        state.budget = action.payload
-        state.currentRequestId = action.meta.requestId
-      })
-      .addCase(createBudget.rejected, (state, action) => {
-        if (action.meta.requestId !== state.currentRequestId) {
-          return
-        }
-        state.loading = false
-        state.error = action.payload as string
-      })
       .addCase(createGroup.fulfilled, (state, action) => {
         if (state.budget) {
           state.budget.groups.push(action.payload)
