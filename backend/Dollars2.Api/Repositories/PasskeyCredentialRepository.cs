@@ -42,30 +42,30 @@ public class PasskeyCredentialRepository
 
     /// <summary>
     /// Inserts a new credential, or updates the mutable fields (sign count, verification/backup
-    /// flags, friendly name) of an existing one matched by CredentialId.
+    /// flags, friendly name) of an existing one matched by CredentialId. A single atomic MERGE
+    /// rather than a separate exists-check + insert/update — the latter is a check-then-act race
+    /// between two concurrent upserts of the same brand-new CredentialId. HOLDLOCK takes a
+    /// serializable-equivalent lock on the matched range for the duration of the statement, so a
+    /// concurrent MERGE on the same CredentialId blocks instead of both taking the insert branch.
     /// </summary>
     public async Task UpsertAsync(PasskeyCredential credential)
     {
         await _db.Connection.ExecuteAsync(
             """
-            IF EXISTS (SELECT 1 FROM PasskeyCredentials WHERE CredentialId = @CredentialId)
-            BEGIN
-                UPDATE PasskeyCredentials
-                SET SignCount = @SignCount,
+            MERGE PasskeyCredentials WITH (HOLDLOCK) AS target
+            USING (SELECT @CredentialId AS CredentialId) AS source
+            ON target.CredentialId = source.CredentialId
+            WHEN MATCHED THEN
+                UPDATE SET
+                    SignCount = @SignCount,
                     IsUserVerified = @IsUserVerified,
                     IsBackupEligible = @IsBackupEligible,
                     IsBackedUp = @IsBackedUp,
                     Name = @Name,
                     UpdatedAt = SYSUTCDATETIME()
-                WHERE CredentialId = @CredentialId;
-            END
-            ELSE
-            BEGIN
-                INSERT INTO PasskeyCredentials
-                    (UserId, CredentialId, PublicKey, AttestationObject, ClientDataJson, SignCount, Transports, IsUserVerified, IsBackupEligible, IsBackedUp, Name, CreatedAt, UpdatedAt)
-                VALUES
-                    (@UserId, @CredentialId, @PublicKey, @AttestationObject, @ClientDataJson, @SignCount, @Transports, @IsUserVerified, @IsBackupEligible, @IsBackedUp, @Name, @CreatedAt, SYSUTCDATETIME());
-            END
+            WHEN NOT MATCHED THEN
+                INSERT (UserId, CredentialId, PublicKey, AttestationObject, ClientDataJson, SignCount, Transports, IsUserVerified, IsBackupEligible, IsBackedUp, Name, CreatedAt, UpdatedAt)
+                VALUES (@UserId, @CredentialId, @PublicKey, @AttestationObject, @ClientDataJson, @SignCount, @Transports, @IsUserVerified, @IsBackupEligible, @IsBackedUp, @Name, @CreatedAt, SYSUTCDATETIME());
             """,
             credential,
             _db.CurrentTransaction);
@@ -76,6 +76,19 @@ public class PasskeyCredentialRepository
         await _db.Connection.ExecuteAsync(
             "DELETE FROM PasskeyCredentials WHERE UserId = @userId AND CredentialId = @credentialId",
             new { userId, credentialId },
+            _db.CurrentTransaction);
+    }
+
+    /// <summary>
+    /// Removes every credential for a user — used both when deleting the user (IUserStore.DeleteAsync
+    /// has no ON DELETE CASCADE to rely on) and for lost-passkey recovery, where re-registering
+    /// revokes whatever credentials existed before (see issue #271/#272).
+    /// </summary>
+    public async Task<int> DeleteAllForUserAsync(int userId)
+    {
+        return await _db.Connection.ExecuteAsync(
+            "DELETE FROM PasskeyCredentials WHERE UserId = @userId",
+            new { userId },
             _db.CurrentTransaction);
     }
 }

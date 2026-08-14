@@ -68,7 +68,7 @@ migrated and freshly-created databases carry identical names.
 | CreatedAt | datetime2 | framework-supplied value, not a default |
 | UpdatedAt | datetime2 | |
 
-Backs ASP.NET Core Identity's `IUserPasskeyStore<TUser>` (migration 023). One row per registered
+Backs ASP.NET Core Identity's `IUserPasskeyStore<TUser>` (migration 024). One row per registered
 WebAuthn credential; a lost-passkey re-registration deletes the user's prior rows rather than
 accumulating them.
 

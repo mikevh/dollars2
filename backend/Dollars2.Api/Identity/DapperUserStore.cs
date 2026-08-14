@@ -45,21 +45,41 @@ public class DapperUserStore : IUserPasskeyStore<User>
 
     public async Task<IdentityResult> CreateAsync(User user, CancellationToken cancellationToken)
     {
+        if (await _users.GetByEmailAsync(user.Email) is not null)
+        {
+            return IdentityResult.Failed(DuplicateEmailError(user.Email));
+        }
+
         user.Id = await _users.CreateAsync(user.Email);
         return IdentityResult.Success;
     }
 
     public async Task<IdentityResult> UpdateAsync(User user, CancellationToken cancellationToken)
     {
+        var existing = await _users.GetByEmailAsync(user.Email);
+        if (existing is not null && existing.Id != user.Id)
+        {
+            return IdentityResult.Failed(DuplicateEmailError(user.Email));
+        }
+
         await _users.UpdateEmailAsync(user.Id, user.Email);
         return IdentityResult.Success;
     }
 
     public async Task<IdentityResult> DeleteAsync(User user, CancellationToken cancellationToken)
     {
+        // No ON DELETE CASCADE on FK_PasskeyCredentials_Users — clear the user's credentials first
+        // so the delete doesn't fail on the foreign key.
+        await _passkeys.DeleteAllForUserAsync(user.Id);
         await _users.DeleteAsync(user.Id);
         return IdentityResult.Success;
     }
+
+    private static IdentityError DuplicateEmailError(string email) => new()
+    {
+        Code = "DuplicateEmail",
+        Description = $"Email '{email}' is already in use.",
+    };
 
     public async Task<User?> FindByIdAsync(string userId, CancellationToken cancellationToken)
         => int.TryParse(userId, out var id) ? await _users.GetByIdAsync(id) : null;
