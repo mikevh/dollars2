@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent, Over } from '@dnd-kit/core'
@@ -56,10 +56,22 @@ export default function BudgetPage()
     dispatch(fetchBudget({ year: currentYear, month: currentMonth }));
   }, [dispatch, currentYear, currentMonth]);
 
+  // Synchronous guard against a fast double-click dispatching two overlapping
+  // createBudget thunks before the store update (which hides the button) re-renders —
+  // a ref reads as current-at-call-time, unlike a closed-over state value.
+  const creatingRef = useRef(false);
   const handleCreateBudget = async () => {
-    const result = await dispatch(createBudget({ year: currentYear, month: currentMonth }));
-    if (createBudget.rejected.match(result)) {
-      toast.error(result.payload as string);
+    if (creatingRef.current) {
+      return;
+    }
+    creatingRef.current = true;
+    try {
+      const result = await dispatch(createBudget({ year: currentYear, month: currentMonth }));
+      if (createBudget.rejected.match(result)) {
+        toast.error(result.payload as string);
+      }
+    } finally {
+      creatingRef.current = false;
     }
   };
 
@@ -67,8 +79,14 @@ export default function BudgetPage()
   // store rather than nulling it out, so the pane can stay mounted during a same-month
   // refresh. Gate rendering on the budget actually matching the month being viewed —
   // otherwise a month navigation would flash the month being left behind.
-  const currentMonthBudget = budget && budget.year === currentYear && 
+  const currentMonthBudget = budget && budget.year === currentYear &&
     budget.month === currentMonth ? budget : null;
+
+  // `creating` is scoped to the month a create was started for — a create left in
+  // flight after navigating elsewhere must not block this month's UI or be mistaken
+  // for a pending operation on it.
+  const isCreatingCurrentMonth = creating !== null && creating.year === currentYear && creating.month === currentMonth;
+  const budgetPending = loading || isCreatingCurrentMonth;
 
   const selectedLineItem = (() => {
     if (!currentMonthBudget || !selectedLineItemId) {
@@ -204,11 +222,11 @@ export default function BudgetPage()
 
         <div className="mx-auto flex w-full max-w-295 items-start gap-6 px-4 py-6">
           <div className="min-w-0 flex-1">
-            {(loading || creating) && !currentMonthBudget && (
+            {budgetPending && !currentMonthBudget && (
               <div className="text-muted py-12 text-center">Loading...</div>
             )}
 
-            {!loading && !creating && !currentMonthBudget && error === 'BUDGET_NOT_FOUND' && (
+            {!budgetPending && !currentMonthBudget && error === 'BUDGET_NOT_FOUND' && (
               <div className="py-12 text-center">
                 <p className="text-muted mb-4">No budget for this month.</p>
                 {!isPastMonth && (
@@ -217,8 +235,7 @@ export default function BudgetPage()
               </div>
             )}
 
-            {!loading &&
-              !creating &&
+            {!budgetPending &&
               !currentMonthBudget &&
               error &&
               error !== 'BUDGET_NOT_FOUND' && (

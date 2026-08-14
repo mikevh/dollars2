@@ -10,7 +10,10 @@ interface BudgetState {
   currentYear: number
   currentMonth: number
   currentRequestId: string | null
-  creating: boolean
+  // Tracks which month a create is in flight for — a create started for one month must
+  // not show as "in progress" for a different month navigated to in the meantime, and
+  // must not overwrite that other month's already-loaded budget when it settles.
+  creating: { year: number; month: number } | null
   createRequestId: string | null
 }
 
@@ -28,7 +31,7 @@ const initialState: BudgetState = {
   currentYear: initYear,
   currentMonth: initMonth,
   currentRequestId: null,
-  creating: false,
+  creating: null,
   createRequestId: null,
 }
 
@@ -217,25 +220,31 @@ const budgetSlice = createSlice({
     // TransactionPane mutation) still legitimately updates its own loading/error when
     // it settles — that alone would re-show the "Create Budget" empty state mid-create,
     // so BudgetPage must also gate that render on `creating`, not just `loading`.
+    // `creating` carries the {year, month} it was started for so a create left in
+    // flight while the user navigates to a different month neither blocks that
+    // month's UI nor overwrites its already-loaded budget when the create settles.
     // See issue #275.
     builder
       .addCase(createBudget.pending, (state, action) => {
         state.createRequestId = action.meta.requestId
-        state.creating = true
+        state.creating = { year: action.meta.arg.year, month: action.meta.arg.month }
+        state.error = null
       })
       .addCase(createBudget.fulfilled, (state, action) => {
         if (action.meta.requestId !== state.createRequestId) {
           return
         }
-        state.budget = action.payload
-        state.error = null
-        state.creating = false
+        state.creating = null
+        if (action.meta.arg.year === state.currentYear && action.meta.arg.month === state.currentMonth) {
+          state.budget = action.payload
+          state.error = null
+        }
       })
       .addCase(createBudget.rejected, (state, action) => {
         if (action.meta.requestId !== state.createRequestId) {
           return
         }
-        state.creating = false
+        state.creating = null
         // No store-level error write — BudgetPage.handleCreateBudget toasts from the
         // dispatch result directly and doesn't read state.error for create failures.
       })
