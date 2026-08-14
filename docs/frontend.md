@@ -21,9 +21,6 @@
 - `/accounts` — accounts list, grouped by connection, with per-connection sync + re-sync actions
 - `/accounts/:accountId` — paged transactions for one account (includes accounts excluded from the
   budget via `IncludeInBudget = 0`)
-- `/accounts/:accountId/sync-archive` — that account's sync archive, browsable run by run (see
-  below); reached from a link on `/accounts/:accountId`, not from a selector — there's no global
-  nav in this app
 
 All routes except `/login` sit behind an authenticated `Outlet` that redirects to `/login`.
 
@@ -142,25 +139,7 @@ All routes except `/login` sit behind an authenticated `Outlet` that redirects t
 
 ## Transaction Edit Dialog (Modal)
 
-### Tabs
-- Editing a transaction shows two tabs: **Details** (the form below) and **Raw History**
-- Creating one shows no tab bar — a transaction that doesn't exist yet has nothing archived
-- Edit state lives in the dialog, not in the form markup, so switching tabs never drops an
-  unsaved change
-
-### Raw History Tab
-- Every archived sighting of the transaction, newest first, from
-  `GET /api/transactions/{id}/raw-history` (see `docs/backend.md`)
-- Fetched through the `rawHistory` slice on the tab's first open, not on dialog mount — most
-  dialog opens never touch it
-- Each row is a collapsible header (synced-at instant in UTC, plus `posted`/`pending` read off
-  the payload's own flag); the newest sighting starts expanded
-- Payloads are pretty-printed client-side in a horizontally scrollable `<pre>`. A payload that
-  doesn't parse renders verbatim — a malformed payload is exactly what this view exists to reveal
-- Manual transactions get "No provider data"; a synced transaction with nothing archived gets
-  "No archived payloads". Neither is an error
-- A failed read renders inline in the tab, with no toast: a side-panel read shouldn't interrupt
-  someone mid-edit
+- A single form, no tab bar. Edit state lives in the dialog, not in the form markup.
 
 ### Money Inputs
 - Amount and split-amount fields are `type="text"` + `inputMode="decimal"`, guarded by
@@ -179,30 +158,6 @@ All routes except `/login` sit behind an authenticated `Outlet` that redirects t
 - All fields editable: date, description, amount, account, notes
 - Line item assignment with split support
 - Actions: unassign, delete (must unassign first)
-
-## Sync Archive Page
-
-- Route `/accounts/:accountId/sync-archive` (see Routing above); a "Sync archive" link on
-  `/accounts/:accountId` reaches it, shown only for synced accounts — manual accounts never sync,
-  so the link is never rendered for them (the route itself still resolves if typed directly, showing
-  an empty state explaining the account doesn't sync)
-- Lists that account's sync runs newest-first, from `GET /api/accounts/{id}/sync-archive?before=&limit=`
-  (see `docs/backend.md`, `docs/sync_archive.md`)
-- Each run is a collapsible row (synced-at instant, source, transaction/removed/skipped/error counts);
-  expanding it reveals the account metadata and the transaction, removed, provider-error, and
-  skipped-transaction items, each rendered through the same JSON viewer as the Raw History tab
-  (shared component — pretty-printed on click, falls back to verbatim text if the payload doesn't
-  parse). Skipped items are provider transactions the parser rejected (see `docs/sync_archive.md`)
-- Runs with provider errors get a visible marker — errors currently only reach Serilog and scroll
-  away, so this is the one place they're visible in the UI
-- "Load more" pages backwards via the endpoint's `nextBefore` cursor, hidden once it comes back null;
-  the fetch is cancellable so a stale response from a rapid "Load more" or a mid-fetch navigation
-  can never overwrite a newer one
-- Empty states: "This account has never synced." (not an error) versus "This account doesn't sync, so
-  there is nothing archived for it." for a manual account reached by typing the URL directly
-- A fetch error (including another user's account id, which 404s) renders inline with a Retry
-  button, plus a toast — a full-page read gets both, unlike the dialog tab's inline-only handling
-- Data fetching: Redux thunk, per the project convention
 
 ## Cross-Month Warning
 
