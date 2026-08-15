@@ -228,7 +228,6 @@ const budgetSlice = createSlice({
       .addCase(createBudget.pending, (state, action) => {
         state.createRequestId = action.meta.requestId
         state.creating = { year: action.meta.arg.year, month: action.meta.arg.month }
-        state.error = null
       })
       .addCase(createBudget.fulfilled, (state, action) => {
         if (action.meta.requestId !== state.createRequestId) {
@@ -245,8 +244,14 @@ const budgetSlice = createSlice({
           return
         }
         state.creating = null
-        // No store-level error write — BudgetPage.handleCreateBudget toasts from the
-        // dispatch result directly and doesn't read state.error for create failures.
+        // A failed create means there's still no budget for that month — restore the
+        // BUDGET_NOT_FOUND empty state (with its Create Budget button) rather than
+        // leaving whatever error value happened to be in state, but only if that
+        // month is still the one being viewed (BudgetPage.handleCreateBudget already
+        // toasts the failure from the dispatch result directly).
+        if (action.meta.arg.year === state.currentYear && action.meta.arg.month === state.currentMonth) {
+          state.error = 'BUDGET_NOT_FOUND'
+        }
       })
     builder
       .addCase(createGroup.fulfilled, (state, action) => {
