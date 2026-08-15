@@ -57,8 +57,9 @@ export default function BudgetPage()
   }, [dispatch, currentYear, currentMonth]);
 
   // Synchronous guard against a fast double-click dispatching two overlapping
-  // createBudget thunks before the store update (which hides the button) re-renders —
-  // a ref reads as current-at-call-time, unlike a closed-over state value.
+  // createBudget thunks before the disabled={creating !== null} button re-renders —
+  // a ref reads as current-at-call-time, unlike a closed-over state value. Global
+  // (not month-scoped), matching the store's single in-flight-create capability.
   const creatingRef = useRef(false);
   const handleCreateBudget = async () => {
     if (creatingRef.current) {
@@ -230,7 +231,18 @@ export default function BudgetPage()
               <div className="py-12 text-center">
                 <p className="text-muted mb-4">No budget for this month.</p>
                 {!isPastMonth && (
-                  <button onClick={handleCreateBudget} className="btn btn-primary">Create Budget</button>
+                  // The store only tracks one in-flight create at a time (budgetSlice's
+                  // single createRequestId/creating pair) — disable this button for every
+                  // month, not just the one being viewed, while any create is pending, so
+                  // a click for a different month gets visible feedback instead of being
+                  // silently swallowed by the creatingRef guard below.
+                  <button
+                    onClick={handleCreateBudget}
+                    disabled={creating !== null}
+                    className="btn btn-primary"
+                  >
+                    Create Budget
+                  </button>
                 )}
               </div>
             )}
