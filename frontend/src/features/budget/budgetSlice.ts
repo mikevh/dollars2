@@ -237,6 +237,15 @@ const budgetSlice = createSlice({
         if (action.meta.arg.year === state.currentYear && action.meta.arg.month === state.currentMonth) {
           state.budget = action.payload
           state.error = null
+          // Reclaim currentRequestId too: a fetchBudget for this same month dispatched
+          // before the create started (e.g. via TransactionPane) may still be in
+          // flight. Without this, its now-stale rejection landing after a successful
+          // create would still pass fetchBudget's own guard (its requestId still
+          // matches the untouched currentRequestId) and overwrite state.error back to
+          // a stale value — masked in the UI today only because state.budget stays
+          // correct, but a real inconsistency. Mirrors what the removed
+          // unconditionalFulfilled reclaim used to prevent. See issue #275.
+          state.currentRequestId = action.meta.requestId
         }
       })
       .addCase(createBudget.rejected, (state, action) => {
