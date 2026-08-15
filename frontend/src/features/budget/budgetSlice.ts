@@ -244,13 +244,13 @@ const budgetSlice = createSlice({
           return
         }
         state.creating = null
-        // A failed create means there's still no budget for that month — restore the
-        // BUDGET_NOT_FOUND empty state (with its Create Budget button) rather than
-        // leaving whatever error value happened to be in state, but only if that
-        // month is still the one being viewed (BudgetPage.handleCreateBudget already
-        // toasts the failure from the dispatch result directly).
+        // Restore the actual failure reason (e.g. BUDGET_EXISTS from a raced double
+        // create, not just a generic "not found") rather than leaving whatever error
+        // value happened to be in state, but only if that month is still the one
+        // being viewed. BudgetPage.handleCreateBudget also toasts this same payload
+        // from the dispatch result directly.
         if (action.meta.arg.year === state.currentYear && action.meta.arg.month === state.currentMonth) {
-          state.error = 'BUDGET_NOT_FOUND'
+          state.error = action.payload as string
         }
       })
     builder
