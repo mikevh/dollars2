@@ -15,14 +15,6 @@ public class PasskeyCredentialRepository
         _db = db;
     }
 
-    public async Task<PasskeyCredential?> FindByCredentialIdAsync(byte[] credentialId)
-    {
-        var sql = $"SELECT {SelectColumns} FROM PasskeyCredentials WHERE CredentialId = @credentialId";
-        var rv = await _db.Connection.QuerySingleOrDefaultAsync<PasskeyCredential>(sql, new { credentialId }, _db.CurrentTransaction);
-        
-        return rv;
-    }
-
     public async Task<PasskeyCredential?> FindByUserAndCredentialIdAsync(int userId, byte[] credentialId)
     {
         var sql = $"SELECT {SelectColumns} FROM PasskeyCredentials WHERE UserId = @userId AND CredentialId = @credentialId";

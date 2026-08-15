@@ -29,6 +29,19 @@ public class UserRepository
         return rv;
     }
 
+    public async Task<User?> GetByPasskeyCredentialIdAsync(byte[] credentialId)
+    {
+        var sql = """
+            SELECT u.Id, u.Email, u.RegistrationKey, u.CreatedAt, u.UpdatedAt
+            FROM Users u
+            INNER JOIN PasskeyCredentials pc ON pc.UserId = u.Id
+            WHERE pc.CredentialId = @credentialId
+            """;
+        var rv = await _db.Connection.QuerySingleOrDefaultAsync<User>(sql, new { credentialId }, _db.CurrentTransaction);
+
+        return rv;
+    }
+
     public async Task<IEnumerable<int>> GetAllIdsAsync()
     {
         var rv = await _db.Connection.QueryAsync<int>("SELECT Id FROM Users", null, _db.CurrentTransaction);

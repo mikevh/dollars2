@@ -96,11 +96,8 @@ public class DapperUserStore : IUserPasskeyStore<User>
         });
     }
 
-    public async Task<User?> FindByPasskeyIdAsync(byte[] credentialId, CancellationToken ct)
-    {
-        var cred = await _passkeys.FindByCredentialIdAsync(credentialId);
-        return cred is null ? null : await _users.GetByIdAsync(cred.UserId);
-    }
+    public async Task<User?> FindByPasskeyIdAsync(byte[] credentialId, CancellationToken ct) =>
+        await _users.GetByPasskeyCredentialIdAsync(credentialId);
 
     public async Task<UserPasskeyInfo?> FindPasskeyAsync(User u, byte[] credentialId, CancellationToken ct)
     {
