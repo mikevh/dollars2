@@ -1,5 +1,5 @@
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { loginThunkAsync } from '../features/auth/authSlice'
@@ -52,8 +52,11 @@ export default function LoginPage() {
               <p className="mt-1 text-[12px] text-accent-700">{errors.email.message}</p>
             )}
           </div>
-          <button type="submit" disabled={loading} className="btn btn-primary btn-block" >{loading ? 'Signing in…' : 'Sign in'}</button>
+          <button type="submit" disabled={loading} className="btn btn-primary btn-block" >{loading ? 'Waiting for passkey…' : 'Sign in'}</button>
         </form>
+        <p className="text-center text-[13px] text-neutral-700">
+          Have a registration key? <Link to="/register" className="underline">Register a passkey</Link>
+        </p>
       </div>
     </div>
   )

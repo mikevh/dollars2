@@ -5,7 +5,6 @@
 - Transfers between line items (use manual withdraw/deposit transactions instead in v1)
 - Account management UI (accounts created directly in DB for v1)
 - Account settings page
-- Proper auth with passkeys (v1 uses email-only login)
 - Open user registration (v1 users are added directly to DB)
 - Manual-only accounts (no bank link)
 - Responsive / mobile design

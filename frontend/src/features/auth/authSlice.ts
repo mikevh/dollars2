@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { api } from '../../api/client'
+import { performPasskeyAssertion, type PasskeyOptionsResponse } from './webauthn'
 
 interface AuthResponse {
   token: string
@@ -23,7 +24,19 @@ const initialState: AuthState = {
 
 export const loginThunkAsync = createAsyncThunk('auth/login',
   async (email: string, { rejectWithValue }) => {
-    const result = await api.post<AuthResponse>('/api/auth/login', { email })
+    const optionsResult = await api.post<PasskeyOptionsResponse>('/api/auth/passkey/login/options', { email })
+    if (optionsResult.error) {
+      return rejectWithValue(optionsResult.error.message)
+    }
+
+    let credentialJson: string
+    try {
+      credentialJson = await performPasskeyAssertion(optionsResult.data!.optionsJson)
+    } catch (err) {
+      return rejectWithValue(err instanceof Error ? err.message : 'Passkey sign-in failed.')
+    }
+
+    const result = await api.post<AuthResponse>('/api/auth/passkey/login/complete', { credentialJson })
     if (result.error) {
       return rejectWithValue(result.error.message)
     }

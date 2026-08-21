@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast'
 import { useAppSelector } from './app/hooks'
 import { useTheme } from './features/theme/useTheme'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 import BudgetPage from './pages/BudgetPage'
 import AccountsPage from './pages/AccountsPage'
 import AccountTransactionsPage from './pages/AccountTransactionsPage'
@@ -22,6 +23,7 @@ function App() {
           <Route path="/accounts/:accountId" element={<AccountTransactionsPage />} />
         </Route>
         <Route path="/login" element={ isAuthenticated ? <Navigate to="/" replace /> : <LoginPage /> } />
+        <Route path="/register" element={ isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage /> } />
       </Routes>
       { isAuthenticated && <Footer /> }
     </BrowserRouter>

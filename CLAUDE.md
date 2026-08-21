@@ -8,7 +8,7 @@ Zero-based budgeting web app (EveryDollar clone). Self-hosted, multi-user with s
 - **Backend:** .NET 10, ASP.NET Core Web API, Dapper, raw SQL
 - **Database:** MSSQL, raw SQL migrations (numbered, tracking table)
 - **Sync archive:** DynamoDB (`amazon/dynamodb-local`, self-hosted — no AWS account)
-- **Auth:** Email-only login (v1), JWT 30-day + refresh tokens
+- **Auth:** Passkey login (WebAuthn), JWT 30-day + refresh tokens
 
 ## Project Structure
 
@@ -26,7 +26,7 @@ Detailed product specs live in `docs/`. Read these before building new features:
 - `docs/budget_structure.md` — Monthly budgets, groups, line items, rollover mechanics, zero-based equation
 - `docs/transaction_handling.md` — Bank sync (Plaid/SimpleFIN), manual entry, drag-and-drop assignment, splits, deletion
 - `docs/accounts.md` — Per-user accounts, JSON connection details, v1 direct DB setup
-- `docs/auth_users.md` — Email-only login (v1), JWT + refresh tokens, multi-user isolation
+- `docs/auth_users.md` — Passkey login (WebAuthn), JWT + refresh tokens, multi-user isolation
 - `docs/ui_layout.md` — Page layout geometry only (pane split, scroll/pin behavior); component
   behavior lives in `docs/frontend.md`
 - `docs/backend.md` — Architecture, all API endpoints, bank sync service, provider abstraction
@@ -134,7 +134,7 @@ code-review findings. Labels: `bug`, `enhancement`, `documentation`, `tech-debt`
 
 ## Out of Scope (v1)
 
-Transfers, account management UI, passkeys, open registration, auto-categorization, debt tracking,
+Transfers, account management UI, open registration, auto-categorization, debt tracking,
 shared budgets, reporting/charts, mobile, CSV import/export, recurring transactions.
 
 `docs/out_of_scope.md` is the authoritative list — update it there, not here.

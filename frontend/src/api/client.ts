@@ -23,6 +23,7 @@ async function attemptRefresh(): Promise<boolean> {
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ refreshToken }),
     })
 
@@ -80,13 +81,18 @@ export async function apiRequest<T>(
     return headers
   }
 
+  // Only the passkey ceremony endpoints round-trip the HttpOnly ceremony cookie (AuthController) —
+  // every other endpoint authenticates via the bearer token in buildHeaders(), so it doesn't need
+  // the cookie sent cross-origin.
+  const credentials: RequestCredentials = endpoint.includes('/api/auth/') ? 'include' : 'same-origin'
+
   try {
-    let response = await fetch(url, { ...options, headers: buildHeaders() })
+    let response = await fetch(url, { ...options, credentials, headers: buildHeaders() })
 
     if (response.status === 401 && !endpoint.includes('/api/auth/')) {
       const refreshed = await refreshOnce()
       if (refreshed) {
-        response = await fetch(url, { ...options, headers: buildHeaders() })
+        response = await fetch(url, { ...options, credentials, headers: buildHeaders() })
       } else {
         forceLogout()
         return {
