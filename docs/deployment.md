@@ -7,7 +7,15 @@ and the deploy path.
 
 Deployed to **claw**, reachable over Tailscale (`claw.tail303da.ts.net`). The stack is LAN/tailnet
 only, never exposed to the public internet — that's why Elasticsearch runs single-node with
-security disabled and nothing in the stack terminates TLS.
+security disabled.
+
+The `frontend` and `backend` services each also terminate TLS (see below), for one reason only:
+passkeys (WebAuthn) require a secure context, so the app has to be reachable over HTTPS. This is
+not public-internet TLS — the cert is a private-CA leaf issued for `claw.tail303da.ts.net`, signed
+by a CA that only devices on the LAN/tailnet trust. The CA and its issued certs live outside this
+repo at `E:\ca` on the machine that manages them; see `E:\ca\claw-cert-notes.md` there for how the
+cert was made and how to install/renew it. `certs/claw.crt` and `certs/claw.key` (gitignored, like
+`.env`) must exist on claw before `docker compose up` for either service to start.
 
 ## Services
 
@@ -15,8 +23,8 @@ security disabled and nothing in the stack terminates TLS.
 
 | Service | Image | Purpose |
 |--------|--------|--------|
-| `backend` | built from `backend/Dollars2.Api` | the .NET API |
-| `frontend` | built from `frontend` | the React app, served on port 80 in-container (`8080:80`) |
+| `backend` | built from `backend/Dollars2.Api` | the .NET API, http on `5062:8080` and https on `5063:8443` |
+| `frontend` | built from `frontend` | the React app, served on port 80/443 in-container (`8080:80`, `8443:443`) |
 | `elasticsearch` | `docker.elastic.co/elasticsearch/elasticsearch:9.0.0` | log sink for the backend |
 | `kibana` | `docker.elastic.co/kibana/kibana:9.0.0` | browse/search logs, port `5601` |
 | `dynamodb` | `amazon/dynamodb-local` | sync archive storage (raw provider payloads) |

@@ -20,3 +20,6 @@ Thumbs.db
 
 # Environment
 *.env
+
+# TLS cert/key for the deployed HTTPS endpoints (see E:\ca\claw-cert-notes.md)
+/certs/

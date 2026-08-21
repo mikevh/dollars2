@@ -3,9 +3,16 @@ services:
     build: ./backend/Dollars2.Api
     ports:
       - "5062:8080"
+      - "5063:8443"
+    volumes:
+      # TLS cert for the https endpoint below — passkeys (WebAuthn) require a secure context.
+      # Private-CA leaf for the Tailscale hostname; see E:\ca\claw-cert-notes.md on the CA host.
+      - ./certs:/certs:ro
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_URLS: http://+:8080;https://+:8443
+      Kestrel__Certificates__Default__Path: /certs/claw.crt
+      Kestrel__Certificates__Default__KeyPath: /certs/claw.key
       ConnectionStrings__DefaultConnection: ${ConnectionStrings__DefaultConnection}
       Jwt__Secret: ${Jwt__Secret}
       Jwt__Issuer: Dollars2
@@ -39,6 +46,10 @@ services:
         VITE_KIBANA_URL: ${VITE_KIBANA_URL}
     ports:
       - "8080:80"
+      - "8443:443"
+    volumes:
+      # Same cert as the backend service above — see the note there.
+      - ./certs:/etc/nginx/certs:ro
     restart: unless-stopped
 
   # Log sink for the backend. Single-node with security disabled: this stack is only reachable on
