@@ -6,6 +6,7 @@ using Dollars2.Api.Data;
 using Dollars2.Api.Models;
 using Dollars2.Api.Repositories;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Dollars2.Api.Services;
@@ -19,6 +20,7 @@ public class AuthService
     private readonly IUserPasskeyStore<User> _passkeyStore;
     private readonly IPasskeyHandler<User> _passkeyHandler;
     private readonly IConfiguration _config;
+    private readonly IHostEnvironment _env;
 
     public AuthService(
         DbSession dbSession,
@@ -27,7 +29,8 @@ public class AuthService
         PasskeyCredentialRepository passkeyRepo,
         IUserPasskeyStore<User> passkeyStore,
         IPasskeyHandler<User> passkeyHandler,
-        IConfiguration config)
+        IConfiguration config,
+        IHostEnvironment env)
     {
         _dbSession = dbSession;
         _userRepo = userRepo;
@@ -36,6 +39,7 @@ public class AuthService
         _passkeyStore = passkeyStore;
         _passkeyHandler = passkeyHandler;
         _config = config;
+        _env = env;
     }
 
     public async Task<(DollarsApiResponse<PasskeyOptionsResponse> Response, string? AttestationState)> GetPasskeyRegistrationOptionsAsync(string email, string registrationKey, HttpContext httpContext)
@@ -147,6 +151,42 @@ public class AuthService
         }
 
         var user = assertion.User;
+
+        _dbSession.BeginTransaction();
+        try
+        {
+            await _refreshTokenRepo.DeleteExpiredForUserAsync(user.Id);
+            var result = await GenerateTokensAsync(user);
+            _dbSession.Commit();
+            return result;
+        }
+        catch
+        {
+            _dbSession.Rollback();
+            throw;
+        }
+    }
+
+    // Local-dev-only bypass so the passkey ceremony (which is bound to a specific rp.id) doesn't
+    // have to be re-registered every time someone points a local `dotnet run` at the real prod
+    // database to debug. Gated on IsDevelopment() rather than a config flag so there is nothing to
+    // forget to unset: launchSettings.json sets ASPNETCORE_ENVIRONMENT=Development for local runs,
+    // and docker-compose.yml hardcodes it to Production on claw, so this can't reach a real
+    // deployment. Checked here too, not just at the controller, in case a future caller reuses
+    // this method without going through that route.
+    public async Task<DollarsApiResponse<AuthResponse>> CompleteDevLoginAsync(string email)
+    {
+        if (!_env.IsDevelopment())
+        {
+            return DollarsApiResponse<AuthResponse>.Fail("Dev login is not available.", "DEV_LOGIN_DISABLED");
+        }
+
+        var user = await _userRepo.GetByEmailAsync(email);
+
+        if (user is null)
+        {
+            return DollarsApiResponse<AuthResponse>.Fail("User not found.", "USER_NOT_FOUND");
+        }
 
         _dbSession.BeginTransaction();
         try

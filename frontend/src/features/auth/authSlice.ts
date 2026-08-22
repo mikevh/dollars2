@@ -24,6 +24,17 @@ const initialState: AuthState = {
 
 export const loginThunkAsync = createAsyncThunk('auth/login',
   async (email: string, { rejectWithValue }) => {
+    // Passkeys are scoped to whatever rp.id the backend was reachable at when they were
+    // registered, which makes them awkward for local debugging against the real prod database
+    // (see /api/auth/dev/login's backend-side comment for why this is safe to skip in dev only).
+    if (import.meta.env.DEV) {
+      const devResult = await api.post<AuthResponse>('/api/auth/dev/login', { email })
+      if (devResult.error) {
+        return rejectWithValue(devResult.error.message)
+      }
+      return devResult.data!
+    }
+
     const optionsResult = await api.post<PasskeyOptionsResponse>('/api/auth/passkey/login/options', { email })
     if (optionsResult.error) {
       return rejectWithValue(optionsResult.error.message)

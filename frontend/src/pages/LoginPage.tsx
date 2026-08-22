@@ -52,7 +52,9 @@ export default function LoginPage() {
               <p className="mt-1 text-[12px] text-accent-700">{errors.email.message}</p>
             )}
           </div>
-          <button type="submit" disabled={loading} className="btn btn-primary btn-block" >{loading ? 'Waiting for passkey…' : 'Sign in'}</button>
+          <button type="submit" disabled={loading} className="btn btn-primary btn-block" >
+            {loading ? (import.meta.env.DEV ? 'Signing in…' : 'Waiting for passkey…') : 'Sign in'}
+          </button>
         </form>
         <p className="text-center text-[13px] text-neutral-700">
           Have a registration key? <Link to="/register" className="underline">Register a passkey</Link>

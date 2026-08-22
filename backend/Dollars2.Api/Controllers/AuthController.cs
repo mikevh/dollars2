@@ -81,6 +81,19 @@ public class AuthController : DollarsControllerBase
         return Ok(result);
     }
 
+    // Local-dev-only bypass — see the comment on AuthService.CompleteDevLoginAsync.
+    [HttpPost("dev/login")]
+    [AllowAnonymous]
+    public async Task<IActionResult> DevLogin([FromBody] DevLoginRequest request)
+    {
+        var result = await _authService.CompleteDevLoginAsync(request.Email);
+        if (result.Error is not null)
+        {
+            return Unauthorized(result);
+        }
+        return Ok(result);
+    }
+
     [HttpPost("refresh")]
     [AllowAnonymous]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
@@ -99,9 +112,10 @@ public class AuthController : DollarsControllerBase
         Response.Cookies.Append(cookieName, protectedState, new CookieOptions
         {
             HttpOnly = true,
-            // Deployment never terminates TLS (see docs/deployment.md) — a hardcoded Secure=true
-            // would make the browser silently drop this cookie over plain HTTP, breaking every
-            // ceremony. Match the scheme the request actually arrived on instead.
+            // Deployment is https-only (see docs/deployment.md), but local dev still runs over
+            // plain HTTP — a hardcoded Secure=true would make the browser silently drop this
+            // cookie there, breaking every ceremony locally. Match the scheme the request actually
+            // arrived on instead.
             Secure = Request.IsHttps,
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddMinutes(5),
