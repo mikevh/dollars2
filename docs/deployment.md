@@ -9,13 +9,14 @@ Deployed to **claw**, reachable over Tailscale (`claw.tail303da.ts.net`). The st
 only, never exposed to the public internet — that's why Elasticsearch runs single-node with
 security disabled.
 
-The `frontend` and `backend` services each also terminate TLS (see below), for one reason only:
-passkeys (WebAuthn) require a secure context, so the app has to be reachable over HTTPS. This is
-not public-internet TLS — the cert is a private-CA leaf issued for `claw.tail303da.ts.net`, signed
-by a CA that only devices on the LAN/tailnet trust. The CA and its issued certs live outside this
-repo at `E:\ca` on the machine that manages them; see `E:\ca\claw-cert-notes.md` there for how the
-cert was made and how to install/renew it. `certs/claw.crt` and `certs/claw.key` (gitignored, like
-`.env`) must exist on claw before `docker compose up` for either service to start.
+The `frontend` and `backend` services are HTTPS-only — no plain-HTTP fallback — for one reason:
+passkeys (WebAuthn) require a secure context. This is not public-internet TLS — the cert is a
+private-CA leaf issued for `claw.tail303da.ts.net`, signed by a CA that only devices on the
+LAN/tailnet trust. The CA and its issued certs live outside this repo at `E:\ca` on the machine
+that manages them; see `E:\ca\claw-cert-notes.md` there for how the cert was made and how to
+install/renew it. `certs/claw.crt` and `certs/claw.key` (gitignored, like `.env`) must exist on
+claw before `docker compose up` — without them neither service can start at all, since there is no
+HTTP listener to fall back to.
 
 ## Services
 
@@ -23,8 +24,8 @@ cert was made and how to install/renew it. `certs/claw.crt` and `certs/claw.key`
 
 | Service | Image | Purpose |
 |--------|--------|--------|
-| `backend` | built from `backend/Dollars2.Api` | the .NET API, http on `5062:8080` and https on `5063:8443` |
-| `frontend` | built from `frontend` | the React app, served on port 80/443 in-container (`8080:80`, `8443:443`) |
+| `backend` | built from `backend/Dollars2.Api` | the .NET API, https-only on `5063:8443` |
+| `frontend` | built from `frontend` | the React app, https-only on `8443:443` |
 | `elasticsearch` | `docker.elastic.co/elasticsearch/elasticsearch:9.0.0` | log sink for the backend |
 | `kibana` | `docker.elastic.co/kibana/kibana:9.0.0` | browse/search logs, port `5601` |
 | `dynamodb` | `amazon/dynamodb-local` | sync archive storage (raw provider payloads) |

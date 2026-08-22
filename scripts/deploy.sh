@@ -10,6 +10,11 @@
 # containers are up, then verify the frontend and backend actually serve HTTP
 # 200 over the Tailscale network. Exits non-zero on any failure.
 #
+# The app is https-only (see docs/deployment.md), served with a private-CA cert
+# (E:\ca\claw-cert-notes.md) — curl is told to skip cert verification (-k) here
+# purely so this script doesn't require that CA to be trusted on whatever
+# machine runs it; it's still a real TLS handshake and a real 200 check.
+#
 # Config can be overridden via environment variables, e.g.:
 #   SSH_HOST=10.0.0.215 ./scripts/deploy.sh
 #
@@ -18,8 +23,8 @@ set -euo pipefail
 SSH_HOST="${SSH_HOST:-claw.tail303da.ts.net}"
 SSH_USER="${SSH_USER:-m}"
 REMOTE_REPO_PATH="${REMOTE_REPO_PATH:-~/dollars2}"
-FRONTEND_URL="${FRONTEND_URL:-http://${SSH_HOST}:8080/}"
-BACKEND_HEALTH_URL="${BACKEND_HEALTH_URL:-http://${SSH_HOST}:5062/api/health}"
+FRONTEND_URL="${FRONTEND_URL:-https://${SSH_HOST}:8443/}"
+BACKEND_HEALTH_URL="${BACKEND_HEALTH_URL:-https://${SSH_HOST}:5063/api/health}"
 
 SSH_TARGET="${SSH_USER}@${SSH_HOST}"
 
@@ -34,8 +39,8 @@ ssh "$SSH_TARGET" "cd $REMOTE_REPO_PATH && VITE_BUILD_ID=\$(git rev-parse --shor
 echo "==> [3/5] Container status"
 ssh "$SSH_TARGET" "cd $REMOTE_REPO_PATH && docker compose ps"
 
-echo "==> [4/5] Verifying HTTP endpoints over the tailnet"
-frontend_code="$(curl -sS -m 10 -o /dev/null -w "%{http_code}" "$FRONTEND_URL" || echo "000")"
+echo "==> [4/5] Verifying HTTPS endpoints over the tailnet"
+frontend_code="$(curl -sS -k -m 10 -o /dev/null -w "%{http_code}" "$FRONTEND_URL" || echo "000")"
 echo "frontend (${FRONTEND_URL}): ${frontend_code}"
 
 # The backend needs a few seconds to boot after its container starts (Kestrel
@@ -45,7 +50,7 @@ echo "frontend (${FRONTEND_URL}): ${frontend_code}"
 backend_code="000"
 backend_body=""
 for attempt in $(seq 1 15); do
-  backend_response="$(curl -sS -m 10 -w $'\n%{http_code}' "$BACKEND_HEALTH_URL" || printf '\n000')"
+  backend_response="$(curl -sS -k -m 10 -w $'\n%{http_code}' "$BACKEND_HEALTH_URL" || printf '\n000')"
   backend_code="$(printf '%s' "$backend_response" | tail -n1)"
   backend_body="$(printf '%s' "$backend_response" | sed '$d')"
   if [ "$backend_code" = "200" ]; then

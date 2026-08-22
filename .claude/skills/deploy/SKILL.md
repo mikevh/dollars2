@@ -27,10 +27,11 @@ The server already has Docker, a clone of this repo, and a real `.env` file
      server's just-pulled short commit hash so the UI footer shows the
      running build
    - `docker compose ps` to confirm both containers are up
-   - **Required health verification** — real HTTP requests over the Tailscale
-     network to the frontend (`http://claw.tail303da.ts.net:8080/`) and the
-     backend health endpoint (`http://claw.tail303da.ts.net:5062/api/health`),
-     both of which must return `200`. The script exits non-zero if either
+   - **Required health verification** — real HTTPS requests over the Tailscale
+     network to the frontend (`https://claw.tail303da.ts.net:8443/`) and the
+     backend health endpoint (`https://claw.tail303da.ts.net:5063/api/health`),
+     both of which must return `200`. The app is HTTPS-only (no plain-HTTP
+     fallback — see `docs/deployment.md`). The script exits non-zero if either
      fails.
    - `docker image prune -f` to reclaim dangling-image disk space
 
